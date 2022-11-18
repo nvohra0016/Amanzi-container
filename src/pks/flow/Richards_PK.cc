@@ -180,7 +180,7 @@ void Richards_PK::Setup()
   if (!S_->HasRecord(pressure_key_)) {
     S_->Require<CV_t, CVS_t>(pressure_key_, Tags::DEFAULT, passwd_)
       .SetMesh(mesh_)->SetGhosted(true)->SetComponents(names, locations, ndofs);
-    AddDefaultPrimaryEvaluator_(pressure_key_);
+    AddDefaultPrimaryEvaluator(S_, pressure_key_);
   }
 
   // Require conserved quantity.
@@ -444,7 +444,7 @@ void Richards_PK::Setup()
   }
 
   if (!S_->HasEvaluator(temperature_key_, Tags::DEFAULT)) {
-    AddDefaultIndependentEvaluator_(temperature_key_, Tags::DEFAULT, 298.15);
+    AddDefaultIndependentEvaluator(S_, temperature_key_, Tags::DEFAULT, 298.15);
   }
 
   // Require additional components for the existing fields

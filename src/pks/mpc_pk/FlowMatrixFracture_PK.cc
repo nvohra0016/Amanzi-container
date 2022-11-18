@@ -75,7 +75,7 @@ void FlowMatrixFracture_PK::Setup()
   if (!S_->HasRecord("pressure")) {
     *S_->Require<CV_t, CVS_t>("pressure", Tags::DEFAULT)
       .SetMesh(mesh_domain_)->SetGhosted(true) = *cvs;
-    AddDefaultPrimaryEvaluator_("pressure", Tags::DEFAULT);
+    AddDefaultPrimaryEvaluator(S_, "pressure", Tags::DEFAULT);
   }
 
   // -- darcy flux
@@ -86,7 +86,7 @@ void FlowMatrixFracture_PK::Setup()
     S_->Require<CV_t, CVS_t>("volumetric_flow_rate", Tags::DEFAULT)
       .SetMesh(mesh_domain_)->SetGhosted(true)
       ->SetComponent(name, AmanziMesh::FACE, mmap, gmap, 1);
-    AddDefaultPrimaryEvaluator_("volumetric_flow_rate", Tags::DEFAULT);
+    AddDefaultPrimaryEvaluator(S_, "volumetric_flow_rate", Tags::DEFAULT);
   }
 
   // -- darcy flux for fracture
@@ -94,7 +94,7 @@ void FlowMatrixFracture_PK::Setup()
     auto cvs2 = Operators::CreateManifoldCVS(mesh_fracture_);
     *S_->Require<CV_t, CVS_t>("fracture-volumetric_flow_rate", Tags::DEFAULT)
       .SetMesh(mesh_fracture_)->SetGhosted(true) = *cvs2;
-    AddDefaultPrimaryEvaluator_("fracture-volumetric_flow_rate", Tags::DEFAULT);
+    AddDefaultPrimaryEvaluator(S_, "fracture-volumetric_flow_rate", Tags::DEFAULT);
   }
 
   // Require additional fields and evaluators
@@ -324,18 +324,6 @@ int FlowMatrixFracture_PK::ApplyPreconditioner(Teuchos::RCP<const TreeVector> X,
   Y->PutScalar(0.0);
   int ok = op_tree_pc_->ApplyInverse(*X, *Y);
   return ok; 
-}
-
-
-/* *******************************************************************
-* This should be refactored, see for simialr function in PK_Physical
-******************************************************************* */
-void FlowMatrixFracture_PK::AddDefaultPrimaryEvaluator_(const Key& key, const Tag& tag)
-{
-  Teuchos::ParameterList elist(key);
-  elist.set<std::string>("tag", tag.get());
-  auto eval = Teuchos::rcp(new EvaluatorPrimary<CompositeVector, CompositeVectorSpace>(elist));
-  S_->SetEvaluator(key, tag, eval);
 }
 
 }  // namespace Amanzi
