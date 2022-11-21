@@ -950,13 +950,6 @@ Teuchos::ParameterList InputConverterU::TranslateFlowFractures_(const std::strin
     node = GetUniqueElementByTagsString_(inode, "assigned_regions", flag);
     std::vector<std::string> regions = CharToStrings_(mm.transcode(node->getTextContent()));
 
-    if (domain == "fracture") {
-      for (int n = 0; n < regions.size(); ++n)
-          fracture_regions_.push_back(regions[n]);
-      fracture_regions_.erase(SelectUniqueEntries(fracture_regions_.begin(), fracture_regions_.end()),
-                              fracture_regions_.end());
-    }
-
     // get permeability
     std::string type, model;
     node = GetUniqueElementByTagsString_(inode, "fracture_permeability", flag);

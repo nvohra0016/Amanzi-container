@@ -18,6 +18,7 @@
 #include "FlowReactiveTransport_PK.hh"
 
 #include "ChemistryMatrixFracture_PK.hh"
+#include "MultiphaseMatrixFracture_PK.hh"
 #include "ReactiveTransport_PK.hh"
 #include "ReactiveTransportMatrixFracture_PK.hh"
 #include "ShallowWaterTransport_PK.hh"
@@ -36,6 +37,7 @@ RegisteredPKFactory<FlowEnergy_PK> FlowEnergy_PK::reg_("thermal flow");
 RegisteredPKFactory<FlowEnergyMatrixFracture_PK> FlowEnergyMatrixFracture_PK::reg_("thermal flow matrix fracture");
 RegisteredPKFactory<FlowReactiveTransport_PK> FlowReactiveTransport_PK::reg_("flow reactive transport");
 RegisteredPKFactory<FlowMatrixFracture_PK> FlowMatrixFracture_PK::reg_("darcy matrix fracture");
+RegisteredPKFactory<MultiphaseMatrixFracture_PK> MultiphaseMatrixFracture_PK::reg_("multiphase matrix fracture");
 
 RegisteredPKFactory<ReactiveTransport_PK> ReactiveTransport_PK::reg_("reactive transport");
 
