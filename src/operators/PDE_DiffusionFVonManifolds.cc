@@ -63,6 +63,9 @@ void PDE_DiffusionFVonManifolds::Init_(Teuchos::ParameterList& plist)
     Exceptions::amanzi_throw(msg);
   }
 
+  // other options
+  gravity_ = plist.get<bool>("gravity");
+
   // solution-independent data
   auto cvs = Operators::CreateManifoldCVS(mesh_);
   beta_ = Teuchos::rcp(new CompositeVector(*cvs, true));
@@ -117,6 +120,12 @@ void PDE_DiffusionFVonManifolds::UpdateMatrices(
   const auto& beta_f = *beta_->ViewComponent("face", true);
   const auto& fmap = *beta_->Map().Map("face", true);
 
+  const std::vector<int>& bc_model = bcs_trial_[0]->bc_model();
+
+  int d = mesh_->space_dimension();
+  auto& rhs_c = *global_op_->rhs()->ViewComponent("cell");
+  global_op_->rhs()->PutScalarGhosted(0.0);
+
   // preparing upwind data
   Teuchos::RCP<const Epetra_MultiVector> k_f = Teuchos::null;
   if (k_ != Teuchos::null) {
@@ -125,7 +134,8 @@ void PDE_DiffusionFVonManifolds::UpdateMatrices(
   }
 
   // updating matrix blocks
-  AmanziMesh::Entity_ID_List cells, faces;
+  AmanziMesh::Entity_ID_List cells;
+  WhetStone::DenseVector v(2), av(2);
 
   for (int f = 0; f != nfaces_owned; ++f) {
     int g = fmap.FirstPointInElement(f);
@@ -155,7 +165,39 @@ void PDE_DiffusionFVonManifolds::UpdateMatrices(
       }
     }
     local_op_->matrices[f] = Aface;
+
+    if (gravity_) {
+      if (bc_model[f] == OPERATOR_BC_NEUMANN) {
+        // skip
+      } else if (bc_model[f] == OPERATOR_BC_DIRICHLET) {
+        double factor = rho_ * norm(g_);
+        mesh_->face_get_cells(f, AmanziMesh::Parallel_type::ALL, &cells);
+        int c = cells[0];
+
+        double zc = (mesh_->cell_centroid(c))[d - 1];
+        double zf = (mesh_->face_centroid(f))[d - 1];
+        rhs_c[0][cells[0]] += factor * Aface(0, 0) * (zc - zf); 
+      } else {
+        double factor = rho_ * norm(g_);
+        v.Reshape(ndofs);
+        av.Reshape(ndofs);
+
+        mesh_->face_get_cells(f, AmanziMesh::Parallel_type::ALL, &cells);
+        for (int n = 0; n < ndofs; ++n) {
+          double zc = (mesh_->cell_centroid(cells[n]))[d - 1];
+          v(n) = zc * factor;
+        }
+
+        Aface.Multiply(v, av, false);
+
+        for (int n = 0; n < ndofs; ++n) {
+          rhs_c[0][cells[n]] += av(n); 
+        } 
+      }
+    }
   }
+
+  global_op_->rhs()->GatherGhostedToMaster("cell", Add);
 }
 
 
@@ -219,12 +261,13 @@ void PDE_DiffusionFVonManifolds::UpdateFlux(
     k_f = k_->ViewComponent("face", true);
   }
 
+  solution->ScatterMasterToGhosted("cell");
   const auto& p = *solution->ViewComponent("cell", true);
   auto& flux = *mass_flux->ViewComponent("face", false);
 
-  int dir;
+  int dir, d(mesh_->space_dimension());
   AmanziMesh::Entity_ID_List cells;
-  WhetStone::DenseVector v(2), av(2);
+  WhetStone::DenseVector ti(2), pi(2);
 
   for (int f = 0; f < nfaces_owned; ++f) {
     int g = fmap.FirstPointInElement(f);
@@ -235,7 +278,15 @@ void PDE_DiffusionFVonManifolds::UpdateFlux(
       int c = getFaceOnBoundaryInternalCell(*mesh_, f);
       getFaceNormalExterior(*mesh_, f, &dir);
 
-      flux[0][g] = dir * beta_f[0][g] * (p[0][c] - value);
+      double tmp = p[0][c] - value;
+      if (gravity_) {
+        double factor = rho_ * norm(g_);
+        double zc = (mesh_->cell_centroid(c))[d - 1];
+        double zf = (mesh_->face_centroid(f))[d - 1];
+        tmp += factor * (zf - zc); 
+      }
+
+      flux[0][g] = dir * beta_f[0][g] * tmp;
       if (k_f.get()) flux[0][g] *= (*k_f)[0][g];
 
     } else if (bc_model[f] == OPERATOR_BC_NEUMANN) {
@@ -245,14 +296,26 @@ void PDE_DiffusionFVonManifolds::UpdateFlux(
       flux[0][g] = dir * value * area;
         
     } else {
+      double factor = rho_ * norm(g_);
+      ti.Reshape(ndofs);
+      pi.Reshape(ndofs);
+
       mesh_->face_get_cells(f, AmanziMesh::Parallel_type::ALL, &cells);
-      v.Reshape(ndofs);
-      av.Reshape(ndofs);
-      for (int i = 0; i < ndofs; ++i) v(i) = p[0][cells[i]];
 
-      local_op_->matrices[f].Multiply(v, av, false);
+      double sum(0.0), pf(0.0);
+      for (int i = 0; i != ndofs; ++i) {
+        ti(i) = beta_f[0][g + i] * (k_f.get() ? (*k_f)[0][g + i] : 1.0);
+        sum += ti(i);
 
-      for (int i = 0; i < ndofs; ++i) flux[0][g + i] = av(i);
+        double zc = (mesh_->cell_centroid(cells[i]))[d - 1];
+        pi(i) = p[0][cells[i]] - factor * zc;
+        pf += ti(i) * pi(i);
+      }
+      pf /= sum;
+
+      for (int i = 0; i < ndofs; ++i) {
+        flux[0][g + i] = -ti(i) * (pf - pi(i));
+      }
     }
   }
 }

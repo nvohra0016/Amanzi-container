@@ -28,7 +28,7 @@
 #include "WhetStoneDefs.hh"
 
 // Amanzi::Operators
-#include "Analytic00.hh"
+#include "Analytic00b.hh"
 #include "Operator.hh"
 #include "OperatorDefs.hh"
 #include "PDE_DiffusionFVonManifolds.hh"
@@ -47,7 +47,7 @@ void RunTest(int icase, double gravity) {
   auto comm = Amanzi::getDefaultComm();
   int MyPID = comm->MyPID();
 
-  if (MyPID == 0) std::cout << "\nTest: FV scheme for diffusion in fractures: " << icase << std::endl;
+  if (MyPID == 0) std::cout << "\nTest: FV scheme for diffusion in fractures g=" << gravity << std::endl;
 
   // read parameter list
   std::string xmlFileName = "test/operator_diffusion_dfn_fv.xml";
@@ -70,10 +70,11 @@ void RunTest(int icase, double gravity) {
   int nfaces_owned = surfmesh->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
   int nfaces_wghost = surfmesh->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::ALL);
 
-  double g(0.0), K((icase == 0) ? 1.0 : 2.0);  
-  Analytic00 ana(surfmesh, 1, g, Point(2), K);
+  double rho(1.0);
+  AmanziGeometry::Point v(3);
+  Analytic00b ana(surfmesh, 1.0, 2.0, 3.0, 1, v, gravity);
 
-  // create boundary data (no mixed bc)
+  // create boundary data (Dirichlet everywhere)
   Teuchos::RCP<BCs> bc = Teuchos::rcp(new BCs(surfmesh, AmanziMesh::FACE, WhetStone::DOF_Type::SCALAR));
   std::vector<int>& bc_model = bc->bc_model();
   std::vector<double>& bc_value = bc->bc_value();
@@ -116,8 +117,10 @@ void RunTest(int icase, double gravity) {
     op->SetScalarCoefficient(Teuchos::null, Teuchos::null);
   } else if (icase == 1) {
     auto k = Teuchos::rcp(new CompositeVector(*cvs2));
-    k->PutScalar(2.0);
+    k->PutScalar(1.0);
     op->SetScalarCoefficient(k, Teuchos::null);
+    op->SetDensity(rho);
+    op->SetGravity(gvec);
   }
 
   Teuchos::RCP<Operator> global_op = op->global_operator();
@@ -186,6 +189,6 @@ TEST(DIFFUSION_FRACTURES_FV_NO_K) {
 }
 
 TEST(DIFFUSION_FRACTURES_FV_K) {
-  RunTest(1, 0.0);
+  RunTest(1, 1.0);
 }
 

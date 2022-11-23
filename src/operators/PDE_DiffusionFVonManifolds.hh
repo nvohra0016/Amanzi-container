@@ -97,9 +97,9 @@ class PDE_DiffusionFVonManifolds : public virtual PDE_Diffusion,
 
   void Init_(Teuchos::ParameterList& plist);
   
- protected:
+ private:
   Teuchos::RCP<CompositeVector> beta_;  // static part of transmissibility
-  bool beta_initialized_;
+  bool beta_initialized_, gravity_;
 };
 
 }  // namespace Operators
