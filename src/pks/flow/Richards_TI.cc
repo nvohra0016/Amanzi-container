@@ -61,7 +61,7 @@ void Richards_PK::FunctionalResidual(
   if (!flow_on_manifold_) {
     *alpha_upwind_->ViewComponent("cell") = *alpha.ViewComponent("cell");
     Operators::BoundaryFacesToFaces(bc_model, alpha, *alpha_upwind_);
-    upwind_->Compute(*vol_flowrate_copy, *u_new->Data(), bc_model, *alpha_upwind_);
+    upwind_->Compute(*vol_flowrate_copy, bc_model, *alpha_upwind_);
 
     // modify relative permeability coefficient for influx faces
     // UpwindInflowBoundary_New(u_new->Data());
@@ -72,7 +72,7 @@ void Richards_PK::FunctionalResidual(
 
     *alpha_upwind_dP_->ViewComponent("cell") = *alpha_dP.ViewComponent("cell");
     Operators::BoundaryFacesToFaces(bc_model, alpha_dP, *alpha_upwind_dP_);
-    upwind_->Compute(*vol_flowrate_copy, *u_new->Data(), bc_model, *alpha_upwind_dP_);
+    upwind_->Compute(*vol_flowrate_copy, bc_model, *alpha_upwind_dP_);
   }
 
   // assemble residual for diffusion operator
@@ -349,7 +349,7 @@ void Richards_PK::UpdatePreconditioner(double tp, Teuchos::RCP<const TreeVector>
   if (!flow_on_manifold_) {
     *alpha_upwind_->ViewComponent("cell") = *alpha.ViewComponent("cell");
     Operators::BoundaryFacesToFaces(bc_model, alpha, *alpha_upwind_);
-    upwind_->Compute(*vol_flowrate_copy, *u->Data(), bc_model, *alpha_upwind_);
+    upwind_->Compute(*vol_flowrate_copy, bc_model, *alpha_upwind_);
 
     // modify relative permeability coefficient for influx faces
     // UpwindInflowBoundary_New(u->Data());
@@ -360,7 +360,7 @@ void Richards_PK::UpdatePreconditioner(double tp, Teuchos::RCP<const TreeVector>
 
     *alpha_upwind_dP_->ViewComponent("cell") = *alpha_dP.ViewComponent("cell");
     Operators::BoundaryFacesToFaces(bc_model, alpha_dP, *alpha_upwind_dP_);
-    upwind_->Compute(*vol_flowrate_copy, *u->Data(), bc_model, *alpha_upwind_dP_);
+    upwind_->Compute(*vol_flowrate_copy, bc_model, *alpha_upwind_dP_);
   }
 
   // create diffusion operators

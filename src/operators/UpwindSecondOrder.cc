@@ -41,9 +41,9 @@ void UpwindSecondOrder::Init(Teuchos::ParameterList& plist)
 /* ******************************************************************
 * Flux-based upwind consistent with mimetic discretization.
 ****************************************************************** */
-void UpwindSecondOrder::Compute(
-    const CompositeVector& flux, const CompositeVector& solution,
-    const std::vector<int>& bc_model, CompositeVector& field)
+void UpwindSecondOrder::Compute(const CompositeVector& flux,
+                                const std::vector<int>& bc_model,
+                                CompositeVector& field)
 {
   AMANZI_ASSERT(field.HasComponent("cell"));
   AMANZI_ASSERT(field.HasComponent("grad"));
@@ -53,7 +53,6 @@ void UpwindSecondOrder::Compute(
   flux.ScatterMasterToGhosted("face");
 
   const Epetra_MultiVector& flx_face = *flux.ViewComponent("face", true);
-  // const Epetra_MultiVector& sol_face = *solution.ViewComponent("face", true);
 
   const Epetra_MultiVector& fld_cell = *field.ViewComponent("cell", true);
   const Epetra_MultiVector& fld_grad = *field.ViewComponent("grad", true);

@@ -38,9 +38,9 @@ void UpwindFlux::Init(Teuchos::ParameterList& plist)
 * Upwind field uses flux. The result is placed in field.
 * Upwinded field must be calculated on all faces of the owned cells.
 ****************************************************************** */
-void UpwindFlux::Compute(
-    const CompositeVector& flux, const CompositeVector& solution,
-    const std::vector<int>& bc_model, CompositeVector& field)
+void UpwindFlux::Compute(const CompositeVector& flux,
+                         const std::vector<int>& bc_model,
+                         CompositeVector& field)
 {
   AMANZI_ASSERT(field.HasComponent("cell"));
   AMANZI_ASSERT(field.HasComponent(face_comp_));

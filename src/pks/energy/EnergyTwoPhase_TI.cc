@@ -40,7 +40,7 @@ void EnergyTwoPhase_PK::FunctionalResidual(
 
     const auto& bc_model = op_bc_->bc_model();
     Operators::CellToBoundaryFaces(bc_model, *upw_conductivity_);
-    upwind_->Compute(*flux, *u_new->Data(), bc_model, *upw_conductivity_);
+    upwind_->Compute(*flux, bc_model, *upw_conductivity_);
   }
 
   // assemble residual for diffusion operator
@@ -110,7 +110,7 @@ void EnergyTwoPhase_PK::UpdatePreconditioner(
     auto flux = S_->GetPtr<CompositeVector>(vol_flowrate_key_, Tags::DEFAULT);
     const auto& bc_model = op_bc_->bc_model();
     Operators::CellToBoundaryFaces(bc_model, *upw_conductivity_);
-    upwind_->Compute(*flux, *up->Data(), bc_model, *upw_conductivity_);
+    upwind_->Compute(*flux, bc_model, *upw_conductivity_);
   }
 
   // assemble matrices for diffusion operator

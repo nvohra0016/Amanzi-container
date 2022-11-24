@@ -101,7 +101,7 @@ void Multiphase_PK::FunctionalResidual(double t_old, double t_new,
         // -- upwind cell-centered coefficient
         auto& flux = S_->GetW<CompositeVector>(flux_names_[phase], passwd_);
         kr_c = *S_->Get<CompositeVector>(fname).ViewComponent("cell");
-        upwind_->Compute(flux, *kr, bcnone, *kr);
+        upwind_->Compute(flux, bcnone, *kr);
 
         // -- form diffusion operator
         //    BCs are defined by the equation and must be imposed only once 
@@ -132,7 +132,7 @@ void Multiphase_PK::FunctionalResidual(double t_old, double t_new,
         S_->GetEvaluator(fname).Update(*S_, passwd_);
         auto& flux = S_->GetW<CompositeVector>(flux_names_[phase], passwd_);
         kr_c = *S_->Get<CompositeVector>(fname).ViewComponent("cell");
-        upwind_->Compute(flux, *kr, bcnone, *kr);
+        upwind_->Compute(flux, bcnone, *kr);
 
         // -- form diffusion operator
         AMANZI_ASSERT(op_bcs_.find(gname) != op_bcs_.end());
@@ -308,7 +308,7 @@ void Multiphase_PK::UpdatePreconditioner(double tp, Teuchos::RCP<const TreeVecto
               kr_c[0][c] = (*der_c)[0][c] * coef_c[0][c];
             }
             auto& flux = S_->GetW<CompositeVector>(flux_names_[phase], passwd_);
-            upwind_->Compute(flux, *kr, bcnone, *kr);
+            upwind_->Compute(flux, bcnone, *kr);
 
             pde->Setup(Kptr, kr, Teuchos::null);
             pde->SetBCs(op_bcs_[keyc], op_bcs_[keyc]);
@@ -352,7 +352,7 @@ void Multiphase_PK::UpdatePreconditioner(double tp, Teuchos::RCP<const TreeVecto
             S_->GetEvaluator(fname).UpdateDerivative(*S_, passwd_, keyc, Tags::DEFAULT);
             kr_c = *S_->GetDerivative<CompositeVector>(fname, Tags::DEFAULT, keyc, Tags::DEFAULT).ViewComponent("cell");
             const auto& flux = S_->Get<CompositeVector>(flux_names_[phase]);
-            upwind_->Compute(flux, *kr, bcnone, *kr);
+            upwind_->Compute(flux, bcnone, *kr);
 
             // --- calculate advective flux 
             S_->GetEvaluator(gname).Update(*S_, passwd_);
@@ -394,7 +394,7 @@ void Multiphase_PK::UpdatePreconditioner(double tp, Teuchos::RCP<const TreeVecto
               kr_c[0][c] = (*der_c)[0][c] * coef_c[0][c];
             }
             auto& flux = S_->GetW<CompositeVector>(flux_names_[phase], passwd_);
-            upwind_->Compute(flux, *kr, bcnone, *kr);
+            upwind_->Compute(flux, bcnone, *kr);
 
             pde->Setup(Teuchos::null, kr, Teuchos::null);
             pde->SetBCs(op_bcs_[keyr], op_bcs_[keyr]);
@@ -439,7 +439,7 @@ void Multiphase_PK::UpdatePreconditioner(double tp, Teuchos::RCP<const TreeVecto
 
             // --- upwind derivative
             const auto& flux = S_->Get<CompositeVector>(flux_names_[phase]);
-            upwind_->Compute(flux, *kr, bcnone, *kr);
+            upwind_->Compute(flux, bcnone, *kr);
 
             // --- calculate advective flux 
             S_->GetEvaluator(gname).Update(*S_, passwd_);
