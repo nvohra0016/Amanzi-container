@@ -49,7 +49,7 @@ RunTestMarshak(std::string op_list_name, double TemperatureFloor)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0) std::cout << "\nTest: Simulating nonlinear Marshak wave" << std::endl;
 
@@ -63,32 +63,36 @@ RunTestMarshak(std::string op_list_name, double TemperatureFloor)
   Teuchos::RCP<GeometricModel> gm = Teuchos::rcp(new GeometricModel(2, region_list, *comm));
 
   MeshFactory meshfactory(comm, gm);
-  meshfactory.set_preference(Preference({ Framework::MSTK}));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
   // RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 3.0, 1.0, 200, 10);
   RCP<const Mesh> mesh = meshfactory.create("test/marshak.exo");
 
   // Create nonlinear coefficient.
   Teuchos::RCP<HeatConduction> knc = Teuchos::rcp(new HeatConduction(mesh, TemperatureFloor));
 
-  // modify diffusion coefficient
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
   int ncells_owned = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
-  for (int c = 0; c < ncells_owned; c++) {
-    WhetStone::Tensor Kc(2, 1);
-    Kc(0, 0) = 1.0;
-    K->push_back(Kc);
-  }
+  // modify diffusion coefficient
+  CompositeVectorSpace K_map;
+  K_map.SetMesh(mesh);
+  K_map.AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1);
+  auto K = Teuchos::rcp(new TensorVector(K_map));
+
+  std::vector<WhetStone::Tensor<DefaultHostMemorySpace>> host_tensors(K->size());
+  WhetStone::Tensor<DefaultHostMemorySpace> Kc;
+  Kc.Init(2, 1);
+  Kc(0, 0) = 1.0;
+  for (int c = 0; c < K->size(); c++) { host_tensors[c].assign(Kc); }
+  K->Init(host_tensors);
 
   // create boundary data (no mixed bc)
   Teuchos::RCP<BCs> bc = Teuchos::rcp(new BCs(mesh, AmanziMesh::Entity_kind::FACE, WhetStone::DOF_Type::SCALAR));
-  std::vector<int>& bc_model = bc->bc_model();
-  std::vector<double>& bc_value = bc->bc_value();
+  auto bc_model = bc->bc_model();
+  auto bc_value = bc->bc_value();
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
+    const Point& xf = mesh->getFaceCentroid(f)
 
     if (fabs(xf[1]) < 1e-6 || fabs(xf[1] - 1.0) < 1e-6) {
       bc_model[f] = Operators::OPERATOR_BC_NEUMANN;
@@ -113,21 +117,16 @@ RunTestMarshak(std::string op_list_name, double TemperatureFloor)
     cvs->SetMesh(mesh)->SetGhosted(true)->AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1);
   }
 
-  Teuchos::RCP<CompositeVector> solution = Teuchos::rcp(new CompositeVector(*cvs));
-  solution->PutScalar(knc->TemperatureFloor); // solution at time T=0
-
+  Teuchos::RCP<CompositeVector> solution = Teuchos::rcp(new CompositeVector(cvs->CreateSpace()));
+  solution->putScalar(knc->TemperatureFloor); // solution at time T=0
   // Create and initialize flux field.
-  Teuchos::RCP<CompositeVector> flux = Teuchos::rcp(new CompositeVector(knc->values()->Map()));
-  Epetra_MultiVector& flx = *flux->ViewComponent("face", true);
+  Teuchos::RCP<CompositeVectorSpace> cvs_flux = Teuchos::rcp(new CompositeVectorSpace());
+  cvs_flux->SetMesh(mesh)->SetComponent("face", AmanziMesh::Entity_kind::FACE, 1)->SetGhosted(true);
+  auto flux = cvs_flux->Create();
+  // op->UpdateFlux(solution.ptr(), flux.ptr());
 
-  Point velocity(0.0, 0.0);
-  for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& normal = mesh->getFaceNormal(f);
-    flx[0][f] = velocity * normal;
-  }
-
-  CompositeVector heat_capacity(*cvs);
-  heat_capacity.PutScalar(1.0);
+  CompositeVector heat_capacity(cvs->CreateSpace());
+  heat_capacity.putScalar(1.0);
 
   // Create upwind model
   ParameterList& ulist = plist.sublist("PK operator").sublist("upwind");
@@ -145,23 +144,22 @@ RunTestMarshak(std::string op_list_name, double TemperatureFloor)
 
     // update bc
     for (int f = 0; f < nfaces_wghost; f++) {
-      const Point& xf = mesh->getFaceCentroid(f);
+      const Point& xf = mesh->getFaceCentroid(f)
       if (fabs(xf[0]) < 1e-6) bc_value[f] = knc->exact(t + dt, xf);
     }
 
     // upwind heat conduction coefficient
-    knc->UpdateValues(*solution, bc_model, bc_value);
-    upwind.Compute(*flux, bc_model, *knc->values());
+    knc->UpdateValues(*solution, *bc);
+    upwind.Compute(*flux, *solution, bc_model, *knc->values());
 
     // add diffusion operator
     Teuchos::ParameterList olist = plist.sublist("PK operator").sublist(op_list_name);
     PDE_DiffusionFactory diff_factory;
     Teuchos::RCP<PDE_Diffusion> op = diff_factory.Create(olist, mesh, bc);
-
     op->Setup(K, knc->values(), knc->derivatives());
     op->UpdateMatrices(flux.ptr(), solution.ptr());
-
     // get the global operator
+
     Teuchos::RCP<Operator> global_op = op->global_operator();
 
     // add accumulation terms
@@ -172,20 +170,19 @@ RunTestMarshak(std::string op_list_name, double TemperatureFloor)
     op->ApplyBCs(true, true, true);
     global_op->set_inverse_parameters(
       "Hypre AMG", plist.sublist("preconditioners"), "Amanzi GMRES", plist.sublist("solvers"));
-    global_op->InitializeInverse();
-    global_op->ComputeInverse();
+    // global_op->add_criteria(AmanziSolvers::LIN_SOLVER_MAKE_ONE_ITERATION);
+    global_op->initializeInverse();
+    global_op->computeInverse();
 
-    Epetra_MultiVector& sol_new = *solution->ViewComponent("cell");
-    Epetra_MultiVector sol_old(sol_new);
-
+    // save solution at previus time step
+    auto sol_prev = *solution;
     CompositeVector rhs = *global_op->rhs();
-    //    global_op->add_criteria(AmanziSolvers::LIN_SOLVER_MAKE_ONE_ITERATION);
-    global_op->ApplyInverse(rhs, *solution);
+    global_op->applyInverse(rhs, *solution);
 
     step++;
     t += dt;
 
-    solution->ViewComponent("cell")->Norm2(&snorm);
+    snorm = solution->norm2();
 
     if (MyPID == 0) {
       printf("%3d  ||r||=%11.6g  itr=%2d  ||sol||=%11.6g  t=%7.4f  dt=%7.4f\n",
@@ -199,15 +196,19 @@ RunTestMarshak(std::string op_list_name, double TemperatureFloor)
 
     // Change time step based on solution change.
     // We use empiric algorithm insired by Levenberg-Marquardt
-    Epetra_MultiVector sol_diff(sol_old);
-    sol_diff.Update(1.0, sol_new, -1.0);
+    auto sol_diff = sol_prev;
+    sol_diff.update(1.0, *solution, -1.0);
+
+    auto sol_diff_c = sol_diff.ViewComponent("cell");
+    auto sol_prev_c = sol_prev.ViewComponent("cell");
 
     double ds_rel(0.0);
     for (int c = 0; c < ncells_owned; c++) {
-      ds_rel = std::max(ds_rel, sol_diff[0][c] / (1e-3 + sol_old[0][c] + sol_new[0][c]));
+      double tmp = std::fabs(sol_diff_c(c, 0));
+      ds_rel = std::max(ds_rel, tmp / (1e-3 + sol_prev_c(c, 0) + tmp));
     }
     double ds_rel_local = ds_rel;
-    sol_diff.Comm().MaxAll(&ds_rel_local, &ds_rel, 1);
+    Teuchos::reduceAll(*(mesh->get_comm()), Teuchos::REDUCE_MAX, 1, &ds_rel_local, &ds_rel);
 
     if (ds_rel < 0.05) {
       dt *= 1.2;
@@ -218,44 +219,40 @@ RunTestMarshak(std::string op_list_name, double TemperatureFloor)
   }
 
   // calculate errors
-  const Epetra_MultiVector& p = *solution->ViewComponent("cell");
+  const auto& p = solution->ViewComponent("cell");
   double pl2_err(0.0), pnorm(0.0);
-
   for (int c = 0; c < ncells_owned; ++c) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
-    double err = p[0][c] - knc->exact(t, xc);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
+    double err = p(c, 0) - knc->exact(t, xc);
     pl2_err += err * err;
-    pnorm += p[0][c] * p[0][c];
+    pnorm += p(c, 0) * p(c, 0);
   }
   double tmp = pl2_err;
-  mesh->getComm()->SumAll(&tmp, &pl2_err, 1);
+  Teuchos::reduceAll(*(mesh->get_comm()), Teuchos::REDUCE_SUM, 1, &tmp, &pl2_err);
+
+  // Teuchos::reduceAll<int>(*mesh->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &pl2_err);
   tmp = pnorm;
-  mesh->getComm()->SumAll(&tmp, &pnorm, 1);
+  Teuchos::reduceAll(*(mesh->get_comm()), Teuchos::REDUCE_SUM, 1, &tmp, &pnorm);
+  // Teuchos::reduceAll<int>(*mesh->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &pnorm);
 
   pl2_err = std::pow(pl2_err / pnorm, 0.5);
   pnorm = std::pow(pnorm, 0.5);
   printf("||dp||=%10.6g  ||p||=%10.6g\n", pl2_err, pnorm);
 
   CHECK_CLOSE(0.0, pl2_err, 0.1);
-
-  if (MyPID == 0) {
-    GMV::open_data_file(*mesh, (std::string) "operators.gmv");
-    GMV::start_data();
-    GMV::write_cell_data(p, 0, "solution");
-    GMV::close_data_file();
-  }
 }
 
 
 /* *****************************************************************
-* This test replaces tensor and boundary conditions by continuous
-* functions. This is a prototype for heat conduction solvers.
-* **************************************************************** */
+ * This test replaces tensor and boundary conditions by continuous
+ * functions. This is a prototype for heat conduction solvers.
+ * **************************************************************** */
 // TEST(MARSHAK_NONLINEAR_WAVE_NLFV) {
 //   RunTestMarshak("diffusion operator nlfv", 0.02);
 // }
 
 TEST(MARSHAK_NONLINEAR_WAVE_MFD)
 {
-  RunTestMarshak("diffusion operator Sff", 0.0);
+  //  RunTestMarshak("diffusion operator Sff", 0.0);
+  RunTestMarshak("diffusion operator fv", 0.0);
 }

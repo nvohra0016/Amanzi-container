@@ -50,7 +50,6 @@
 #include <map>
 #include <string>
 
-#include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 
 #include "errors.hh"

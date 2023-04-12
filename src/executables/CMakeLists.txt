@@ -109,19 +109,19 @@ add_amanzi_executable(verify_mesh
 # verify_hex uses deprecated boost::filesystem
 # methods needs to pass version information to the
 # prepoccessor
-add_amanzi_executable(verify_hex
-                      SOURCE VerifyHex.cc
-                      LINK_LIBS mesh_factory
-                                mesh
-                                output ${Boost_LIBRARIES} ${HDF5_LIBRARIES})
-set_target_properties(verify_hex PROPERTIES
-                      COMPILE_DEFINES "${Boost_FILESYSTEM_DEFINES}")
+# add_amanzi_executable(verify_hex
+#                       SOURCE VerifyHex.cc
+#                       LINK_LIBS mesh_factory
+#                                 mesh
+#                                 output ${Boost_LIBRARIES} ${HDF5_LIBRARIES})
+# set_target_properties(verify_hex PROPERTIES
+#                       COMPILE_DEFINES "${Boost_FILESYSTEM_DEFINES}")
 
 #
 # Binary: concat
 #
-add_amanzi_executable(concat
-                      SOURCE concat.cc)
+# add_amanzi_executable(concat
+#                       SOURCE concat.cc)
 
 #
 #

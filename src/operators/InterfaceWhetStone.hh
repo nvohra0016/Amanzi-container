@@ -32,10 +32,10 @@ class InterfaceWhetStone {
   InterfaceWhetStone(){};
   virtual ~InterfaceWhetStone(){};
 
-  virtual void MassMatrix(int c, WhetStone::DenseMatrix& Acell){};
-  virtual void MassMatrixInverse(int c, WhetStone::DenseMatrix& Acell){};
-  virtual void StiffnessMatrix(int c, WhetStone::DenseMatrix& Acell){};
-  virtual void FaceMatrixJump(int f, int c1, int c2, WhetStone::DenseMatrix& Aface){};
+  virtual void MassMatrix(int c, WhetStone::DenseMatrix<>& Acell){};
+  virtual void MassMatrixInverse(int c, WhetStone::DenseMatrix<>& Acell){};
+  virtual void StiffnessMatrix(int c, WhetStone::DenseMatrix<>& Acell){};
+  virtual void FaceMatrixJump(int f, int c1, int c2, WhetStone::DenseMatrix<>& Aface){};
 };
 
 
@@ -45,12 +45,12 @@ class InterfaceWhetStoneDG : public InterfaceWhetStone {
   InterfaceWhetStoneDG(const Teuchos::RCP<T>& dg, const std::shared_ptr<U>& coef)
     : dg_(dg), coef_(coef){};
 
-  virtual void StiffnessMatrix(int c, WhetStone::DenseMatrix& Acell) override
+  virtual void StiffnessMatrix(int c, WhetStone::DenseMatrix<>& Acell) override
   {
     dg_->StiffnessMatrix(c, coef_->get_coef(c), Acell);
   }
 
-  virtual void FaceMatrixJump(int f, int c1, int c2, WhetStone::DenseMatrix& Aface) override
+  virtual void FaceMatrixJump(int f, int c1, int c2, WhetStone::DenseMatrix<>& Aface) override
   {
     dg_->FaceMatrixJump(f, coef_->get_coef(c1), coef_->get_coef(c2), Aface);
   }
@@ -67,17 +67,17 @@ class InterfaceWhetStoneMFD : public InterfaceWhetStone {
   InterfaceWhetStoneMFD(const Teuchos::RCP<T>& mfd, const std::shared_ptr<U>& coef)
     : mfd_(mfd), coef_(coef){};
 
-  virtual void MassMatrix(int c, WhetStone::DenseMatrix& Acell) override
+  virtual void MassMatrix(int c, WhetStone::DenseMatrix<>& Acell) override
   {
     mfd_->MassMatrix(c, coef_->get_coef(c), Acell);
   }
 
-  virtual void MassMatrixInverse(int c, WhetStone::DenseMatrix& Acell) override
+  virtual void MassMatrixInverse(int c, WhetStone::DenseMatrix<>& Acell) override
   {
     mfd_->MassMatrixInverse(c, coef_->get_coef(c), Acell);
   }
 
-  virtual void StiffnessMatrix(int c, WhetStone::DenseMatrix& Acell) override
+  virtual void StiffnessMatrix(int c, WhetStone::DenseMatrix<>& Acell) override
   {
     mfd_->StiffnessMatrix(c, coef_->get_coef(c), Acell);
   }

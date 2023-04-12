@@ -19,18 +19,16 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <fstream>
 
 // TPLs
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
-#include "EpetraExt_RowMatrixOut.h"
 #include "UnitTest++.h"
 
 // Amanzi
 #include "Mesh_MSTK.hh"
-#include "Mesh_Algorithms.hh"
+#include "LinearOperatorFactory.hh"
 #include "Tensor.hh"
 #include "WhetStoneDefs.hh"
 
@@ -46,19 +44,28 @@
 
 using namespace Amanzi;
 
+int
+BoundaryFaceGetCell(const AmanziMesh::Mesh& mesh, int f)
+{
+  AmanziMesh::Entity_ID_List cells;
+  mesh.getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
+  return cells[0];
+}
+
+
 double
 BoundaryFaceGetValue(Operators::BCs& bc, const CompositeVector& u, int f)
 {
   if (bc.bc_model()[f] == Operators::OPERATOR_BC_DIRICHLET) {
     return bc.bc_value()[f];
   } else {
-    if (u.HasComponent("face")) {
+    if (u.hasComponent("face")) {
       return u("face", 0, f);
-    } else if (u.HasComponent("boundary_face")) {
-      int bf = AmanziMesh::getFaceOnBoundaryBoundaryFace(*u.Mesh(), f);
+    } else if (u.hasComponent("boundary_face")) {
+      int bf = u.getMesh()->exterior_face_map(false).getLocalElement(u.getMesh()->getMap(AmanziMesh::Entity_kind::FACE,false).getGlobalElement(f));
       return u("boundary_face", 0, bf);
     } else {
-      return u("cell", 0, AmanziMesh::getFaceOnBoundaryInternalCell(*u.Mesh(), f));
+      return u("cell", 0, BoundaryFaceGetCell(*u.getMesh(), f));
     }
   }
 }
@@ -69,7 +76,8 @@ struct Problem {
   Problem(const Teuchos::RCP<AmanziMesh::Mesh>& mesh_,
           const Teuchos::RCP<AnalyticNonlinearCoupledBase>& ana_,
           const std::string& discretization_)
-    : mesh(mesh_), ana(ana_), discretization(discretization_), comm(mesh_->getComm())
+    : mesh(mesh_), ana(ana_), discretization(discretization_), comm(mesh_->get_comm())
+
   {}
 
   ~Problem() {}
@@ -80,6 +88,7 @@ struct Problem {
   {
     int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
     int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
+    int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
     // kr0,1 on faces, always upwinded
     Epetra_MultiVector& kr0_f = *kr0->ViewComponent("face", true);
@@ -89,7 +98,8 @@ struct Problem {
     const Epetra_MultiVector& v_c = *v.ViewComponent("cell", true);
 
     for (int f = 0; f != nfaces; ++f) {
-      auto cells = mesh->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+      AmanziMesh::Entity_ID_List cells;
+      mesh->getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
 
       if (cells.size() == 2) {
         if (u_c[0][cells[0]] > u_c[0][cells[1]]) {
@@ -121,7 +131,7 @@ struct Problem {
     }
 
     // derivatives
-    if (kr0_u->HasComponent("cell")) {
+    if (kr0_u->hasComponent("cell")) {
       // FV, only need derivs on cells
       Epetra_MultiVector& kr0_u_c = *kr0_u->ViewComponent("cell", false);
       Epetra_MultiVector& kr0_v_c = *kr0_v->ViewComponent("cell", false);
@@ -145,7 +155,8 @@ struct Problem {
       Epetra_MultiVector& kr1_v_f = *kr1_v->ViewComponent("face", false);
 
       for (int f = 0; f != nfaces; ++f) {
-        auto cells = mesh->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+        AmanziMesh::Entity_ID_List cells;
+        mesh->getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
 
         if (cells.size() == 2) {
           if (u_c[0][cells[0]] > u_c[0][cells[1]]) {
@@ -206,25 +217,18 @@ struct Problem {
 
     int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
     for (int f = 0; f < nfaces_wghost; f++) {
-      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
+      double area = mesh->getFaceArea(f)
+      int dir, c = BoundaryFaceGetCell(*mesh, f);
+      const AmanziGeometry::Point& normal = mesh->face_normal(f, false, c, &dir);
 
       if (fabs(xf[0]) < 1e-12) {
-        double area = mesh->getFaceArea(f);
-        int dir = 0;
-        int c = AmanziMesh::getFaceOnBoundaryInternalCell(*mesh, f);
-        const AmanziGeometry::Point& normal = mesh->getFaceNormal(f, c, &dir);
-
         bc_model0[f] = Operators::OPERATOR_BC_NEUMANN;
         bc_value0[f] = ana->velocity_exact0(xf, 0.0) * normal / area;
         bc_model1[f] = Operators::OPERATOR_BC_NEUMANN;
         bc_value1[f] = ana->velocity_exact1(xf, 0.0) * normal / area;
 
       } else if (fabs(xf[1]) < 1e-12) {
-        double area = mesh->getFaceArea(f);
-        int dir = 0;
-        int c = AmanziMesh::getFaceOnBoundaryInternalCell(*mesh, f);
-        const AmanziGeometry::Point& normal = mesh->getFaceNormal(f, c, &dir);
-
         // y = 0 boundary
         bc_model0[f] = Operators::OPERATOR_BC_DIRICHLET;
         bc_value0[f] = ana->exact0(xf, 0.0);
@@ -232,11 +236,6 @@ struct Problem {
         bc_value1[f] = ana->velocity_exact1(xf, 0.0) * normal / area;
 
       } else if (fabs(xf[0] - 1.0) < 1e-12) {
-        double area = mesh->getFaceArea(f);
-        int dir = 0;
-        int c = AmanziMesh::getFaceOnBoundaryInternalCell(*mesh, f);
-        const AmanziGeometry::Point& normal = mesh->getFaceNormal(f, c, &dir);
-
         // x = 1 boundary
         bc_model0[f] = Operators::OPERATOR_BC_NEUMANN;
         bc_value0[f] = ana->velocity_exact0(xf, 0.0) * normal / area;
@@ -258,17 +257,17 @@ struct Problem {
     int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
 
     // tensor list
-    K00 = Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+    K00 = Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
     for (int c = 0; c < ncells; c++) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
-      const WhetStone::Tensor& Kc = ana->Tensor00(xc, 0.0);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
+      const WhetStone:Tensor<>& Kc = ana->Tensor00(xc, 0.0);
       K00->push_back(Kc);
     }
 
-    K11 = Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+    K11 = Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
     for (int c = 0; c < ncells; c++) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
-      const WhetStone::Tensor& Kc = ana->Tensor11(xc, 0.0);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
+      const WhetStone:Tensor<>& Kc = ana->Tensor11(xc, 0.0);
       K11->push_back(Kc);
     }
   }
@@ -278,20 +277,20 @@ struct Problem {
     int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
 
     // tensor list
-    K00 = Teuchos::rcp(new std::vector<WhetStone::Tensor>());
-    K11 = Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+    K00 = Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
+    K11 = Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
 
     for (int c = 0; c < ncells; c++) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
 
       double u = ana->exact0(xc, 0);
       double v = ana->exact1(xc, 0);
 
-      WhetStone::Tensor Kc0 = ana->Tensor00(xc, 0.0);
+      WhetStone:Tensor<> Kc0 = ana->Tensor00(xc, 0.0);
       Kc0 *= ana->ScalarCoefficient00(u, v);
       K00->push_back(Kc0);
 
-      WhetStone::Tensor Kc1 = ana->Tensor11(xc, 0.0);
+      WhetStone:Tensor<> Kc1 = ana->Tensor11(xc, 0.0);
       Kc1 *= ana->ScalarCoefficient11(u, v);
       K11->push_back(Kc1);
     }
@@ -327,33 +326,33 @@ struct Problem {
     Epetra_MultiVector& v_c = *v.ViewComponent("cell", false);
 
     for (int c = 0; c != ncells; ++c) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
       u_c[0][c] = ana->exact0(xc, 0);
       v_c[0][c] = ana->exact1(xc, 0);
     }
 
-    if (u.HasComponent("face")) {
+    if (u.hasComponent("face")) {
       int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
       Epetra_MultiVector& u_f = *u.ViewComponent("face", false);
       Epetra_MultiVector& v_f = *v.ViewComponent("face", false);
 
       for (int f = 0; f != nfaces; ++f) {
-        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
         u_f[0][f] = ana->exact0(xf, 0);
         v_f[0][f] = ana->exact1(xf, 0);
       }
     }
 
-    if (u.HasComponent("boundary_face")) {
+    if (u.hasComponent("boundary_face")) {
       int nboundary_faces =
         mesh->getNumEntities(AmanziMesh::Entity_kind::BOUNDARY_FACE, AmanziMesh::Parallel_kind::OWNED);
       Epetra_MultiVector& u_f = *u.ViewComponent("boundary_face", false);
       Epetra_MultiVector& v_f = *v.ViewComponent("boundary_face", false);
 
       for (int bf = 0; bf != nboundary_faces; ++bf) {
-        int f = mesh->getMap(AmanziMesh::Entity_kind::FACE,false).LID(mesh->getMap(AmanziMesh::Entity_kind::BOUNDARY_FACE,false).GID(bf));
+        int f = mesh->getMap(AmanziMesh::Entity_kind::FACE,false).getLocalElement(mesh->exterior_face_map(false).getGlobalElement(bf));
 
-        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
         u_f[0][f] = ana->exact0(xf, 0);
         v_f[0][f] = ana->exact1(xf, 0);
       }
@@ -372,20 +371,21 @@ struct Problem {
   void CreateOperator()
   {
     op = Teuchos::rcp(new Operators::TreeOperator(tvs));
-    op->set_operator_block(0, 0, op00->global_operator());
-    op->set_operator_block(1, 1, op11->global_operator());
+    op->SetOperatorBlock(0, 0, op00->global_operator());
+    op->SetOperatorBlock(1, 1, op11->global_operator());
   }
 
   void CreatePC()
   {
     pc = Teuchos::rcp(new Operators::TreeOperator(tvs));
-    pc->set_operator_block(0, 0, pc00->global_operator());
-    pc->set_operator_block(1, 1, pc11->global_operator());
+    pc->SetOperatorBlock(0, 0, pc00->global_operator());
+    pc->SetOperatorBlock(1, 1, pc11->global_operator());
 
     if (pc01 != Teuchos::null) {
-      pc->set_operator_block(0, 1, pc01->global_operator());
-      pc->set_operator_block(1, 0, pc10->global_operator());
+      pc->SetOperatorBlock(0, 1, pc01->global_operator());
+      pc->SetOperatorBlock(1, 0, pc10->global_operator());
     }
+    pc->SymbolicAssembleMatrix();
   }
 
 
@@ -510,7 +510,7 @@ struct Problem {
     Epetra_MultiVector& f1_c = *f1->ViewComponent("cell", false);
 
     for (int c = 0; c != ncells; ++c) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
       f0_c[0][c] = ana->source_exact0(xc, 0);
       f1_c[0][c] = ana->source_exact1(xc, 0);
     }
@@ -529,7 +529,7 @@ struct Problem {
   {
     std::cout << "Problem with "
               << mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL) << " on "
-              << mesh->getComm()->NumProc() << " cores with discretization \"" << discretization
+              << mesh->get_comm()->NumProc() << " cores with discretization \"" << discretization
               << "\"" << std::endl;
     std::cout << "Solution:" << std::endl;
     std::cout << "U = ";
@@ -560,17 +560,17 @@ struct Problem {
     fid << std::scientific;
 
     for (int c = 0; c != ncells; ++c) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
       fid << xc[0] << " " << xc[1] << " " << e0_c[0][c] << " " << e1_c[0][c] << std::endl;
     }
 
-    if (faces && err0.HasComponent("face")) {
+    if (faces && err0.hasComponent("face")) {
       int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
       Epetra_MultiVector& e0_f = *err0.ViewComponent("face", false);
       Epetra_MultiVector& e1_f = *err1.ViewComponent("face", false);
 
       for (int c = 0; c != nfaces; ++c) {
-        const AmanziGeometry::Point& xc = mesh->getFaceCentroid(c);
+        const AmanziGeometry::Point& xc = mesh->getFaceCentroid(c)
         fid << xc[0] << " " << xc[1] << " " << e0_f[0][c] << " " << e1_f[0][c] << std::endl;
       }
     }
@@ -581,8 +581,8 @@ struct Problem {
   Teuchos::RCP<Operators::BCs> bc0;
   Teuchos::RCP<Operators::BCs> bc1;
 
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K00;
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K11;
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K00;
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K11;
 
   Teuchos::RCP<CompositeVector> kr0;
   Teuchos::RCP<CompositeVector> kr1;
@@ -629,8 +629,11 @@ getProblem(const std::string& discretization, bool upwind, int nx, int ny)
   auto comm = Amanzi::getDefaultComm();
 
   // create a mesh
-  auto mesh_mstk = Teuchos::rcp(new Mesh_MSTK(0., 0., 1., 1., nx, ny, comm));
-  auto mesh = Teuchos::rcp(new Mesh(mesh_mstk, Teuchos::rcp(new Amanzi::AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null)); 
+  Teuchos::RCP<Mesh> mesh = Teuchos::rcp(new Mesh_MSTK(0., 0., 1., 1., nx, ny, comm));
+
+  int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+  int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
+  int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
   // create the analytic solution
   Teuchos::RCP<AnalyticNonlinearCoupledBase> ana =
@@ -708,19 +711,18 @@ RunForwardProblem(const std::string& discretization, bool upwind, int nx, int ny
   double error0_linf, error1_linf;
   double unorm, vnorm;
 
-  B.SubVector(0)->Data()->ViewComponent("cell")->Norm2(&unorm);
-  B.SubVector(0)->Data()->ViewComponent("cell")->Norm2(&vnorm);
+  B.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&unorm);
+  B.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&vnorm);
 
-  AX.SubVector(0)->Data()->ViewComponent("cell")->Norm2(&error0_l2);
-  AX.SubVector(1)->Data()->ViewComponent("cell")->Norm2(&error1_l2);
-  AX.SubVector(0)->Data()->ViewComponent("cell")->NormInf(&error0_linf);
-  AX.SubVector(1)->Data()->ViewComponent("cell")->NormInf(&error1_linf);
+  AX.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&error0_l2);
+  AX.SubVector(1)->Data()->ViewComponent("cell", false)->Norm2(&error1_l2);
+  AX.SubVector(0)->Data()->ViewComponent("cell", false)->normInf(&error0_linf);
+  AX.SubVector(1)->Data()->ViewComponent("cell", false)->normInf(&error1_linf);
 
-  double error_l2 =
-    sqrt((error0_l2 * error0_l2 + error1_l2 * error1_l2) / (unorm * unorm + vnorm * vnorm));
+  double error_l2 = sqrt(pow(error0_l2 / unorm, 2) + pow(error1_l2 / vnorm, 2));
   double error_linf = std::max(error0_linf, error1_linf);
 
-  if (problem->comm->MyPID() == 0) {
+  if (problem->comm->getRank() == 0) {
     printf("[%4d, %6.12e, %6.12e],\n", (int)round(log2(nx)), log2(error_l2), log2(error_linf));
   }
 
@@ -784,22 +786,28 @@ RunForwardProblem_Assembled(const std::string& discretization, bool upwind, int 
   // apply
   problem->op->SymbolicAssembleMatrix();
   problem->op->AssembleMatrix();
-  problem->op->ApplyAssembled(X, AX, 0.0);
+  problem->op->ApplyAssembled(X, AX);
 
   // subtract off true RHS
   AX.Update(-1., B, 1.);
 
   // norms
-  double error_l2, error_linf;
-  double unorm;
+  double error0_l2, error1_l2;
+  double error0_linf, error1_linf;
+  double unorm, vnorm;
 
-  B.Norm2(&unorm);
-  AX.Norm2(&error_l2);
-  AX.NormInf(&error_linf);
+  B.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&unorm);
+  B.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&vnorm);
 
-  error_l2 /= unorm;
+  AX.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&error0_l2);
+  AX.SubVector(1)->Data()->ViewComponent("cell", false)->Norm2(&error1_l2);
+  AX.SubVector(0)->Data()->ViewComponent("cell", false)->normInf(&error0_linf);
+  AX.SubVector(1)->Data()->ViewComponent("cell", false)->normInf(&error1_linf);
 
-  if (problem->comm->MyPID() == 0) {
+  double error_l2 = sqrt(pow(error0_l2 / unorm, 2) + pow(error1_l2 / vnorm, 2));
+  double error_linf = std::max(error0_linf, error1_linf);
+
+  if (problem->comm->getRank() == 0) {
     printf("[%4d, %6.12e, %6.12e],\n", (int)round(log2(nx)), log2(error_l2), log2(error_linf));
   }
 
@@ -815,7 +823,12 @@ RunForwardProblem_Assembled(const std::string& discretization, bool upwind, int 
 // Returns the l2, linf errors as a pair.
 // -----------------------------------------------------------------------------
 std::pair<double, double>
-RunInverseProblem(const std::string& discretization, bool upwind, int nx, int ny, bool write_file)
+RunInverseProblem(const std::string& discretization,
+                  bool upwind,
+                  int nx,
+                  int ny,
+                  bool write_file,
+                  bool multi_domain)
 {
   using namespace Amanzi;
   using namespace Amanzi::AmanziMesh;
@@ -857,6 +870,7 @@ RunInverseProblem(const std::string& discretization, bool upwind, int nx, int ny
   TreeVector X(*problem->tvs);
   TreeVector AX(*problem->tvs);
 
+  // apply inverse
   problem->op->SymbolicAssembleMatrix();
   problem->op->AssembleMatrix();
 
@@ -873,21 +887,22 @@ RunInverseProblem(const std::string& discretization, bool upwind, int nx, int ny
 
 
   Teuchos::ParameterList pc_list;
-  pc_list.set("preconditioning method", "boomer amg");
-  pc_list.sublist("boomer amg parameters").set("tolerance", 0.0);
-  pc_list.sublist("boomer amg parameters").set("verbosity", 0);
-  //  pc_list.sublist("boomer amg parameters").set("number of functions", 2);
-  pc_list.set("iterative method", "pcg");
-  pc_list.sublist("pcg parameters").set("maximum number of iterations", 200);
-  pc_list.sublist("verbose object").set("verbosity level", "medium");
-  problem->op->set_inverse_parameters(pc_list);
-  problem->op->InitializeInverse();
-  problem->op->ComputeInverse();
+  pc_list.set("preconditioner type", "boomer amg");
+  pc_list.sublist("boomer amg parameters").set("tolerance", 0.);
+  // pc_list.sublist("boomer amg parameters").set("number of functions", 2);
+  problem->op->InitPreconditioner(pc_list);
 
-  X.PutScalar(0.);
-  int ierr = problem->op->ApplyInverse(B, X);
+  Teuchos::ParameterList lin_list;
+  lin_list.set("iterative method", "pcg");
+  lin_list.sublist("pcg parameters").sublist("verbose object").set("verbosity level", "medium");
+  AmanziSolvers::LinearOperatorFactory<TreeOperator, TreeVector, TreeVectorSpace> fac;
+  Teuchos::RCP<AmanziSolvers::LinearOperator<TreeOperator, TreeVector, TreeVectorSpace>> lin_op =
+    fac.Create(lin_list, problem->op);
+
+  X.putScalar(0.);
+  int ierr = lin_op->ApplyInverse(B, X);
   CHECK(ierr >= 0);
-  CHECK(problem->op->num_itrs() < 100);
+  CHECK(lin_op->num_itrs() < 100);
 
   // subtract off true solution
   X.SubVector(0)->Data()->Update(-1., *u, 1.);
@@ -915,13 +930,13 @@ RunInverseProblem(const std::string& discretization, bool upwind, int nx, int ny
 
   X.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&error0_l2);
   X.SubVector(1)->Data()->ViewComponent("cell", false)->Norm2(&error1_l2);
-  X.SubVector(0)->Data()->ViewComponent("cell", false)->NormInf(&error0_linf);
-  X.SubVector(1)->Data()->ViewComponent("cell", false)->NormInf(&error1_linf);
+  X.SubVector(0)->Data()->ViewComponent("cell", false)->normInf(&error0_linf);
+  X.SubVector(1)->Data()->ViewComponent("cell", false)->normInf(&error1_linf);
 
   double error_l2 = sqrt(pow(error0_l2 / unorm, 2) + pow(error1_l2 / vnorm, 2));
   double error_linf = std::max(error0_linf, error1_linf);
 
-  if (problem->comm->MyPID() == 0) {
+  if (problem->comm->getRank() == 0) {
     printf("[%4d, %6.12e, %6.12e],\n", (int)round(log2(nx)), log2(error_l2), log2(error_linf));
   }
 
@@ -930,7 +945,7 @@ RunInverseProblem(const std::string& discretization, bool upwind, int nx, int ny
 
 
 // -----------------------------------------------------------------------------
-// Solves the full nonlinear problem
+// Solves the full nonlinear problem->
 //
 // Returns the l2, linf errors as a pair.
 // -----------------------------------------------------------------------------
@@ -971,7 +986,7 @@ RunNonlinearProblem(const std::string& discretization,
 
   // simple newton iteration
   TreeVector X(*problem->tvs);
-  X.PutScalar(0.2);
+  X.putScalar(0.2);
   Teuchos::RCP<CompositeVector> u = X.SubVector(0)->Data();
   Teuchos::RCP<CompositeVector> v = X.SubVector(1)->Data();
   TreeVector R(*problem->tvs);
@@ -1016,7 +1031,7 @@ RunNonlinearProblem(const std::string& discretization,
     R.SubVector(0)->Data()->Update(-1., *problem->op00->global_operator()->rhs(), 1);
     R.SubVector(1)->Data()->Update(-1., *problem->op11->global_operator()->rhs(), 1);
 
-    R.NormInf(&error);
+    R.normInf(&error);
     R.Norm2(&l2error);
     double unorm;
     X.Norm2(&unorm);
@@ -1091,19 +1106,23 @@ RunNonlinearProblem(const std::string& discretization,
       EpetraExt::RowMatrixToMatlabFile(fname.str().c_str(), *problem->pc->A());
     }
 
+    // create the preconditioner, linear solver
     Teuchos::ParameterList pc_list;
-    pc_list.set("preconditioning method", "boomer amg");
-    pc_list.sublist("boomer amg parameters").set("tolerance", 0.0);
+    pc_list.set("preconditioner type", "boomer amg");
+    pc_list.sublist("boomer amg parameters").set("tolerance", 0.);
     pc_list.sublist("boomer amg parameters").set("number of functions", 2);
-    pc_list.set("iterative method", "gmres");
-    pc_list.sublist("verbose object").set("verbosity level", "medium");
-    problem->op->set_inverse_parameters(pc_list);
-    problem->op->InitializeInverse();
-    problem->op->ComputeInverse();
+    problem->pc->InitPreconditioner(pc_list);
+
+    Teuchos::ParameterList lin_list;
+    lin_list.set("iterative method", "gmres");
+    lin_list.sublist("gmres parameters").sublist("verbose object").set("verbosity level", "low");
+    AmanziSolvers::LinearOperatorFactory<TreeOperator, TreeVector, TreeVectorSpace> fac;
+    Teuchos::RCP<AmanziSolvers::LinearOperator<TreeOperator, TreeVector, TreeVectorSpace>> lin_op =
+      fac.Create(lin_list, problem->pc);
 
     // invert the preconditioner to get a correction
-    DX.PutScalar(0.);
-    int converged_reason = problem->op->ApplyInverse(R, DX);
+    DX.putScalar(0.);
+    int converged_reason = lin_op->ApplyInverse(R, DX);
     CHECK(converged_reason >= 0);
 
     // apply the correction
@@ -1139,13 +1158,13 @@ RunNonlinearProblem(const std::string& discretization,
 
   X.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&error0_l2);
   X.SubVector(1)->Data()->ViewComponent("cell", false)->Norm2(&error1_l2);
-  X.SubVector(0)->Data()->ViewComponent("cell", false)->NormInf(&error0_linf);
-  X.SubVector(1)->Data()->ViewComponent("cell", false)->NormInf(&error1_linf);
+  X.SubVector(0)->Data()->ViewComponent("cell", false)->normInf(&error0_linf);
+  X.SubVector(1)->Data()->ViewComponent("cell", false)->normInf(&error1_linf);
 
   double error_l2 = sqrt(pow(error0_l2 / unorm, 2) + pow(error1_l2 / vnorm, 2));
   double error_linf = std::max(error0_linf, error1_linf);
 
-  if (problem->comm->MyPID() == 0) {
+  if (problem->comm->getRank() == 0) {
     printf("[%4d, %6.12e, %6.12e],\n", (int)round(log2(nx)), log2(error_l2), log2(error_linf));
   }
 
@@ -1202,40 +1221,52 @@ RunInverseProblem_Diag(const std::string& discretization,
   problem->op11->ApplyBCs(true, true, true);
 
   // assemble, invert
+  problem->op00->global_operator()->SymbolicAssembleMatrix();
+  problem->op00->global_operator()->AssembleMatrix();
   Teuchos::ParameterList pc_list;
-  pc_list.set("preconditioning method", "boomer amg");
-  pc_list.set("iterative method", "gmres");
+  pc_list.set("preconditioner type", "boomer amg");
   pc_list.sublist("boomer amg parameters").set("tolerance", 0.);
   pc_list.sublist("boomer amg parameters").set("number of functions", 2);
-  problem->op00->global_operator()->set_inverse_parameters(pc_list);
-  problem->op00->global_operator()->InitializeInverse();
-  problem->op00->global_operator()->ComputeInverse();
+  problem->op00->global_operator()->InitPreconditioner(pc_list);
 
+  problem->op11->global_operator()->SymbolicAssembleMatrix();
+  problem->op11->global_operator()->AssembleMatrix();
   Teuchos::ParameterList pc_list11;
-  pc_list11.set("preconditioning method", "boomer amg");
-  pc_list11.set("iterative method", "gmres");
+  pc_list11.set("preconditioner type", "boomer amg");
   pc_list11.sublist("boomer amg parameters").set("tolerance", 0.);
   pc_list11.sublist("boomer amg parameters").set("number of functions", 2);
-  problem->op11->global_operator()->set_inverse_parameters(pc_list11);
-  problem->op11->global_operator()->InitializeInverse();
-  problem->op11->global_operator()->ComputeInverse();
+  problem->op11->global_operator()->InitPreconditioner(pc_list11);
+
+
+  Teuchos::ParameterList lin_list;
+  lin_list.set("iterative method", "gmres");
+  lin_list.sublist("gmres parameters").sublist("verbose object").set("verbosity level", "low");
+  AmanziSolvers::LinearOperatorFactory<Operator, CompositeVector, CompositeVectorSpace> fac;
+  Teuchos::RCP<AmanziSolvers::LinearOperator<Operator, CompositeVector, CompositeVectorSpace>>
+    lin_op = fac.Create(lin_list, problem->op00->global_operator());
+
+
+  Teuchos::ParameterList lin_list11;
+  lin_list11.set("iterative method", "gmres");
+  lin_list11.sublist("gmres parameters").sublist("verbose object").set("verbosity level", "low");
+  Teuchos::RCP<AmanziSolvers::LinearOperator<Operator, CompositeVector, CompositeVectorSpace>>
+    lin_op11 = fac.Create(lin_list, problem->op11->global_operator());
 
   TreeVector B(*problem->tvs);
   *B.SubVector(0)->Data() = *problem->op00->global_operator()->rhs();
   *B.SubVector(1)->Data() = *problem->op11->global_operator()->rhs();
 
   TreeVector X(*problem->tvs);
-  X.PutScalar(0.);
+  X.putScalar(0.);
 
-  int ierr = problem->op00->global_operator()->ApplyInverse(*B.SubVector(0)->Data(),
-                                                            *X.SubVector(0)->Data());
+  int ierr = lin_op->ApplyInverse(*B.SubVector(0)->Data(), *X.SubVector(0)->Data());
   CHECK(ierr >= 0);
 
-  ierr = problem->op11->global_operator()->ApplyInverse(*B.SubVector(1)->Data(),
-                                                        *X.SubVector(1)->Data());
+  ierr = lin_op11->ApplyInverse(*B.SubVector(1)->Data(), *X.SubVector(1)->Data());
   CHECK(ierr >= 0);
 
-  //  std::cout << "Ran inverse with nitrs = " << lin_op->num_itrs() << std::endl;
+  //  std::cout << "Ran inverse with nitrs = " << lin_op->num_itrs() <<
+  //  std::endl;
   X.SubVector(0)->Data()->Update(-1., *u, 1.);
   X.SubVector(1)->Data()->Update(-1., *v, 1.);
 
@@ -1259,13 +1290,13 @@ RunInverseProblem_Diag(const std::string& discretization,
 
   X.SubVector(0)->Data()->ViewComponent("cell", false)->Norm2(&error0_l2);
   X.SubVector(1)->Data()->ViewComponent("cell", false)->Norm2(&error1_l2);
-  X.SubVector(0)->Data()->ViewComponent("cell", false)->NormInf(&error0_linf);
-  X.SubVector(1)->Data()->ViewComponent("cell", false)->NormInf(&error1_linf);
+  X.SubVector(0)->Data()->ViewComponent("cell", false)->normInf(&error0_linf);
+  X.SubVector(1)->Data()->ViewComponent("cell", false)->normInf(&error1_linf);
 
   double error_l2 = sqrt(pow(error0_l2 / unorm, 2) + pow(error1_l2 / vnorm, 2));
   double error_linf = std::max(error0_linf, error1_linf);
 
-  if (problem->comm->MyPID() == 0) {
+  if (problem->comm->getRank() == 0) {
     printf("[%4d, %6.12e, %6.12e],\n", (int)round(log2(nx)), log2(error_l2), log2(error_linf));
   }
 
@@ -1278,7 +1309,8 @@ RunForwardTest(const std::string& discretization, bool upwind)
 {
   std::cout << std::endl
             << std::endl
-            << "============================================================================="
+            << "==============================================================="
+               "=============="
             << std::endl;
   std::cout << "Convergence for forward operator with discretization: " << discretization;
   if (upwind) std::cout << " with upwinding";
@@ -1313,18 +1345,19 @@ RunForwardTest(const std::string& discretization, bool upwind)
     CHECK(rate2 > 0.8);
     CHECK(rateinf > 0.8);
   } else {
-    CHECK(rate2 > 1.5);
+    CHECK(rate2 > 1.8);
     CHECK(rateinf > 1.5);
   }
 }
 
 
 void
-RunInverseTest(const std::string& discretization, bool upwind)
+RunInverseTest(const std::string& discretization, bool upwind, bool multi_domain)
 {
   std::cout << std::endl
             << std::endl
-            << "============================================================================="
+            << "==============================================================="
+               "=============="
             << std::endl;
   std::cout << "Convergence for inverse operator with discretization: " << discretization;
   if (upwind) std::cout << " with upwinding";
@@ -1332,8 +1365,9 @@ RunInverseTest(const std::string& discretization, bool upwind)
 
   std::cout << "x = np.array([\n";
   std::vector<std::pair<double, double>> l2s;
-  for (int i = 4; i <= 128; i *= 2) {
-    std::pair<double, double> l2 = RunInverseProblem(discretization, upwind, i, i, false);
+  for (int i = 2; i <= 129; i *= 2) {
+    std::pair<double, double> l2 =
+      RunInverseProblem(discretization, upwind, i, i, false, multi_domain);
     l2s.push_back(l2);
   }
   std::cout << "])" << std::endl;
@@ -1344,9 +1378,11 @@ RunInverseTest(const std::string& discretization, bool upwind)
   std::cout << "  Convergence rates = ";
 
   // mean via the last few -- let's not base convergence on a 2x2 problem!
-  for (int i = 1; i != l2s.size(); ++i) {
+  for (int i = 3; i != l2s.size(); ++i) {
     mean_dl2 += (l2s[i].first - l2s[i - 1].first);
     mean_dlinf += (l2s[i].second - l2s[i - 1].second);
+    // std::cout << " (" << l2s[i].first - l2s[i-1].first << ", "
+    //           << (l2s[i].second - l2s[i-1].second) << "),";
     size++;
   }
   std::cout << std::endl;
@@ -1370,7 +1406,8 @@ RunNonlinearTest(const std::string& discretization, const std::string& jacobian)
 {
   std::cout << std::endl
             << std::endl
-            << "============================================================================="
+            << "==============================================================="
+               "=============="
             << std::endl;
   std::cout << "Convergence for nonlinear operator with discretization: " << discretization
             << " with jacobian: " << jacobian << std::endl;
@@ -1410,37 +1447,23 @@ RunNonlinearTest(const std::string& discretization, const std::string& jacobian)
 // -----------------------------------------------------------------------------
 // Full Suite is the following 12 tests
 // -----------------------------------------------------------------------------
-TEST(OPERATOR_COUPLED_DIFFUSION_FORWARD_HARMONIC_CONVERGENCE_MFD)
-{
-  RunForwardTest("mfd: default", false);
-}
-TEST(OPERATOR_COUPLED_DIFFUSION_FORWARD_HARMONIC_CONVERGENCE_FV)
-{
-  RunForwardTest("fv: default", false);
-}
-
-// TEST(OPERATOR_COUPLED_DIFFUSION_FORWARD_UPWIND_CONVERGENCE_MFD) {
-//   RunForwardTest("mfd: default", true);
+// TEST(OPERATOR_COUPLED_DIFFUSION_FORWARD_HARMONIC_CONVERGENCE_FV) {
+//   RunForwardTest("fv: default", false);
 // }
-
-TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_HARMONIC_CONVERGENCE_MFD)
-{
-  RunInverseTest("mfd: default", false);
-}
-TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_HARMONIC_CONVERGENCE_FV)
-{
-  RunInverseTest("fv: default", false);
-}
-
-TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_UPWIND_CONVERGENCE_MFD)
-{
-  RunInverseTest("mfd: default", true);
-}
+// TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_HARMONIC_CONVERGENCE_FV) {
+//   RunInverseTest("fv: default", false);
+// }
+// TEST(OPERATOR_COUPLED_DIFFUSION_FORWARD_UPWIND_CONVERGENCE_FV) {
+//   RunForwardTest("fv: default", true);
+// }
 TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_UPWIND_CONVERGENCE_FV)
 {
-  RunInverseTest("fv: default", true);
+  RunInverseTest("fv: default", true, false);
 }
-
+TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_UPWIND_CONVERGENCE_FV_MD)
+{
+  RunInverseTest("fv: default", true, true);
+}
 // TEST(OPERATOR_COUPLED_DIFFUSION_NONLINEAR_UPWIND_CONVERGENCE_FV) {
 //   RunNonlinearTest("fv: default", "none");
 // }
@@ -1449,6 +1472,18 @@ TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_UPWIND_CONVERGENCE_FV)
 // }
 
 
+// TEST(OPERATOR_COUPLED_DIFFUSION_FORWARD_HARMONIC_CONVERGENCE_MFD) {
+//   RunForwardTest("mfd: default", false);
+// }
+// TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_HARMONIC_CONVERGENCE_MFD) {
+//   RunInverseTest("mfd: default", false);
+// }
+// TEST(OPERATOR_COUPLED_DIFFUSION_FORWARD_UPWIND_CONVERGENCE_MFD) {
+//   RunForwardTest("mfd: default", true);
+// }
+// TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_UPWIND_CONVERGENCE_MFD) {
+//   RunInverseTest("mfd: default", true);
+// }
 // TEST(OPERATOR_COUPLED_DIFFUSION_NONLINEAR_UPWIND_CONVERGENCE_MFD) {
 //   RunNonlinearTest("mfd: default", "none");
 // }
@@ -1457,7 +1492,7 @@ TEST(OPERATOR_COUPLED_DIFFUSION_INVERSE_UPWIND_CONVERGENCE_FV)
 // }
 
 
-// -----------------------------------------------------------------------------
+//
 // debugging tests, simply run one run and write more info to files
 // -----------------------------------------------------------------------------
 // TEST(OPERATOR_COUPLED_DIFFUSION_NONLINEAR_MFD_NONE) {

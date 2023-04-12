@@ -55,10 +55,10 @@ TEST(ELASTICITY_STIFFNESS_2D)
   MFD3D_Elasticity mfd(plist, mesh);
 
   int nnodes = 5, nrows = nnodes * 2, cell = 0;
-  DenseMatrix A(nrows, nrows);
+  DenseMatrix<> A(nrows, nrows);
 
   for (int method = 0; method < 2; method++) {
-    Tensor T;
+   Tensor<> T;
     double lambda(1.0), mu(0.0);
     if (method == 0) {
       T.Init(2, 1);
@@ -136,10 +136,10 @@ TEST(ELASTICITY_STIFFNESS_3D)
   MFD3D_Elasticity mfd(plist, mesh);
 
   int nrows = 24, nnodes = 8, cell = 0;
-  Tensor T(3, 1);
+ Tensor<> T(3, 1);
   T(0, 0) = 1;
 
-  DenseMatrix A(nrows, nrows);
+  DenseMatrix<> A(nrows, nrows);
   mfd.StiffnessMatrix(cell, T, A);
 
   printf("Stiffness matrix for cell %3d\n", cell);

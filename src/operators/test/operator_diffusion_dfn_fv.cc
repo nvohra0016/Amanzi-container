@@ -73,7 +73,7 @@ RunTest(int icase, double gravity)
   std::string setname("fractures");
   auto surfmesh_fw = Teuchos::rcp(
     new MeshExtractedManifold(mesh, setname, AmanziMesh::FACE, comm, gm, plist));
-  Teuchos::RCP<Mesh> surfmesh = Teuchos::rcp(new Mesh(surfmesh_fw, Teuchos::rcp(new AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null)); 
+  Teuchos::RCP<Mesh> surfmesh = Teuchos::rcp(new Mesh(surfmesh_fw, Teuchos::rcp(new AmanziMesh::MeshAlgorithms()), Teuchos::null)); 
 
   // modify diffusion coefficient
   int ncells_owned = surfmesh->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::OWNED);

@@ -16,7 +16,7 @@
 #ifndef AMANZI_OPERATOR_ANALYTIC_MAXWELL_BASE_HH_
 #define AMANZI_OPERATOR_ANALYTIC_MAXWELL_BASE_HH_
 
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 #include "Tensor.hh"
 #include "WhetStoneFunction.hh"
 
@@ -27,7 +27,7 @@ class AnalyticElectromagneticsBase : public Amanzi::WhetStone::WhetStoneFunction
 
   // analytic solution for Maxwell's equations
   // -- resitivity tensor T
-  virtual Amanzi::WhetStone::Tensor Tensor(const Amanzi::AmanziGeometry::Point& p, double t) = 0;
+  virtual Amanzi::WhetStone:Tensor<> Tensor(const Amanzi::AmanziGeometry::Point& p, double t) = 0;
   // -- analytic solution E
   virtual Amanzi::AmanziGeometry::Point
   electric_exact(const Amanzi::AmanziGeometry::Point& p, double t) = 0;

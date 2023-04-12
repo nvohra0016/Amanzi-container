@@ -70,7 +70,7 @@ StateArchive::Restore(const std::string& passwd)
 
 
 /* *******************************************************************
-* Copy: Field (BASE) -> Field (prev_BASE)
+* Copy: Evaluator (BASE) -> Field (prev_BASE)
 ******************************************************************* */
 void
 StateArchive::CopyFieldsToPrevFields(std::vector<std::string>& fields, const std::string& passwd)
@@ -104,24 +104,25 @@ StateArchive::get(const std::string& name)
 ****************************************************************** */
 void
 PKUtils_CalculatePermeabilityFactorInWell(const Teuchos::Ptr<State>& S,
-                                          Teuchos::RCP<Epetra_Vector>& Kxy)
+                                          Teuchos::RCP<Vector_type>& Kxy)
 {
   if (!S->HasRecord("permeability", Tags::DEFAULT)) return;
 
   const auto& cv = S->Get<CompositeVector>("permeability", Tags::DEFAULT);
-  cv.ScatterMasterToGhosted("cell");
-  const auto& perm = *cv.ViewComponent("cell", true);
+  cv.scatterMasterToGhosted("cell");
 
   int ncells_wghost = S->GetMesh()->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
-  int dim = perm.NumVectors();
 
-  Kxy = Teuchos::rcp(new Epetra_Vector(S->GetMesh()->getMap(AmanziMesh::Entity_kind::CELL,true)));
-
-  for (int c = 0; c < ncells_wghost; c++) {
-    (*Kxy)[c] = 0.0;
-    int idim = std::max(1, dim - 1);
-    for (int i = 0; i < idim; i++) (*Kxy)[c] += perm[i][c];
-    (*Kxy)[c] /= idim;
+  Kxy = Teuchos::rcp(new Vector_type(S->GetMesh()->getMap(AmanziMesh::Entity_kind::CELL,true)));
+  {
+    auto perm = cv.viewComponent<Kokkos::HostSpace>("cell", true);
+    auto Kxy_v = Kxy->getLocalViewHost(Tpetra::Access::ReadWrite);
+    int idim = std::max(1, (int)perm.extent(1) - 1);
+    for (int c = 0; c < ncells_wghost; c++) {
+      Kxy_v(c,0) = 0.0;
+      for (int i = 0; i < idim; i++) Kxy_v(c,0) += perm(c,i);
+      Kxy_v(c,0) /= idim;
+    }
   }
 }
 

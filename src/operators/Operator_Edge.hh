@@ -28,16 +28,14 @@ namespace Operators {
 
 class Operator_Edge : public Operator {
  public:
+  // main constructor
   // The input CVS is the domain and range of the operator.
   Operator_Edge(const Teuchos::RCP<const CompositeVectorSpace>& cvs, Teuchos::ParameterList& plist)
     : Operator(cvs, plist, OPERATOR_SCHEMA_DOFS_EDGE)
   {
     set_schema_string("EDGE");
-    cell_max_edges = mesh_->getCellMaxEdges();
+    cell_max_edges = mesh_->cell_get_max_edges();
   }
-
-  // copy constructor
-  virtual Teuchos::RCP<Operator> Clone() const;
 
   // rhs update which multiplies by cell
   virtual void UpdateRHS(const CompositeVector& source, bool volume_included);

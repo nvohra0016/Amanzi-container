@@ -47,21 +47,21 @@ class MFD3D_Elasticity : public MFD3D {
   }
 
   // -- mass matrices
-  int L2consistency(int c, const Tensor& T, DenseMatrix& N, DenseMatrix& Mc, bool symmetry);
+  int L2consistency(int c, const Tensor<>& T, DenseMatrix<>& N, DenseMatrix<>& Mc, bool symmetry);
 
   // -- stiffness matrix
-  int H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMatrix& Mc);
-  virtual int StiffnessMatrix(int c, const Tensor& T, DenseMatrix& A) override;
+  int H1consistency(int c, const Tensor<>& T, DenseMatrix<>& N, DenseMatrix<>& Mc);
+  virtual int StiffnessMatrix(int c, const Tensor<>& T, DenseMatrix<>& A) override;
 
   // optimization methods (mainly for research, since the maximum principle does not exists)
-  int StiffnessMatrixOptimized(int c, const Tensor& T, DenseMatrix& A);
-  int StiffnessMatrixMMatrix(int c, const Tensor& T, DenseMatrix& A);
+  int StiffnessMatrixOptimized(int c, const Tensor<>& T, DenseMatrix<>& A);
+  int StiffnessMatrixMMatrix(int c, const Tensor<>& T, DenseMatrix<>& A);
 
  private:
-  void MatrixMatrixProduct_(const DenseMatrix& A,
-                            const DenseMatrix& B,
+  void MatrixMatrixProduct_(const DenseMatrix<>& A,
+                            const DenseMatrix<>& B,
                             bool transposeB,
-                            DenseMatrix& AB);
+                            DenseMatrix<>& AB);
 
  private:
   static RegisteredFactory<MFD3D_Elasticity> reg_;

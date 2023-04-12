@@ -31,6 +31,7 @@
 #include "MeshLogicalFactory.hh"
 #include "MeshLogical.hh"
 #include "Tensor.hh"
+#include "AmanziComm.hh"
 
 // Amanzi::Operators
 #include "PDE_Accumulation.hh"
@@ -51,7 +52,7 @@ RunTestMarshakLogical(std::string op_list_name)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0) std::cout << "\nTest: Simulating nonlinear Marshak wave" << std::endl;
 
@@ -67,7 +68,7 @@ RunTestMarshakLogical(std::string op_list_name)
   MeshLogicalFactory fac(comm, gm);
 
   AmanziGeometry::Point begin(0., 0.5, 0.5), end(1., 0.5, 0.5);
-  std::vector<AmanziMesh::Entity_ID> cells, faces;
+  AmanziMesh::Entity_ID_List cells, faces;
   fac.AddSegment(100,
                  begin,
                  end,
@@ -77,21 +78,20 @@ RunTestMarshakLogical(std::string op_list_name)
                  "myregion",
                  &cells,
                  &faces);
-  auto mesh_logical = fac.Create();
-  auto mesh = Teuchos::rcp(new Mesh(mesh_logical,Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()),Teuchos::null)); 
+  RCP<const Mesh> mesh = fac.Create();
 
   // Create nonlinear coefficient.
   Teuchos::RCP<HeatConduction> knc = Teuchos::rcp(new HeatConduction(mesh, 0.0));
 
   // modify diffusion coefficient
   // -- since rho=mu=1.0, we do not need to scale the diffusion coefficient.
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells_owned = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
   for (int c = 0; c < ncells_owned; c++) {
-    WhetStone::Tensor Kc(2, 1);
+    WhetStone:Tensor<> Kc(2, 1);
     Kc(0, 0) = 1.0;
     K->push_back(Kc);
   }
@@ -102,7 +102,7 @@ RunTestMarshakLogical(std::string op_list_name)
   std::vector<double>& bc_value = bc->bc_value();
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
+    const Point& xf = mesh->getFaceCentroid(f)
 
     if (fabs(xf[1]) < 1e-6 || fabs(xf[1] - 1.0) < 1e-6) {
       bc_model[f] = Operators::OPERATOR_BC_NEUMANN;
@@ -130,15 +130,15 @@ RunTestMarshakLogical(std::string op_list_name)
 
   Point velocity(0.0, 0.0);
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& normal = mesh->getFaceNormal(f);
+    const Point& normal = mesh->getFaceNormal(f)
     flx[0][f] = velocity * normal;
   }
 
   CompositeVector solution(*cvs);
-  solution.PutScalar(knc->TemperatureFloor); // solution at time T=0
+  solution.putScalar(knc->TemperatureFloor); // solution at time T=0
 
   CompositeVector heat_capacity(*cvs);
-  heat_capacity.PutScalar(1.0);
+  heat_capacity.putScalar(1.0);
 
   // Create upwind model
   ParameterList& ulist = plist.sublist("PK operator").sublist("upwind");
@@ -155,13 +155,13 @@ RunTestMarshakLogical(std::string op_list_name)
 
     // update bc
     for (int f = 0; f < nfaces_wghost; f++) {
-      const Point& xf = mesh->getFaceCentroid(f);
+      const Point& xf = mesh->getFaceCentroid(f)
       if (fabs(xf[0]) < 1e-6) bc_value[f] = knc->exact(T + dT, xf);
     }
 
     // upwind heat conduction coefficient
     knc->UpdateValues(solution, bc_model, bc_value);
-    upwind.Compute(*flux, bc_model, *knc->values());
+    upwind.Compute(*flux, solution, bc_model, *knc->values());
 
     // add diffusion operator
     Teuchos::ParameterList olist = plist.sublist("PK operator").sublist(op_list_name);
@@ -218,7 +218,7 @@ RunTestMarshakLogical(std::string op_list_name)
       ds_rel = std::max(ds_rel, sol_diff[0][c] / (1e-3 + sol_old[0][c] + sol_new[0][c]));
     }
     double ds_rel_local = ds_rel;
-    sol_diff.Comm().MaxAll(&ds_rel_local, &ds_rel, 1);
+    Teuchos::reduceAll<int>(sol_diff.Comm(),Teuchos::REDUCE_MAX, 1,&ds_rel_local, &ds_rel);
 
     if (ds_rel < 0.05) {
       dT *= 1.2;
@@ -233,7 +233,7 @@ RunTestMarshakLogical(std::string op_list_name)
   double pl2_err(0.0), pnorm(0.0);
 
   for (int c = 0; c < ncells_owned; ++c) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     double err = p[0][c] - knc->exact(T, xc);
     pl2_err += err * err;
     pnorm += p[0][c] * p[0][c];

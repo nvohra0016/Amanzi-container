@@ -30,7 +30,7 @@ bool POINT_CLOSE(const Point& p1, const Point& p2) {
 #define CHECK_POINT_CLOSE(p1, p2) CHECK(POINT_CLOSE(p1,p2))
 
 void
-test_segment_regular(const Teuchos::RCP<const Amanzi::AmanziMesh::Mesh>& m,
+test_segment_regular(const Teuchos::RCP<const MeshHost>& m,
                      bool test_region)
 {
   MeshLogicalAudit audit(m, std::cout);
@@ -42,9 +42,9 @@ test_segment_regular(const Teuchos::RCP<const Amanzi::AmanziMesh::Mesh>& m,
   for (int i=0; i!=4; ++i) {
     CHECK_EQUAL(0.25, m->getCellVolume(i));
 
-    cEntity_ID_View faces;
-    cEntity_Direction_View dirs;
-    Amanzi::AmanziMesh::cPoint_View bisectors;
+    MeshFramework::cEntity_ID_View faces;
+    MeshFramework::cDirection_View dirs;
+    MeshFramework::cPoint_View bisectors;
     m->getCellFacesAndDirs(i, faces, &dirs);
     CHECK_EQUAL(2, faces.size());
     CHECK_EQUAL(i, faces[0]);
@@ -72,7 +72,7 @@ test_segment_regular(const Teuchos::RCP<const Amanzi::AmanziMesh::Mesh>& m,
       CHECK_POINT_CLOSE(Point(-1.,0.,0.), normal);
     }
 
-    cEntity_ID_View cells;
+    MeshFramework::cEntity_ID_View cells;
     m->getFaceCells(i, Parallel_kind::ALL, cells);
     if (i == 0) {
       CHECK_EQUAL(1, cells.size());
@@ -93,19 +93,15 @@ test_segment_regular(const Teuchos::RCP<const Amanzi::AmanziMesh::Mesh>& m,
     CHECK_EQUAL(4, m->getSetSize("myregion", Entity_kind::CELL, Parallel_kind::ALL));
     CHECK_EQUAL(0, m->getSetSize("myregion", Entity_kind::FACE, Parallel_kind::ALL));
 
-    cEntity_ID_View set_ents;
-    set_ents = m->getSetEntities("myregion", Entity_kind::CELL, Parallel_kind::ALL);
+    auto set_ents = m->getSetEntities("myregion", Entity_kind::CELL, Parallel_kind::ALL);
     CHECK_EQUAL(0, set_ents[0]);
     CHECK_EQUAL(2, set_ents[2]);
   }
 }
 
 void
-test_segment_irregular(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
+test_segment_irregular(const Teuchos::RCP<MeshHost>& m,
                      bool test_region) {
-  using namespace Amanzi::AmanziMesh;
-  using namespace Amanzi::AmanziGeometry;
-
   MeshLogicalAudit audit(m, std::cout);
   CHECK(!audit.Verify());
 
@@ -125,8 +121,7 @@ test_segment_irregular(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
   CHECK_THROW(m->getSetSize("myregion", Entity_kind::FACE, Parallel_kind::ALL), Errors::Message);
 
   if (test_region) {
-    Entity_ID_View set_ents;
-    set_ents = m->getSetEntities("myregion", Entity_kind::CELL, Parallel_kind::ALL);
+    auto set_ents = m->getSetEntities("myregion", Entity_kind::CELL, Parallel_kind::ALL);
     CHECK_EQUAL(0, set_ents[0]);
     CHECK_EQUAL(2, set_ents[1]);
   }
@@ -134,11 +129,8 @@ test_segment_irregular(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
 
 
 void
-test_Y(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
+test_Y(const Teuchos::RCP<MeshHost>& m,
                      bool test_region) {
-  using namespace Amanzi::AmanziMesh;
-  using namespace Amanzi::AmanziGeometry;
-
   MeshLogicalAudit audit(m, std::cout);
   CHECK(!audit.Verify());
 
@@ -156,8 +148,8 @@ test_Y(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
   CHECK_CLOSE(0., norm(branch - m->getCellCentroid(2)), 1.e-6);
   branch[2] = -3.0;
 
-  cEntity_ID_View branch_faces;
-  cEntity_Direction_View dirs;
+  MeshFramework::cEntity_ID_View branch_faces;
+  MeshFramework::cDirection_View dirs;
   m->getCellFacesAndDirs(2, branch_faces, &dirs);
   CHECK_EQUAL(5, branch_faces.size());
 
@@ -179,20 +171,17 @@ test_Y(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
 
 
 void
-test_2Y(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
+test_2Y(const Teuchos::RCP<MeshHost>& m,
                      bool test_region) {
-  using namespace Amanzi::AmanziMesh;
-  using namespace Amanzi::AmanziGeometry;
-
   MeshLogicalAudit audit(m, std::cout);
   CHECK(!audit.Verify());
 
   CHECK_EQUAL(3, m->getNumEntities(Entity_kind::CELL, Parallel_kind::ALL));
   CHECK_EQUAL(5, m->getNumEntities(Entity_kind::FACE, Parallel_kind::ALL));
 
-  cEntity_ID_View branch_faces;
-  cEntity_Direction_View dirs;
-  Amanzi::AmanziMesh::cPoint_View bisectors;
+  MeshFramework::cEntity_ID_View branch_faces;
+  MeshFramework::cDirection_View dirs;
+  MeshFramework::cPoint_View bisectors;
   double r22 = sqrt(2.0) / 2.0;
 
   // check topology/geometry
@@ -307,7 +296,6 @@ test_2Y(const Teuchos::RCP<Amanzi::AmanziMesh::Mesh>& m,
 // Tests the construction process, ensures it does not crash.
 TEST(MESH_LOGICAL_CONSTRUCTION)
 {
-  using namespace Amanzi::AmanziMesh;
   std::cout << std::endl
             << "TEST: MeshLogical Construction" << std::endl
             << "------------------------------" << std::endl;
@@ -323,7 +311,7 @@ TEST(MESH_LOGICAL_SEGMENT_REGULAR_MANUAL)
             << "-----------------------------------------------------" << std::endl;
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalSegmentRegularManual();
   std::cout<<"Before Cache"<<std::endl;
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
   std::cout<<"After Cache"<<std::endl;
   test_segment_regular(mesh, false);
 }
@@ -335,7 +323,7 @@ TEST(MESH_LOGICAL_SEGMENT_REGULAR_XML)
             << "TEST: MeshLogical single segment, xml construction" << std::endl
             << "-----------------------------------------------------" << std::endl;
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalFromXML("regular");
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
   test_segment_regular(mesh, false);
 }
 
@@ -347,7 +335,7 @@ TEST(MESH_LOGICAL_SEGMENT_IRREGULAR_WITH_SETS)
             << "TEST: MeshLogical single segment, deformed" << std::endl
             << "-----------------------------------------------------" << std::endl;
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalSegmentIrregularManual();
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
   test_segment_irregular(mesh, true);
 }
 
@@ -360,7 +348,7 @@ TEST(MESH_LOGICAL_2Y_XML_WITH_SETS)
             << "-----------------------------------------------------" << std::endl;
 
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalFromXML("logical mesh 2Y");
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
   test_2Y(mesh, true);
 }
 
@@ -372,7 +360,7 @@ TEST(MESH_LOGICAL_Y)
             << "TEST: MeshLogical Y, manual construction" << std::endl
             << "-----------------------------------------------------" << std::endl;
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalYManual();
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
   test_Y(mesh, true);
 }
 
@@ -384,7 +372,7 @@ TEST(MESH_LOGICAL_Y_XML_WITH_SETS)
             << "TEST: MeshLogical Y, from XML" << std::endl
             << "-----------------------------------------------------" << std::endl;
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalFromXML("logical mesh Y");
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
   test_Y(mesh, true);
 }
 
@@ -396,7 +384,7 @@ TEST(MESH_EMBEDDED_Y)
             << "TEST: MeshLogical Y, embedded in background mesh" << std::endl
             << "-----------------------------------------------------" << std::endl;
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalYEmbedded();
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshEmbeddedLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshEmbeddedLogicalAlgorithms()), Teuchos::null));
   Amanzi::AmanziMesh::MeshLogicalAudit audit(mesh, std::cout);
   CHECK(!audit.Verify());
 }
@@ -409,7 +397,7 @@ TEST(MESH_SUBGRID_VARIABLE_TAU)
             << "TEST: subgrid mesh in travel time space" << std::endl
             << "-----------------------------------------------------" << std::endl;
   Teuchos::RCP<MeshFramework> mesh_fw = Amanzi::Testing::demoMeshLogicalFromXML("subgrid mesh");
-  auto mesh = Teuchos::rcp(new Amanzi::AmanziMesh::MeshCache<MemSpace_kind::HOST>(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
+  auto mesh = Teuchos::rcp(new MeshHost(mesh_fw, Teuchos::rcp(new Amanzi::AmanziMesh::MeshLogicalAlgorithms()), Teuchos::null));
   Amanzi::AmanziMesh::MeshLogicalAudit audit(mesh, std::cout);
   CHECK(!audit.Verify());
 }

@@ -127,7 +127,7 @@ class VerboseObject : public Teuchos::VerboseObject<VerboseObject> {
   static unsigned int global_writing_rank;
 
   // Color output for developers
-  std::string color(const std::string& name) const;
+  std::string color(const std::string& name = "") const;
   std::string reset() const;
   std::string clock() const;
 

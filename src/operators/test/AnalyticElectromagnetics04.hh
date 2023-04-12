@@ -24,9 +24,9 @@ class AnalyticElectromagnetics04 : public AnalyticElectromagneticsBase {
     : AnalyticElectromagneticsBase(mesh){};
   ~AnalyticElectromagnetics04(){};
 
-  Amanzi::WhetStone::Tensor Tensor(const Amanzi::AmanziGeometry::Point& p, double t)
+  Amanzi::WhetStone:Tensor<> Tensor(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K(p.dim(), 1);
+    Amanzi::WhetStone:Tensor<> K(p.dim(), 1);
     K(0, 0) = 1.0;
     return K;
   }

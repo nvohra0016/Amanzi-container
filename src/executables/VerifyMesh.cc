@@ -41,8 +41,8 @@ main(int argc, char* argv[])
 {
   Teuchos::GlobalMPISession mpiSession(&argc, &argv);
   auto comm = Amanzi::getDefaultComm();
-  const int nproc(comm->NumProc());
-  const int me(comm->MyPID());
+  const int nproc(comm->getSize());
+  const int me(comm->getRank());
 
   // handle command line
 
@@ -101,8 +101,7 @@ main(int argc, char* argv[])
     ierr++;
   }
 
-  comm->SumAll(&ierr, &aerr, 1);
-
+  Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &ierr, &aerr);
   if (aerr > 0) { return 1; }
 
   if (parseReturn == Teuchos::CommandLineProcessor::PARSE_HELP_PRINTED) { return 0; }
@@ -147,8 +146,7 @@ main(int argc, char* argv[])
     ierr++;
   }
 
-  comm->SumAll(&ierr, &aerr, 1);
-
+  Teuchos::reduceAll(*comm, Teuchos::REDUCE_SUM, 1, &ierr, &aerr);
   if (aerr > 0) { return 3; }
 
   int status;
@@ -167,19 +165,20 @@ main(int argc, char* argv[])
 
   if (me == 0) { std::cout << filename << ": " << (status ? "has errors" : "OK") << std::endl; }
 
+  auto out = Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout));
   if (dump_node_map) {
     if (me == 0) { std::cout << "Node Epetra Map: " << std::endl; }
-    (mesh->getMap(Amanzi::AmanziMesh::Entity_kind::NODE, false)).Print(std::cout);
+    (mesh->getMap(Amanzi::AmanziMesh::Entity_kind::NODE, false))->describe(*out);
   }
 
   if (dump_face_map) {
     if (me == 0) { std::cout << "Face Epetra Map: " << std::endl; }
-    (mesh->getMap(Amanzi::AmanziMesh::Entity_kind::FACE, false)).Print(std::cout);
+    (mesh->getMap(Amanzi::AmanziMesh::Entity_kind::FACE, false))->describe(*out);
   }
 
   if (dump_cell_map) {
     if (me == 0) { std::cout << "Cell Epetra Map: " << std::endl; }
-    (mesh->getMap(Amanzi::AmanziMesh::Entity_kind::CELL, false)).Print(std::cout);
+    (mesh->getMap(Amanzi::AmanziMesh::Entity_kind::CELL, false))->describe(*out);
   }
 
   return status;

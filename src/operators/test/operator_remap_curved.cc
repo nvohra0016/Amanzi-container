@@ -18,7 +18,6 @@
 #include <vector>
 
 // TPLs
-#include "Epetra_MultiVector.h"
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
@@ -28,7 +27,7 @@
 #include "CompositeVector.hh"
 #include "DG_Modal.hh"
 #include "Explicit_TI_RK.hh"
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 #include "MeshCurved.hh"
 #include "MeshFactory.hh"
 #include "NumericalIntegration.hh"
@@ -51,8 +50,8 @@ class MyRemapDGc : public Operators::RemapDG<CompositeVector> {
              double T1)
     : RemapDG<CompositeVector>(mesh0, mesh1, plist),
       tprint_(0.0),
-      dt_output_(0.1),
       l2norm_(-1.0),
+      dt_output_(0.1),
       T1_(T1),
       tini_(0.0){};
   ~MyRemapDGc(){};
@@ -90,52 +89,52 @@ class MyRemapDGc : public Operators::RemapDG<CompositeVector> {
 
 
 /* *****************************************************************
-* Initialization of remap.
-***************************************************************** */
+ * Initialization of remap.
+ ***************************************************************** */
 void
 MyRemapDGc::Init(const Teuchos::RCP<WhetStone::DG_Modal> dg)
 {
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data on mesh scheleton...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data on mesh scheleton...\n";
   InitializeOperators(dg);
   StaticEdgeFaceVelocities();
   StaticCellVelocity();
 
   velf_vec0_.resize(nfaces_wghost_);
   for (int f = 0; f < nfaces_wghost_; ++f) {
-    velf_vec0_[f].Reshape(dim_, dim_, 1, true);
-    velf_vec0_[f].set_origin(mesh0_->getFaceCentroid(f));
+    velf_vec0_[f].reshape(dim_, dim_, 1, true);
+    velf_vec0_[f].set_origin(mesh0_->getFaceCentroid(f))
   }
 
-  if (mesh0_->hasEdges()) {
+  if (mesh0_->valid_edges()) {
     vele_vec0_.resize(nedges_wghost_);
     for (int e = 0; e < nedges_wghost_; ++e) {
-      vele_vec0_[e].Reshape(dim_, dim_, 1, true);
-      vele_vec0_[e].set_origin(mesh0_->getEdgeCentroid(e));
+      vele_vec0_[e].reshape(dim_, dim_, 1, true);
+      vele_vec0_[e].set_origin(mesh0_.getEdgeCentroid(e));
     }
   }
 
   J0_.resize(ncells_owned_);
   for (int c = 0; c < ncells_owned_; ++c) {
-    J0_[c].Reshape(dim_, dim_, dim_, 0, true);
-    J0_[c].set_origin(mesh0_->getCellCentroid(c));
+    J0_[c].reshape(dim_, dim_, dim_, 0, true);
+    J0_[c].set_origin(mesh0_->getCellCentroid(c))
   }
 
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data in mesh cells...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data in mesh cells...\n";
   StaticFaceCoVelocity();
   StaticCellCoVelocity();
 }
 
 
 /* *****************************************************************
-* TBW
-***************************************************************** */
+ * TBW
+ ***************************************************************** */
 void
 MyRemapDGc::ReInit(double tini)
 {
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data on mesh scheleton...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data on mesh scheleton...\n";
   for (int f = 0; f < nfaces_wghost_; ++f) velf_vec0_[f] += velf_vec_[f];
 
-  if (mesh0_->hasEdges()) {
+  if (mesh0_->valid_edges()) {
     for (int e = 0; e < nedges_wghost_; ++e) vele_vec0_[e] += vele_vec_[e];
   }
 
@@ -147,18 +146,18 @@ MyRemapDGc::ReInit(double tini)
   // adjust new velocities for interval [tini, tend]
   for (int f = 0; f < nfaces_wghost_; ++f) velf_vec_[f] -= velf_vec0_[f];
 
-  if (mesh0_->hasEdges()) {
+  if (mesh0_->valid_edges()) {
     for (int e = 0; e < nedges_wghost_; ++e) vele_vec_[e] -= vele_vec0_[e];
   }
 
   StaticCellVelocity();
 
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data in mesh cells...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data in mesh cells...\n";
   StaticFaceCoVelocity();
   StaticCellCoVelocity();
 
   // re-calculate static matrices
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static matrices for operators...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static matrices for operators...\n";
   op_adv_->Setup(velc_, true);
   op_reac_->Setup(det_, true);
   op_flux_->Setup(velf_.ptr(), true);
@@ -168,8 +167,8 @@ MyRemapDGc::ReInit(double tini)
 
 
 /* *****************************************************************
-* Initialization of space-tim co-velocity v = u * (j J^{-t} N)
-***************************************************************** */
+ * Initialization of space-tim co-velocity v = u * (j J^{-t} N)
+ ***************************************************************** */
 void
 MyRemapDGc::StaticFaceCoVelocity()
 {
@@ -192,8 +191,8 @@ MyRemapDGc::StaticFaceCoVelocity()
 
 
 /* *****************************************************************
-* Initialization of the constant cell velocity
-***************************************************************** */
+ * Initialization of the constant cell velocity
+ ***************************************************************** */
 void
 MyRemapDGc::StaticCellCoVelocity()
 {
@@ -204,6 +203,7 @@ MyRemapDGc::StaticCellCoVelocity()
     // space-time cell velocity: v = -j J^{-1} u = -C^t u
     WhetStone::MatrixSpaceTimePolynomial Jt(dim_, dim_, dim_, 1), Ct;
     WhetStone::VectorSpaceTimePolynomial tmp(dim_, dim_, 0);
+    const auto& origin = uc_[c][0].origin();
 
     for (int i = 0; i < dim_; ++i) {
       for (int j = 0; j < dim_; ++j) {
@@ -225,18 +225,18 @@ MyRemapDGc::StaticCellCoVelocity()
 
 
 /* *****************************************************************
-* Compute initial mass: partial specialization
-***************************************************************** */
+ * Compute initial mass: partial specialization
+ ***************************************************************** */
 double
 MyRemapDGc::InitialMass(const CompositeVector& p1, int order)
 {
   const Epetra_MultiVector& p1c = *p1.ViewComponent("cell", false);
-  int nk = p1c.NumVectors();
-  int ncells = p1c.MyLength();
+  int nk = p1c.getNumVectors();
+  int ncells = p1c.getLocalLength();
 
   double mass(0.0), mass0;
-  WhetStone::DenseVector data(nk);
-  WhetStone::NumericalIntegration numi(mesh0_);
+  WhetStone::DenseVector<> data(nk);
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh0_);
 
   for (int c = 0; c < ncells; c++) {
     for (int i = 0; i < nk; ++i) data(i) = p1c[i][c];
@@ -244,14 +244,14 @@ MyRemapDGc::InitialMass(const CompositeVector& p1, int order)
     mass += numi.IntegratePolynomialCell(c, poly);
   }
 
-  mesh0_->getComm()->SumAll(&mass, &mass0, 1);
+  Teuchos::reduceAll<int>(*mesh0_->get_comm(),Teuchos::REDUCE_SUM, 1,&mass, &mass0);
   return mass0;
 }
 
 
 /* *****************************************************************
-* Print statistics using conservative field u
-***************************************************************** */
+ * Print statistics using conservative field u
+ ***************************************************************** */
 void
 MyRemapDGc::CollectStatistics(double t, const CompositeVector& u)
 {
@@ -263,10 +263,10 @@ MyRemapDGc::CollectStatistics(double t, const CompositeVector& u)
 
     auto& rhs = *op_reac_->global_operator()->rhs();
     op_reac_->global_operator()->Apply(u, rhs);
-    rhs.Dot(u, &l2norm_);
+    rhs.dot(u, &l2norm_);
 
     Epetra_MultiVector& xc = *rhs.ViewComponent("cell");
-    int nk = xc.NumVectors();
+    int nk = xc.getNumVectors();
     double xmax[nk], xmin[nk], lmax(-1.0), lmin(-1.0), lavg(-1.0);
     xc.MaxValue(xmax);
     xc.MinValue(xmin);
@@ -278,9 +278,9 @@ MyRemapDGc::CollectStatistics(double t, const CompositeVector& u)
       lim.MeanValue(&lavg);
     }
 
-    if (mesh0_->getComm()->MyPID() == 0) {
-      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  limiter: %6.3f %6.3f %6.3f  umax/umin: "
-             "%9.5g %9.5g\n",
+    if (mesh0_->get_comm()->getRank() == 0) {
+      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  limiter: %6.3f %6.3f "
+             "%6.3f  umax/umin: %9.5g %9.5g\n",
              tglob,
              l2norm_,
              nfun_,
@@ -301,9 +301,9 @@ MyRemapDGc::CollectStatistics(double t, const CompositeVector& u)
 
 
 /* *****************************************************************
-* Remap of polynomilas in two dimensions. Explicit time scheme.
-* Dual formulation places gradient and jumps on a test function.
-***************************************************************** */
+ * Remap of polynomilas in two dimensions. Explicit time scheme.
+ * Dual formulation places gradient and jumps on a test function.
+ ***************************************************************** */
 template <class AnalyticDG>
 void
 RemapTestsCurved(std::string file_name,
@@ -323,7 +323,7 @@ RemapTestsCurved(std::string file_name,
   int dim = (nz == 0) ? 2 : 3;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   // read and set parameters
   std::string xmlFileName = "test/operator_remap.xml";
@@ -385,8 +385,6 @@ RemapTestsCurved(std::string file_name,
     mesh0 = Teuchos::rcp(new MeshCurved(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, nx, ny, nz, comm, gm, mlist));
     mesh1 = Teuchos::rcp(new MeshCurved(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, nx, ny, nz, comm, gm, mlist));
   }
-  mesh0->BuildCache();
-  mesh1->BuildCache();
 
   int ncells_owned = mesh0->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh0->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
@@ -417,7 +415,7 @@ RemapTestsCurved(std::string file_name,
 
   p2c = *p1->ViewComponent("cell");
 
-  io->InitializeCycle(0.0, 0, "");
+  io->InitializeCycle(0.0, 0);
   io->WriteVector(*p2c(0), "solution", AmanziMesh::Entity_kind::CELL);
   io->FinalizeCycle();
 
@@ -464,7 +462,7 @@ RemapTestsCurved(std::string file_name,
 
     // visualize solution on mesh1
     // io = Teuchos::rcp(new OutputXDMF(iolist, mesh1, true, false));
-    io->InitializeCycle(t, iloop + 1, "");
+    io->InitializeCycle(t, iloop + 1);
     io->WriteVector(*p2c(0), "solution", AmanziMesh::Entity_kind::CELL);
     if (order > 0) {
       io->WriteVector(*p2c(1), "gradx", AmanziMesh::Entity_kind::CELL);
@@ -482,16 +480,14 @@ RemapTestsCurved(std::string file_name,
   Entity_ID_View nodes;
   AmanziGeometry::Point v0(dim), v1(dim), tau(dim);
 
-  double pnorm, l2_err, inf_err, l20_err, l10_err, inf0_err;
-  ana.ComputeCellErrorRemap(
-    *dg, p2c, tend, 0, mesh1, pnorm, l2_err, inf_err, l20_err, l10_err, inf0_err);
+  double pnorm, l2_err, inf_err, l20_err, inf0_err;
+  ana.ComputeCellErrorRemap(*dg, p2c, tend, 0, mesh1, pnorm, l2_err, inf_err, l20_err, inf0_err);
 
   CHECK(l20_err < 0.2 / (order + 1));
 
   if (MyPID == 0) {
-    printf("nx=%3d (orig) L1=%12.8g(mean) L2=%12.8g(mean) %12.8g  Inf=%12.8g %12.8g\n",
+    printf("nx=%3d (orig) L2=%12.8g(mean) %12.8g  Inf=%12.8g %12.8g\n",
            nx,
-           l10_err,
            l20_err,
            l2_err,
            inf0_err,
@@ -503,13 +499,16 @@ RemapTestsCurved(std::string file_name,
   Epetra_MultiVector& q2c = *q2.ViewComponent("cell");
 
   for (int c = 0; c < ncells_owned; ++c) {
-    WhetStone::DenseVector data(nk);
+    const AmanziGeometry::Point& xc0 = mesh0->getCellCentroid(c)
+    const AmanziGeometry::Point& xc1 = mesh1->getCellCentroid(c)
+
+    WhetStone::DenseVector<> data(nk);
     for (int i = 0; i < nk; ++i) data(i) = p2c[i][c];
 
     if (order > 0 && order < 3 && dim == 2) {
       auto poly = dg->cell_basis(c).CalculatePolynomial(mesh0, c, order, data);
       remap.maps()->ProjectPolynomial(c, poly);
-      poly.ChangeOrigin(mesh1->getCellCentroid(c));
+      poly.ChangeOrigin(mesh1->getCellCentroid(c))
       for (int i = 0; i < nk; ++i) q2c[i][c] = poly(i);
     }
   }
@@ -518,26 +517,26 @@ RemapTestsCurved(std::string file_name,
   double area(0.0), area0(0.0), area1(0.0);
   double mass1(0.0), gcl_err(0.0), gcl_inf(0.0);
   auto& det = remap.det();
-  WhetStone::NumericalIntegration numi(mesh0);
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh0);
 
   for (int c = 0; c < ncells_owned; ++c) {
     double vol1 = numi.IntegratePolynomialCell(c, det[c].Value(1.0));
-    double vol2 = mesh1->getCellVolume(c);
+    double vol2 = mesh1->getCellVolume(c)
 
     area += vol1;
-    area0 += mesh0->getCellVolume_linear(c);
-    area1 += mesh1->getCellVolume_linear(c);
+    area0 += mesh0->cell_volume_linear(c);
+    area1 += mesh1->cell_volume_linear(c);
 
     double err = std::fabs(vol1 - vol2);
     gcl_inf = std::max(gcl_inf, err / vol1);
     gcl_err += err;
 
-    WhetStone::DenseVector data(nk);
+    WhetStone::DenseVector<> data(nk);
     for (int i = 0; i < nk; ++i) data(i) = p2c[i][c];
     auto poly = dg->cell_basis(c).CalculatePolynomial(mesh0, c, order, data);
 
-    WhetStone::Polynomial tmp(det[c].Value(1.0));
-    tmp.ChangeOrigin(mesh0->getCellCentroid(c));
+    WhetStone::Polynomial<> tmp(det[c].Value(1.0));
+    tmp.ChangeOrigin(mesh0->getCellCentroid(c))
     poly *= tmp;
     mass1 += numi.IntegratePolynomialCell(c, poly);
   }
@@ -565,7 +564,8 @@ TEST(REMAP_CURVED_3D)
   double dT(0.025), T1(1.0 / nloop);
   int deform = 5;
   RemapTestsCurved<AnalyticDG04b>("", 4, 4, 4, dT, deform, nloop, T1);
-  // RemapTestsCurved<AnalyticDG04b>("test/prism10.exo", 10,1,1, dT,   deform, nloop, T1);
+  // RemapTestsCurved<AnalyticDG04b>("test/prism10.exo", 10,1,1, dT,   deform,
+  // nloop, T1);
 }
 
 TEST(REMAP_CURVED_2D)
@@ -574,7 +574,8 @@ TEST(REMAP_CURVED_2D)
   double dT(0.1), T1(1.0 / nloop);
   int deform = 1;
   RemapTestsCurved<AnalyticDG04>("", 8, 8, 0, dT, deform, nloop, T1);
-  // RemapTestsCurved<AnalyticDG04>("test/circle_quad10.exo", 10,0,0, 0.1, 6, 40, 0.025);
+  // RemapTestsCurved<AnalyticDG04>("test/circle_quad10.exo", 10,0,0, 0.1, 6,
+  // 40, 0.025);
 }
 
 TEST(REMAP_CURVED_DEV)
@@ -583,19 +584,22 @@ TEST(REMAP_CURVED_DEV)
   int nloop = 2;
   double dT(0.025), T1(1.0 / nloop);
   int deform = 5;
-  RemapTestsCurved<AnalyticDG04b>("test/prism10.exo", 10,1,1, dT,   deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04b>("test/prism20.exo", 20,1,1, dT/2, deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04b>("test/prism40.exo", 40,1,1, dT/4, deform, nloop, T1);
+  RemapTestsCurved<AnalyticDG04b>("test/prism10.exo", 10,1,1, dT,   deform,
+  nloop, T1); RemapTestsCurved<AnalyticDG04b>("test/prism20.exo", 20,1,1, dT/2,
+  deform, nloop, T1); RemapTestsCurved<AnalyticDG04b>("test/prism40.exo",
+  40,1,1, dT/4, deform, nloop, T1);
   */
 
   /*
   int nloop = 40;
   double dT(0.0025 * nloop), T1(1.0 / nloop);
   int deform = 6;
-  RemapTestsCurved<AnalyticDG04>("test/circle_quad10.exo", 10,0,0, dT,   deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04>("test/circle_quad20.exo", 20,0,0, dT/2, deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04>("test/circle_poly40.exo", 40,0,0, dT/4, deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04>("test/circle_poly80.exo", 80,0,0, dT/8, deform, nloop, T1);
+  RemapTestsCurved<AnalyticDG04>("test/circle_quad10.exo", 10,0,0, dT,   deform,
+  nloop, T1); RemapTestsCurved<AnalyticDG04>("test/circle_quad20.exo", 20,0,0,
+  dT/2, deform, nloop, T1);
+  RemapTestsCurved<AnalyticDG04>("test/circle_poly40.exo", 40,0,0, dT/4, deform,
+  nloop, T1); RemapTestsCurved<AnalyticDG04>("test/circle_poly80.exo", 80,0,0,
+  dT/8, deform, nloop, T1);
   */
 
   /*
@@ -612,9 +616,11 @@ TEST(REMAP_CURVED_DEV)
   int nloop = 1;
   double dT(0.01 * nloop), T1(1.0 / nloop);
   int deform = 5;
-  RemapTestsCurved<AnalyticDG04>("test/median15x16.exo",    16,0,0, dT,   deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04>("test/median32x33.exo",    32,0,0, dT/2, deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04>("test/median63x64.exo",    64,0,0, dT/4, deform, nloop, T1);
-  RemapTestsCurved<AnalyticDG04>("test/median127x128.exo", 128,0,0, dT/8, deform, nloop, T1);
+  RemapTestsCurved<AnalyticDG04>("test/median15x16.exo",    16,0,0, dT, deform,
+  nloop, T1); RemapTestsCurved<AnalyticDG04>("test/median32x33.exo",    32,0,0,
+  dT/2, deform, nloop, T1);
+  RemapTestsCurved<AnalyticDG04>("test/median63x64.exo",    64,0,0, dT/4,
+  deform, nloop, T1); RemapTestsCurved<AnalyticDG04>("test/median127x128.exo",
+  128,0,0, dT/8, deform, nloop, T1);
   */
 }

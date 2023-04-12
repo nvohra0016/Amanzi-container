@@ -21,7 +21,7 @@
 
 // Amanzi
 #include "CompositeVector.hh"
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 #include "Mesh_Algorithms.hh"
 
 // Operators
@@ -47,25 +47,27 @@ UpwindSecondOrder::Init(Teuchos::ParameterList& plist)
 ****************************************************************** */
 void
 UpwindSecondOrder::Compute(const CompositeVector& flux,
+                           const CompositeVector& solution,
                            const std::vector<int>& bc_model,
                            CompositeVector& field)
 {
-  AMANZI_ASSERT(field.HasComponent("cell"));
-  AMANZI_ASSERT(field.HasComponent("grad"));
-  AMANZI_ASSERT(field.HasComponent(face_comp_));
+  AMANZI_ASSERT(field.hasComponent("cell"));
+  AMANZI_ASSERT(field.hasComponent("grad"));
+  AMANZI_ASSERT(field.hasComponent(face_comp_));
 
   field.ScatterMasterToGhosted("cell");
   flux.ScatterMasterToGhosted("face");
 
-  const Epetra_MultiVector& flx_face = *flux.ViewComponent("face", true);
+  const Epetra_MultiVector& flx_face = *flux.viewComponent("face", true);
+  // const Epetra_MultiVector& sol_face = *solution.viewComponent("face", true);
 
-  const Epetra_MultiVector& fld_cell = *field.ViewComponent("cell", true);
-  const Epetra_MultiVector& fld_grad = *field.ViewComponent("grad", true);
-  const Epetra_MultiVector& fld_boundary = *field.ViewComponent("boundary_face", true);
+  const Epetra_MultiVector& fld_cell = *field.viewComponent("cell", true);
+  const Epetra_MultiVector& fld_grad = *field.viewComponent("grad", true);
+  const Epetra_MultiVector& fld_boundary = *field.viewComponent("boundary_face", true);
   const Epetra_Map& ext_face_map = mesh_->getMap(AmanziMesh::Entity_kind::BOUNDARY_FACE,true);
   const Epetra_Map& face_map = mesh_->getMap(AmanziMesh::Entity_kind::FACE,true);
-  Epetra_MultiVector& upw_face = *field.ViewComponent(face_comp_, true);
-  upw_face.PutScalar(0.0);
+  Epetra_MultiVector& upw_face = *field.viewComponent(face_comp_, true);
+  upw_face.putScalar(0.0);
 
   double flxmin, flxmax;
   flx_face.MinValue(&flxmin);
@@ -103,7 +105,7 @@ UpwindSecondOrder::Compute(const CompositeVector& flux,
         upw_face[0][f] += (kc + grad * (xf - xc)) * tmp;
         // Boundary faces. We upwind only on inflow dirichlet faces.
       } else if (bc_model[f] == OPERATOR_BC_DIRICHLET && flag) {
-        upw_face[0][f] = fld_boundary[0][ext_face_map.LID(face_map.GID(f))];
+        upw_face[0][f] = fld_boundary[0][ext_face_map.getLocalElement(face_map.getGlobalElement(f))];
       } else if (bc_model[f] == OPERATOR_BC_NEUMANN && flag) {
         upw_face[0][f] = kc;
       } else if (bc_model[f] == OPERATOR_BC_MIXED && flag) {

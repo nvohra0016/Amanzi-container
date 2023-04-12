@@ -5,16 +5,10 @@
   provided in the top-level COPYRIGHT file.
 
   Authors: Markus Berndt
-           Ethan Coon (ecoon@lanl.gov)
+           Ethan Coon (coonet@ornl.gov)
 */
 
-//! Storage and parameters for BDF1 problems.
-/*
-
-  NOTE: Documentation for this file lives in BDF1_TI.hh
-
-*/
-
+//! <MISSING_ONELINE_DOCSTRING>
 #ifndef AMANZI_BDF1STATE_HH_
 #define AMANZI_BDF1STATE_HH_
 
@@ -33,22 +27,20 @@ namespace Amanzi {
 template <class Vector>
 struct BDF1_State {
   BDF1_State()
-    : freeze_pc(false),
-      maxpclag(0),
+    : maxpclag(0),
       extrapolate_guess(true),
-      uhist_size(2),
-      pc_calls(0),
       seq(-1),
       failed_solve(0),
       failed_current(0),
+      solve_itrs(0),
+      pc_calls(0),
       pc_updates(0),
-      hmin(std::numeric_limits<double>::max()),
+      uhist_size(2),
       hmax(std::numeric_limits<double>::min()),
-      solve_itrs(0)
+      hmin(std::numeric_limits<double>::max())
   {}
 
   // Parameters and control
-  bool freeze_pc;         // freeze initial preconditioner
   int maxpclag;           // maximum iterations that the preconditioner can be lagged
   bool extrapolate_guess; // extrapolate forward in time or use previous
                           // step as initial guess for nonlinear solver
@@ -61,7 +53,8 @@ struct BDF1_State {
   int uhist_size; // extrapolation order for initial guess
   double hlast;   // last step size
   double hpc;     // step size built into the current preconditioner
-  int pc_lag;     // counter for how many iterations the preconditioner has been lagged
+  int pc_lag;     // counter for how many iterations the preconditioner has been
+                  // lagged
   int pc_calls;   // counter for the number of preconditioner calls
 
   // performance counters
@@ -77,23 +70,19 @@ struct BDF1_State {
   // restart fine constrol
   double tol_multiplier, tol_multiplier_damp;
 
-  void InitializeFromPlist(Teuchos::ParameterList&,
-                           const Teuchos::RCP<const Vector>&,
-                           const Teuchos::RCP<State>&);
+  void InitializeFromPlist(Teuchos::ParameterList&, const Teuchos::RCP<const Vector>&);
 };
 
 
 /* ******************************************************************
-* Initiazition of fundamental parameters
-****************************************************************** */
+ * Initiazition of fundamental parameters
+ ****************************************************************** */
 template <class Vector>
 void
 BDF1_State<Vector>::InitializeFromPlist(Teuchos::ParameterList& plist,
-                                        const Teuchos::RCP<const Vector>& initvec,
-                                        const Teuchos::RCP<State>& S)
+                                        const Teuchos::RCP<const Vector>& initvec)
 {
-  // preconditioner control
-  freeze_pc = plist.get<bool>("freeze preconditioner", false);
+  // preconditioner lag control
   maxpclag = plist.get<int>("max preconditioner lag iterations", 0);
 
   // forward time extrapolation (fix me lipnikov@lanl.gov)
@@ -103,13 +92,7 @@ BDF1_State<Vector>::InitializeFromPlist(Teuchos::ParameterList& plist,
 
   // solution history object
   double t0 = plist.get<double>("initial time", 0.0);
-  std::string name;
-  if (plist.sublist("verbose object").isParameter("name")) {
-    name = plist.sublist("verbose object").get<std::string>("name");
-  } else {
-    name = "TI_BDF1";
-  }
-  uhist = Teuchos::rcp(new SolutionHistory<Vector>(name, uhist_size, t0, *initvec, nullptr, S));
+  uhist = Teuchos::rcp(new SolutionHistory<Vector>(uhist_size, t0, *initvec));
 
   // restart fine control
   tol_multiplier = plist.get<double>("restart tolerance relaxation factor", 1.0);

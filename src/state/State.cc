@@ -26,20 +26,17 @@
 #include "boost/filesystem.hpp"
 
 #include "Teuchos_XMLParameterListHelpers.hpp"
-#include "Epetra_Vector.h"
 
 // Amanzi
 #include "CompositeVector.hh"
 #include "DomainSet.hh"
 #include "errors.hh"
 #include "Mesh.hh"
-#include "MeshPartition.hh"
 #include "StringExt.hh"
 
 // Amanzi::State
-#include "Evaluator_Factory.hh"
-#include "EvaluatorCellVolume.hh"
 #include "EvaluatorPrimary.hh"
+#include "Evaluator_Factory.hh"
 #include "StateDefs.hh"
 #include "State.hh"
 #include "Checkpoint.hh"
@@ -413,86 +410,45 @@ State::HasEvaluator(const Key& key, const Tag& tag)
 }
 
 
-Teuchos::RCP<const Functions::MeshPartition>
-State::GetMeshPartition(Key key)
-{
-  Teuchos::RCP<const Functions::MeshPartition> mp = GetMeshPartition_(key);
-  if (mp == Teuchos::null) {
-    std::stringstream messagestream;
-    messagestream << "Mesh partition " << key << " does not exist in the state.";
-    Errors::Message message(messagestream.str());
-    Exceptions::amanzi_throw(message);
-  }
-  return mp;
-}
-
-
-Teuchos::RCP<const Functions::MeshPartition>
-State::GetMeshPartition_(Key key)
-{
-  MeshPartitionMap::iterator lb = mesh_partitions_.lower_bound(key);
-  if (lb != mesh_partitions_.end() && !(mesh_partitions_.key_comp()(key, lb->first))) {
-    return lb->second;
-  } else {
-    if (state_plist_.isParameter("mesh partitions")) {
-      Teuchos::ParameterList& part_superlist = state_plist_.sublist("mesh partitions");
-      if (part_superlist.isParameter(key)) {
-        Teuchos::ParameterList& part_list = part_superlist.sublist(key);
-        std::string mesh_name = part_list.get<std::string>("mesh name", "domain");
-        Teuchos::Array<std::string> region_list =
-          part_list.get<Teuchos::Array<std::string>>("region list");
-        Teuchos::RCP<Functions::MeshPartition> mp =
-          Teuchos::rcp(new Functions::MeshPartition(AmanziMesh::CELL, region_list.toVector()));
-        mp->Initialize(GetMesh(mesh_name), -1);
-        mp->Verify();
-        mesh_partitions_[key] = mp;
-        return mp;
-      }
-    }
-    return Teuchos::null;
-  }
-}
-
-
 void
 State::WriteDependencyGraph() const
 {
-  // FIXME -- this is not what it used to be.  This simply writes data
-  // struture, and is not the dependency graph information at all.  Rename
-  // this, then recover the old WriteDependencyGraph method, which wrote a list
-  // of all evaluators and their dependnecies that could be read in networkx
-  // for plotting the dag. --ETC
+  // // FIXME -- this is not what it used to be.  This simply writes data
+  // // struture, and is not the dependency graph information at all.  Rename
+  // // this, then recover the old WriteDependencyGraph method, which wrote a list
+  // // of all evaluators and their dependnecies that could be read in networkx
+  // // for plotting the dag. --ETC
 
-  if (vo_->os_OK(Teuchos::VERB_HIGH)) {
-    *vo_->os() << "------------------------------------------" << std::endl
-               << "Dependency & Structure list for evaluators" << std::endl
-               << "------------------------------------------" << std::endl;
-    for (auto& e : evaluators_) {
-      for (auto& r : e.second) *vo_->os() << *r.second;
-      if (GetRecord(e.first, e.second.begin()->first).ValidType<CompositeVector>()) {
-        Teuchos::OSTab tab1 = vo_->getOSTab();
-        Teuchos::OSTab tab2 = vo_->getOSTab();
-        data_.at(e.first)->GetFactory<CompositeVector, CompositeVectorSpace>().Print(*vo_->os());
-        *vo_->os() << std::endl;
-      }
-    }
+  // if (vo_->os_OK(Teuchos::VERB_HIGH)) {
+  //   *vo_->os() << "------------------------------------------" << std::endl
+  //              << "Dependency & Structure list for evaluators" << std::endl
+  //              << "------------------------------------------" << std::endl;
+  //   for (auto& e : evaluators_) {
+  //     for (auto& r : e.second) *vo_->os() << *r.second;
+  //     if (GetRecord(e.first, e.second.begin()->first).ValidType<CompositeVector>()) {
+  //       Teuchos::OSTab tab1 = vo_->getOSTab();
+  //       Teuchos::OSTab tab2 = vo_->getOSTab();
+  //       data_.at(e.first)->GetFactory<CompositeVector, CompositeVectorSpace>().print(*vo_->os());
+  //       *vo_->os() << std::endl;
+  //     }
+  //   }
 
-    *vo_->os() << "------------------------------" << std::endl
-               << "Structure list for derivatives" << std::endl
-               << "------------------------------" << std::endl;
-    for (auto& e : derivs_) {
-      *vo_->os() << "D" << e.first << "/D{ ";
-      for (const auto& wrt : *e.second) *vo_->os() << wrt.first.get() << " ";
-      *vo_->os() << "}" << std::endl;
-      auto wrt_tag = e.second->begin();
-      if (e.second->GetRecord(wrt_tag->first).ValidType<CompositeVector>()) {
-        Teuchos::OSTab tab1 = vo_->getOSTab();
-        Teuchos::OSTab tab2 = vo_->getOSTab();
-        e.second->GetFactory<CompositeVector, CompositeVectorSpace>().Print(*vo_->os());
-        *vo_->os() << std::endl;
-      }
-    }
-  }
+  //   *vo_->os() << "------------------------------" << std::endl
+  //              << "Structure list for derivatives" << std::endl
+  //              << "------------------------------" << std::endl;
+  //   for (auto& e : derivs_) {
+  //     *vo_->os() << "D" << e.first << "/D{ ";
+  //     for (const auto& wrt : *e.second) *vo_->os() << wrt.first.get() << " ";
+  //     *vo_->os() << "}" << std::endl;
+  //     auto wrt_tag = e.second->begin();
+  //     if (e.second->GetRecord(wrt_tag->first).ValidType<CompositeVector>()) {
+  //       Teuchos::OSTab tab1 = vo_->getOSTab();
+  //       Teuchos::OSTab tab2 = vo_->getOSTab();
+  //       e.second->GetFactory<CompositeVector, CompositeVectorSpace>().print(*vo_->os());
+  //       *vo_->os() << std::endl;
+  //     }
+  //   }
+  // }
 }
 
 
@@ -586,7 +542,7 @@ State::Setup()
       if (r.second->ValidType<CompositeVector, CompositeVectorSpace>()) {
         const auto& cvs = r.second->GetFactory<CompositeVector, CompositeVectorSpace>();
         *vo_->os() << "comps: ";
-        for (const auto& comp : cvs) *vo_->os() << comp << " ";
+        for (const auto& comp : *cvs) *vo_->os() << comp << " ";
       } else {
         *vo_->os() << "not CV";
       }
@@ -730,9 +686,9 @@ State::InitializeFields(const Tag& tag)
 
     for (auto it = data_.begin(); it != data_.end(); ++it) {
       auto owner = GetRecord(it->first, tag).owner();
-      auto& r = GetRecordW(it->first, tag, owner);
-      if (r.ValidType<CompositeVector>()) {
-        r.ReadCheckpoint(file_input, tag);
+      auto& rs = GetRecordSetW(it->first);
+      if (rs.ValidType<CompositeVector>()) {
+        rs.ReadCheckpoint(file_input, &tag);
 
         // this is pretty hacky -- why are these ICs not in the PK's list?  And
         // if they aren't owned by a PK, they should be independent variables

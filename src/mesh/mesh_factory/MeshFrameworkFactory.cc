@@ -17,7 +17,6 @@
 #include "FileFormat.hh"
 
 #include "MeshExtractedManifold.hh"
-// #include "MeshColumn.hh"
 #include "Mesh_simple.hh"
 #include "RegionLabeledSet.hh"
 
@@ -30,30 +29,6 @@
 
 namespace Amanzi {
 namespace AmanziMesh {
-
-
-// -------------------------------------------------------------
-// Factory for creating a MeshColumn object from a parent and a column ID
-// -------------------------------------------------------------
-Teuchos::RCP<Mesh>
-createColumnMesh(const Teuchos::RCP<const Mesh>& parent_mesh,
-                 int col_id,
-                 const Teuchos::RCP<Teuchos::ParameterList>& plist)
-{
-  AMANZI_ASSERT(col_id >= 0);
-  AMANZI_ASSERT(col_id < parent_mesh->columns.num_columns_owned);
-
-  // create the extracted mesh of the column of cells
-  MeshFrameworkFactory fac(getCommSelf(), parent_mesh->getGeometricModel(), plist);
-  Entity_ID_View col_list = parent_mesh->columns.getCells<MemSpace_kind::HOST>(col_id); 
-  auto extracted_mesh = fac.create(parent_mesh,
-          col_list, CELL, false);
-
-  // create the MeshColumn object
-  return Teuchos::rcp(new Mesh(extracted_mesh, Teuchos::rcp(new MeshFrameworkAlgorithms()), plist));
-}
-
-
 
 // -------------------------------------------------------------
 //  class MeshFactory
@@ -79,7 +54,7 @@ MeshFrameworkFactory::MeshFrameworkFactory(const Comm_ptr_type& comm,
   if (plist_ == Teuchos::null) {
     plist_ = Teuchos::rcp(new Teuchos::ParameterList());
   }
-  
+
   vo_ = Teuchos::rcp(new VerboseObject(comm_, "Amanzi::MeshFactory", *plist_));
 
   // submesh parameter
@@ -126,7 +101,7 @@ MeshFrameworkFactory::create(const std::string& filename)
   }
 
   for (auto p : preference_) {
-    int nproc = comm_->NumProc();
+    int nproc = comm_->getSize();
 
 #ifdef HAVE_MESH_MSTK
     if (p == Framework::MSTK) {
@@ -154,7 +129,6 @@ MeshFrameworkFactory::create(const std::string& filename)
       }
     }
 #endif
-
   }
 
   Message m("No construct was found in preferences that is available and can read this file/file format.");
@@ -181,7 +155,7 @@ MeshFrameworkFactory::create(const double x0, const double y0, const double z0,
                              const double x1, const double y1, const double z1,
                              const int nx, const int ny, const int nz)
 {
-  int nproc = comm_->NumProc();
+  int nproc = comm_->getSize();
 
   for (auto p : preference_) {
     if (p == Framework::SIMPLE && nproc == 1) {
@@ -307,7 +281,7 @@ MeshFrameworkFactory::create(const Teuchos::ParameterList& parameter_list)
 // -------------------------------------------------------------
 Teuchos::RCP<MeshFramework>
 MeshFrameworkFactory::create(const Teuchos::RCP<const Mesh>& inmesh,
-                             const Entity_ID_View& setids,
+                             const MeshFramework::cEntity_ID_View& setids,
                              const Entity_kind setkind,
                              const bool flatten)
 {
@@ -326,14 +300,14 @@ MeshFrameworkFactory::create(const Teuchos::RCP<const Mesh>& inmesh,
     // mpi comm split
     MPI_Comm child_comm;
     bool empty = setids.size() == 0;
-    int ierr = MPI_Comm_split(parent_comm->Comm(),
+    int ierr = MPI_Comm_split(*parent_comm->getRawMpiComm(),
             empty ? MPI_UNDEFINED : 1,
             0, &child_comm);
     if (ierr) {
       Errors::Message msg("Error in MPI_Comm_split in creating extracted mesh.");
       Exceptions::amanzi_throw(msg);
     }
-    if (!empty) comm = Teuchos::rcp(new Epetra_MpiComm(child_comm));
+    if (!empty) comm = Teuchos::rcp(new MpiComm_type(child_comm));
   } else {
     // note, this could be parent_comm or it could be COMM_SELF or any other
     // comm that the factory was made with.
@@ -397,19 +371,21 @@ MeshFrameworkFactory::create(const Teuchos::RCP<const Mesh>& inmesh,
       Teuchos::rcp_const_cast<AmanziGeometry::GeometricModel>(gm)->AddRegion(rgn);
     }
 
-    auto mesh = Teuchos::rcp(new MeshExtractedManifold(
-        inmesh, setname, setkind,
-        comm, gm, plist_, flatten));
+    auto inmesh_host = onMemSpace<MemSpace_kind::HOST>(inmesh);
+    auto mesh = Teuchos::rcp(new MeshExtractedManifold(inmesh_host, setname, setkind,
+            comm, gm, plist_, flatten));
 
     return mesh;
-  }
 
-  Entity_ID_View ids;
-  for (auto name : setnames) {
-    Entity_ID_View ids_l = inmesh->getSetEntities(name, setkind, Parallel_kind::OWNED);
-    ids.insert(ids.end(), ids_l.begin(), ids_l.end());
+  } else {
+    MeshFramework::Entity_ID_View ids;
+    auto inmesh_host = onMemSpace<MemSpace_kind::HOST>(inmesh);
+    for (auto name : setnames) {
+      MeshFramework::cEntity_ID_View ids_l = inmesh_host->getSetEntities(name, setkind, Parallel_kind::OWNED);
+      ids.insert(ids.end(), ids_l.cbegin(), ids_l.cend());
+    }
+    return create(inmesh, ids, setkind, flatten);
   }
-  return create(inmesh, ids, setkind, flatten);
 }
 
 

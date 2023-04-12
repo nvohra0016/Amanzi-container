@@ -1773,14 +1773,14 @@ void Mesh_MOAB::init_cell_map()
     ErrorCheck_(result, "Problem getting tag data");
     ncell = OwnedCells.size();
     
-    cell_map_wo_ghosts_ = new Epetra_Map(-1, ncell, cell_gids, 0, *getComm());
+    cell_map_wo_ghosts_ = new Map_type(-1, ncell, cell_gids, 0, *getComm());
     
     result = mbcore_->tag_get_data(gid_tag, GhostCells, &(cell_gids[ncell]));
     ErrorCheck_(result, "Problem getting tag data");
     
     ncell += GhostCells.size();
 
-    cell_map_w_ghosts_ = new Epetra_Map(-1, ncell, cell_gids, 0, *getComm());
+    cell_map_w_ghosts_ = new Map_type(-1, ncell, cell_gids, 0, *getComm());
   }
   else {
     cell_gids = new int[AllCells.size()];
@@ -1789,7 +1789,7 @@ void Mesh_MOAB::init_cell_map()
     ErrorCheck_(result, "Problem getting tag data");
 
     ncell = AllCells.size();
-    cell_map_wo_ghosts_ = new Epetra_Map(-1, ncell, cell_gids, 0, *getComm());
+    cell_map_wo_ghosts_ = new Map_type(-1, ncell, cell_gids, 0, *getComm());
   }
 
   delete [] cell_gids;
@@ -1817,13 +1817,13 @@ void Mesh_MOAB::init_face_map()
     ErrorCheck_(result, "Problem getting tag data");
 
     nface = nowned;
-    face_map_wo_ghosts_ = new Epetra_Map(-1, nface, face_gids, 0, *getComm());
+    face_map_wo_ghosts_ = new Map_type(-1, nface, face_gids, 0, *getComm());
 
     result = mbcore_->tag_get_data(gid_tag, NotOwnedFaces, &(face_gids[nface]));
     ErrorCheck_(result, "Problem getting tag data");
     
     nface += nnotowned;
-    face_map_w_ghosts_ = new Epetra_Map(-1, nface, face_gids, 0, *getComm());
+    face_map_w_ghosts_ = new Map_type(-1, nface, face_gids, 0, *getComm());
 
     // domain boundary faces: owned
     int n_extface_owned, n_extface = 0;
@@ -1840,7 +1840,7 @@ void Mesh_MOAB::init_face_map()
       if (f == nowned - 1) n_extface_owned = n_extface;
     }
 
-    extface_map_wo_ghosts_ = new Epetra_Map(-1, n_extface_owned, extface_gids, 0, *getComm());
+    extface_map_wo_ghosts_ = new Map_type(-1, n_extface_owned, extface_gids, 0, *getComm());
 
     // domain boundary faces: owned + ghost. We filter out incorrect ghost faces
     int n_extface_notowned = n_extface - n_extface_owned;
@@ -1853,7 +1853,7 @@ void Mesh_MOAB::init_face_map()
         extface_gids[n_extface++] = extface_gids[n_extface_owned + k];
     }
 
-    extface_map_w_ghosts_ = new Epetra_Map(-1, n_extface, extface_gids, 0, *getComm());
+    extface_map_w_ghosts_ = new Map_type(-1, n_extface, extface_gids, 0, *getComm());
   }
   else {
     // all faces
@@ -1863,7 +1863,7 @@ void Mesh_MOAB::init_face_map()
     result = mbcore_->tag_get_data(gid_tag, AllFaces, face_gids);
     ErrorCheck_(result, "Problem getting tag data");
 
-    face_map_wo_ghosts_ = new Epetra_Map(-1, nface, face_gids, 0, *getComm());
+    face_map_wo_ghosts_ = new Map_type(-1, nface, face_gids, 0, *getComm());
 
     // boundary faces
     int n_extface = 0;
@@ -1876,7 +1876,7 @@ void Mesh_MOAB::init_face_map()
         extface_gids[n_extface++] = face_gids[f];
     }
 
-    extface_map_wo_ghosts_ = new Epetra_Map(-1, n_extface, extface_gids, 0, *getComm());
+    extface_map_wo_ghosts_ = new Map_type(-1, n_extface, extface_gids, 0, *getComm());
   }
 
   delete [] face_gids;
@@ -1903,14 +1903,14 @@ void Mesh_MOAB::init_node_map()
 
     nvert = OwnedVerts.size();
     
-    node_map_wo_ghosts_ = new Epetra_Map(-1, nvert, vert_gids, 0, *getComm());
+    node_map_wo_ghosts_ = new Map_type(-1, nvert, vert_gids, 0, *getComm());
     
     result = mbcore_->tag_get_data(gid_tag, NotOwnedVerts, &(vert_gids[nvert]));
     ErrorCheck_(result, "Problem getting tag data");
     
     nvert += NotOwnedVerts.size();
 
-    node_map_w_ghosts_ = new Epetra_Map(-1, nvert, vert_gids, 0, *getComm());
+    node_map_w_ghosts_ = new Map_type(-1, nvert, vert_gids, 0, *getComm());
   }
   else {
     vert_gids = new int[AllVerts.size()];
@@ -1919,7 +1919,7 @@ void Mesh_MOAB::init_node_map()
     ErrorCheck_(result, "Problem getting tag data");
 
     nvert = AllVerts.size();
-    node_map_wo_ghosts_ = new Epetra_Map(-1, nvert, vert_gids, 0, *getComm());
+    node_map_wo_ghosts_ = new Map_type(-1, nvert, vert_gids, 0, *getComm());
   }
 
   delete [] vert_gids;
@@ -1961,7 +1961,7 @@ Entity_ID Mesh_MOAB::GID(Entity_ID lid, Entity_kind kind) const
 //--------------------------------------------------------------------
 // TBW
 //--------------------------------------------------------------------
-const Epetra_Map& Mesh_MOAB::cell_map(bool include_ghost) const
+const Map_type& Mesh_MOAB::cell_map(bool include_ghost) const
 {
   if (serial_run)
     return *cell_map_wo_ghosts_;
@@ -1973,7 +1973,7 @@ const Epetra_Map& Mesh_MOAB::cell_map(bool include_ghost) const
 //--------------------------------------------------------------------
 // TBW
 //--------------------------------------------------------------------
-const Epetra_Map& Mesh_MOAB::face_map(bool include_ghost) const
+const Map_type& Mesh_MOAB::face_map(bool include_ghost) const
 {
   if (serial_run)
     return *face_map_wo_ghosts_;
@@ -1985,7 +1985,7 @@ const Epetra_Map& Mesh_MOAB::face_map(bool include_ghost) const
 //--------------------------------------------------------------------
 // TBW
 //--------------------------------------------------------------------
-const Epetra_Map& Mesh_MOAB::node_map(bool include_ghost) const
+const Map_type& Mesh_MOAB::node_map(bool include_ghost) const
 {
   if (serial_run)
     return *node_map_wo_ghosts_;
@@ -1997,7 +1997,7 @@ const Epetra_Map& Mesh_MOAB::node_map(bool include_ghost) const
 //--------------------------------------------------------------------
 // TBW
 //--------------------------------------------------------------------
-const Epetra_Map& Mesh_MOAB::exterior_face_map(bool include_ghost) const {
+const Map_type& Mesh_MOAB::exterior_face_map(bool include_ghost) const {
   if (serial_run)
     return *extface_map_wo_ghosts_;
   else
@@ -2010,7 +2010,7 @@ const Epetra_Map& Mesh_MOAB::exterior_face_map(bool include_ghost) const {
 // vector defined on all owned faces into an Epetra vector defined
 // only on exterior faces
 //--------------------------------------------------------------------
-const Epetra_Import& Mesh_MOAB::exterior_face_importer(void) const
+const Import_type& Mesh_MOAB::exterior_face_importer(void) const
 {
   Errors::Message mesg("Exterior face importer is not implemented");
   amanzi_throw(mesg);
@@ -2020,7 +2020,7 @@ const Epetra_Import& Mesh_MOAB::exterior_face_importer(void) const
 //--------------------------------------------------------------------
 // TBW
 //--------------------------------------------------------------------
-const Epetra_Map& Mesh_MOAB::exterior_node_map(bool include_ghost) const {
+const Map_type& Mesh_MOAB::exterior_node_map(bool include_ghost) const {
   Errors::Message mesg("Exterior node map is not implemented");
   Exceptions::amanzi_throw(mesg);
   throw(mesg);

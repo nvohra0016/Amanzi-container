@@ -33,7 +33,7 @@ class AnalyticDG02b : public AnalyticDGBase {
   virtual Amanzi::WhetStone::Tensor
   Tensor(const Amanzi::AmanziGeometry::Point& p, double t) override
   {
-    Amanzi::WhetStone::Tensor K(d_, 1);
+    Amanzi::WhetStone:Tensor<> K(d_, 1);
     K(0, 0) = 0.0;
     return K;
   }
@@ -42,10 +42,10 @@ class AnalyticDG02b : public AnalyticDGBase {
   // -- solution
   virtual void SolutionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& sol) override
+                              Amanzi::WhetStone::Polynomial<>& sol) override
   {
     AMANZI_ASSERT(order_ > 1);
-    sol.Reshape(d_, order_, true);
+    sol.reshape(d_, order_, true);
     sol.set_origin(p);
 
     sol(0) = 1.0 + p * p;
@@ -60,9 +60,9 @@ class AnalyticDG02b : public AnalyticDGBase {
   // -- accumulation
   virtual void AccumulationTaylor(const Amanzi::AmanziGeometry::Point& p,
                                   double t,
-                                  Amanzi::WhetStone::Polynomial& a) override
+                                  Amanzi::WhetStone::Polynomial<>& a) override
   {
-    a.Reshape(d_, 0, true);
+    a.reshape(d_, 0, true);
     a(0) = 1.0;
     a.set_origin(p);
   }
@@ -76,9 +76,9 @@ class AnalyticDG02b : public AnalyticDGBase {
 
     v.resize(d_);
     if (!advection_) {
-      for (int i = 0; i < 2; ++i) { v[i].Reshape(d_, 0, true); }
+      for (int i = 0; i < 2; ++i) { v[i].reshape(d_, 0, true); }
     } else {
-      for (int i = 0; i < 2; ++i) { v[i].Reshape(d_, 2, true); }
+      for (int i = 0; i < 2; ++i) { v[i].reshape(d_, 2, true); }
       v[0](0, 0) = 0.1 + x - x * x;
       v[0](1, 0) = 1.0 - 2 * x;
       v[0](2, 0) = -1.0;
@@ -94,23 +94,23 @@ class AnalyticDG02b : public AnalyticDGBase {
   // -- reaction
   virtual void ReactionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& r) override
+                              Amanzi::WhetStone::Polynomial<>& r) override
   {
-    r.Reshape(d_, 0, true);
+    r.reshape(d_, 0, true);
     r.set_origin(p);
   }
 
   // -- source term
   virtual void SourceTaylor(const Amanzi::AmanziGeometry::Point& p,
                             double t,
-                            Amanzi::WhetStone::Polynomial& src) override
+                            Amanzi::WhetStone::Polynomial<>& src) override
   {
     double x(p[0]), y(p[1]);
 
     if (!advection_) {
-      src.Reshape(d_, 0, true);
+      src.reshape(d_, 0, true);
     } else {
-      src.Reshape(d_, 3, true);
+      src.reshape(d_, 3, true);
       src(0, 0) = 2 * x * (0.1 + x - x * x) + 2 * y * y * (1.0 - y);
       src(1, 0) = 0.2 + 4 * x - 6 * x * x;
       src(1, 1) = 4 * y - 6 * y * y;
@@ -124,7 +124,7 @@ class AnalyticDG02b : public AnalyticDGBase {
     src.set_origin(p);
 
     // add accumulation term whicth equals solution at time 1
-    Amanzi::WhetStone::Polynomial sol;
+    Amanzi::WhetStone::Polynomial<> sol;
     SolutionTaylor(p, 1.0, sol);
     src += sol;
   }

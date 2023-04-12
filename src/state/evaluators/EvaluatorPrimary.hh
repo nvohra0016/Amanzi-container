@@ -161,7 +161,7 @@ template <>
 inline void
 EvaluatorPrimary<CompositeVector, CompositeVectorSpace>::UpdateDerivative_(State& S)
 {
-  S.GetDerivativeW<CompositeVector>(my_key_, my_tag_, my_key_, my_tag_, my_key_).PutScalar(1.0);
+  S.GetDerivativeW<CompositeVector>(my_key_, my_tag_, my_key_, my_tag_, my_key_).putScalar(1.0);
 }
 
 // Implementatin for a CV also updates derivatives, but not clear why it is

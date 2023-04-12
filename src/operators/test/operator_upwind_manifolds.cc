@@ -76,7 +76,7 @@ TEST(UPWIND_FLUX_MANIFOLDS)
     auto mesh3D = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, n, n, n);
     auto mesh_fw = Teuchos::rcp(
       new MeshExtractedManifold(mesh3D, setname, AmanziMesh::FACE, comm, gm, plist));
-    auto mesh = Teuchos::rcp(new Mesh(mesh_fw, Teuchos::rcp(new MeshFrameworkAlgorithms()), Teuchos::null)); 
+    auto mesh = Teuchos::rcp(new Mesh(mesh_fw, Teuchos::rcp(new MeshAlgorithms()), Teuchos::null)); 
 
     int ncells_owned = mesh->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::OWNED);
     int ncells_wghost = mesh->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::ALL);

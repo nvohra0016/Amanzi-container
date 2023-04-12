@@ -33,7 +33,6 @@ Note this always monitors the residual, and the correction is always modified.
 
     * `"diverged tolerance`" ``[double]`` **1.e10** Defines the error level
       indicating divergence of the solver. The error is calculated by a PK.
-      Set to a negative value to ignore this check.
 
     * `"nka lag iterations`" ``[int]`` **0** Delays the NKA acceleration, but
       updates the Krylov space.
@@ -76,7 +75,8 @@ Note this always monitors the residual, and the correction is always modified.
 
     IF
 
-    * `"Anderson mixing`" ``[bool]`` **false** If true, use Anderson mixing instead of NKA.
+    * `"Anderson mixing`" ``[bool]`` **false** If true, use Anderson mixing
+instead of NKA.
 
     THEN
 
@@ -120,7 +120,8 @@ class SolverNKA_BT_ATS : public Solver<Vector, VectorSpace> {
     Init(fn, map);
   }
 
-  void Init(const Teuchos::RCP<SolverFnBase<Vector>>& fn, const VectorSpace& map);
+  void
+  Init(const Teuchos::RCP<SolverFnBase<Vector>>& fn, const Teuchos::RCP<const VectorSpace>& map);
 
   virtual int Solve(const Teuchos::RCP<Vector>& u)
   {
@@ -130,7 +131,7 @@ class SolverNKA_BT_ATS : public Solver<Vector, VectorSpace> {
 
   // mutators
   void set_tolerance(double tol) { tol_ = tol; }
-  void set_pc_lag(int pc_lag) { pc_lag_ = pc_lag; }
+  void set_pc_lag(double pc_lag) { pc_lag_ = pc_lag; }
   virtual void set_db(const Teuchos::RCP<ResidualDebugger>& db) { db_ = db; }
 
   // access
@@ -189,7 +190,7 @@ class SolverNKA_BT_ATS : public Solver<Vector, VectorSpace> {
 template <class Vector, class VectorSpace>
 void
 SolverNKA_BT_ATS<Vector, VectorSpace>::Init(const Teuchos::RCP<SolverFnBase<Vector>>& fn,
-                                            const VectorSpace& map)
+                                            const Teuchos::RCP<const VectorSpace>& map)
 {
   fn_ = fn;
   Init_();
@@ -204,7 +205,7 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::Init(const Teuchos::RCP<SolverFnBase<Vect
   }
 
   // update the verbose options
-  vo_ = Teuchos::rcp(new VerboseObject(map.Comm(), "Solver::NKA_BT_ATS", plist_));
+  vo_ = Teuchos::rcp(new VerboseObject("Solver::NKA_BT_ATS", plist_));
 }
 
 
@@ -286,10 +287,10 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
   pc_updates_ = 0;
 
   // create storage
-  Teuchos::RCP<Vector> res = Teuchos::rcp(new Vector(*u));
-  Teuchos::RCP<Vector> du_nka = Teuchos::rcp(new Vector(*u));
-  Teuchos::RCP<Vector> du_pic = Teuchos::rcp(new Vector(*u));
-  Teuchos::RCP<Vector> u_precorr = Teuchos::rcp(new Vector(*u));
+  Teuchos::RCP<Vector> res = Teuchos::rcp(new Vector(u->getMap()));
+  Teuchos::RCP<Vector> du_nka = Teuchos::rcp(new Vector(u->getMap()));
+  Teuchos::RCP<Vector> du_pic = Teuchos::rcp(new Vector(u->getMap()));
+  Teuchos::RCP<Vector> u_precorr = Teuchos::rcp(new Vector(u->getMap()));
 
   // variables to monitor the progress of the nonlinear solver
   double error(0.), previous_error(0.);
@@ -309,7 +310,7 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
   db_->WriteVector<Vector>(db_write_iter++, *res, u.ptr(), du_nka.ptr());
 
   residual_ = error;
-  res->Norm2(&l2_error);
+  l2_error = res->norm2();
 
   if (vo_->os_OK(Teuchos::VERB_MEDIUM)) {
     *vo_->os() << num_itrs_ << ": error(res) = " << error << std::endl
@@ -317,7 +318,7 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
   }
 
   // Check divergence
-  if (overflow_tol_ > 0 && error > overflow_tol_) {
+  if (error > overflow_tol_) {
     if (vo_->os_OK(Teuchos::VERB_LOW)) {
       *vo_->os() << "Solve failed, error " << error << " > " << overflow_tol_ << " (dtol)"
                  << std::endl;
@@ -346,10 +347,10 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
 
     // Apply the preconditioner to the nonlinear residual.
     pc_calls_++;
-    du_pic->PutScalar(0.);
+    du_pic->putScalar(0.);
     fn_->ApplyPreconditioner(res, du_pic);
     double du_pic_norm = 0;
-    du_pic->NormInf(&du_pic_norm);
+    du_pic_norm = du_pic->normInf();
 
     if (nka_restarted) {
       // NKA was working, but failed.  Reset the iteration counter.
@@ -406,13 +407,13 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
     if (num_itrs_ > backtrack_lag_ && num_itrs_ < last_backtrack_iter_ &&
         hacked != FnBaseDefs::CORRECTION_MODIFIED_LAG_BACKTRACKING) {
       bool good_step = false;
-      *u_precorr = *u;
+      u_precorr->assign(*u);
       previous_error = error;
       previous_l2_error = l2_error;
 
       if (nka_applied) {
         // check the NKA updated norm
-        u->Update(-1, *du_nka, 1.);
+        u->update(-1, *du_nka, 1.);
         fn_->ChangedSolution();
 
         // Check admissibility of the iterate
@@ -429,7 +430,7 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
           db_->WriteVector<Vector>(db_write_iter++, *res, u.ptr(), du_nka.ptr());
 
           residual_ = error;
-          res->Norm2(&l2_error);
+          l2_error = res->norm2();
           if (vo_->os_OK(Teuchos::VERB_MEDIUM)) {
             *vo_->os() << num_itrs_ << ": NKA "
                        << ": error(res) = " << error << std::endl
@@ -449,8 +450,8 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
         // if NKA did not improve the error, toss Jacobian info
         if (!good_step) {
           if (vo_->os_OK(Teuchos::VERB_HIGH)) {
-            *vo_->os() << "Restarting NKA, NKA step does not improve error or resulted in "
-                          "inadmissible solution, on NKA itr = "
+            *vo_->os() << "Restarting NKA, NKA step does not improve error or "
+                          "resulted in inadmissible solution, on NKA itr = "
                        << nka_itr << std::endl;
           }
           if (use_aa_)
@@ -464,13 +465,14 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
           // unless this is NKA itr 1, in which case the NKA update IS the
           // Picard update, so we can just copy over the NKA hacked version.
           if (nka_itr == 1) {
-            *du_pic = *du_nka;
+            du_pic->assign(*du_nka);
           } else {
             hacked = fn_->ModifyCorrection(res, u, du_pic);
 
             if (hacked == FnBaseDefs::CORRECTION_MODIFIED_LAG_BACKTRACKING) {
-              // no backtracking, just use this correction, checking admissibility
-              u->Update(-1., *du_pic, 1.);
+              // no backtracking, just use this correction, checking
+              // admissibility
+              u->update(-1., *du_pic, 1.);
               fn_->ChangedSolution();
               admitted_iterate = false;
               if (fn_->IsAdmissible(u)) {
@@ -485,7 +487,7 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
                 db_->WriteVector<Vector>(db_write_iter++, *res, u.ptr(), du_pic.ptr());
 
                 residual_ = error;
-                res->Norm2(&l2_error);
+                l2_error = res->norm2();
                 if (vo_->os_OK(Teuchos::VERB_MEDIUM)) {
                   *vo_->os() << num_itrs_ << ": PIC "
                              << ": error(res) = " << error << std::endl
@@ -517,8 +519,8 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
           total_backtrack++;
 
           // apply the correction
-          *u = *u_precorr;
-          u->Update(-backtrack_alpha, *du_pic, 1.);
+          u->assign(*u_precorr);
+          u->update(-backtrack_alpha, *du_pic, 1.);
           fn_->ChangedSolution();
 
           // Check admissibility of the iterate
@@ -535,7 +537,7 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
             db_->WriteVector<Vector>(db_write_iter++, *res, u.ptr(), du_pic.ptr());
 
             residual_ = error;
-            res->Norm2(&l2_error);
+            l2_error = res->norm2();
             if (vo_->os_OK(Teuchos::VERB_MEDIUM)) {
               *vo_->os() << num_itrs_ << ": backtrack " << n_backtrack << ": error(res) = " << error
                          << std::endl
@@ -574,10 +576,10 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
       // not backtracking, either due to BT Lag or past the last BT iteration
       // apply the correction
       if (nka_applied) {
-        u->Update(-1., *du_nka, 1.);
+        u->update(-1., *du_nka, 1.);
         fn_->ChangedSolution();
       } else {
-        u->Update(-1., *du_pic, 1.);
+        u->update(-1., *du_pic, 1.);
         fn_->ChangedSolution();
       }
 
@@ -599,8 +601,8 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
         }
 
         residual_ = error;
-        res->Norm2(&l2_error);
-        if (vo_->os_OK(Teuchos::VERB_MEDIUM)) {
+        l2_error = res->norm2();
+        if (vo_->os_OK(Teuchos::VERB_LOW)) {
           *vo_->os() << num_itrs_ << (nka_applied ? ": NKA " : ": PIC ")
                      << ": error(res) = " << error << std::endl
                      << num_itrs_ << (nka_applied ? ": NKA " : ": PIC ")
@@ -619,7 +621,7 @@ SolverNKA_BT_ATS<Vector, VectorSpace>::NKA_BT_ATS_(const Teuchos::RCP<Vector>& u
     }
 
     // Check divergence
-    if (overflow_tol_ > 0 && error > overflow_tol_) {
+    if (error > overflow_tol_) {
       if (vo_->os_OK(Teuchos::VERB_LOW)) {
         *vo_->os() << "Solve failed, error " << error << " > " << overflow_tol_ << " (dtol)"
                    << std::endl;

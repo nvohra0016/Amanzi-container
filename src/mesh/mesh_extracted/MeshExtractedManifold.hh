@@ -25,7 +25,6 @@
 #include <vector>
 
 // TPLs
-#include "Epetra_Map.h"
 #include "Teuchos_ParameterList.hpp"
 
 // Amanzi
@@ -41,9 +40,9 @@ namespace AmanziMesh {
 class MeshExtractedManifold : public MeshFramework {
  public:
   // Construct a mesh by extracting a subset of entities from another
-  // mesh. The subset may be specified by a list of entities. 
-  MeshExtractedManifold(const Teuchos::RCP<const Mesh>& parent_mesh,
-                        const std::string& setname, 
+  // mesh. The subset may be specified by a list of entities.
+  MeshExtractedManifold(const Teuchos::RCP<const MeshHost>& parent_mesh,
+                        const std::string& setname,
                         const Entity_kind entity_kind,
                         const Comm_ptr_type& comm = Teuchos::null,
                         const Teuchos::RCP<const AmanziGeometry::GeometricModel>& gm = Teuchos::null,
@@ -53,17 +52,20 @@ class MeshExtractedManifold : public MeshFramework {
 
   // initialization
   void InitParentMaps(const std::string& setname);
-  void InitEpetraMaps(); 
+  void InitMaps();
 
   virtual Teuchos::RCP<const MeshFramework> getParentMesh() const override {
-    AMANZI_ASSERT(false);
     return Teuchos::null;
   }
 
   // Entity meta-data
   virtual Entity_ID getEntityGID(const Entity_kind kind, const Entity_ID lid) const override
   {
-    return ent_map_wghost_[kind]->GID(lid);
+    AMANZI_ASSERT(lid < getNumEntities(kind, Parallel_kind::ALL));
+    AMANZI_ASSERT(lid < ent_map_wghost_[kind]->getLocalNumElements());
+    auto gid = ent_map_wghost_[kind]->getGlobalElement(lid);
+    AMANZI_ASSERT(gid >= 0);
+    return gid;
   }
 
   // parent entity if this mesh was extracted from another mesh
@@ -85,13 +87,13 @@ class MeshExtractedManifold : public MeshFramework {
 
   // -- edges
   virtual void getEdgeNodes(const Entity_ID e, cEntity_ID_View& nodes) const override {
-    Entity_ID_View lnodes("lnodes",2); 
+    Entity_ID_View lnodes("lnodes",2);
     lnodes[0] = e;
-    lnodes[1] = e; 
-    nodes = lnodes; 
+    lnodes[1] = e;
+    nodes = lnodes;
   }
 
-  // -- faces of type 'ptype' connected to a node - The order of faces is not guaranteed 
+  // -- faces of type 'ptype' connected to a node - The order of faces is not guaranteed
   //    to be the same for corresponding nodes on different processors
   virtual void getNodeFaces(const Entity_ID n, const Parallel_kind ptype,
                               cEntity_ID_View& nfaces) const override {
@@ -116,7 +118,7 @@ class MeshExtractedManifold : public MeshFramework {
   // same level adjacencies
   // -- face connected neighboring cells of given cell of a particular ptype
   //    (e.g. a hex has 6 face neighbors)
-  // 
+  //
   // The order in which the cellids are returned cannot be guaranteed in general
   // except when ptype = ALL, in which case the cell ids will correspond to cells
   // across the respective faces given by cell_get_faces().
@@ -140,13 +142,13 @@ class MeshExtractedManifold : public MeshFramework {
   //    implemented in each mesh framework. The results are cached in the base class
   virtual void getCellFacesAndDirs(const Entity_ID c,
                                                  cEntity_ID_View& faces,
-                                                 cEntity_Direction_View *fdirs) const override;
+                                                 cDirection_View *fdirs) const override;
 
   // -- edges of a face - this function is implemented in each mesh
   //    framework. The results are cached in the base class
   virtual void getFaceEdgesAndDirs(const Entity_ID f,
-                                                 cEntity_ID_View& edges,
-                                                 cEntity_Direction_View *edirs) const override;
+          cEntity_ID_View& edges,
+          cDirection_View *edirs) const override;
 
   // -- edges of a cell - this function is implemented in each mesh
   //    framework. The results are cached in the base class.
@@ -154,19 +156,19 @@ class MeshExtractedManifold : public MeshFramework {
 
  private:
   void TryExtension_(const std::string& setname,
-                     Entity_kind kind_p, Entity_kind kind_d, Entity_ID_View* setents) const;
+                     Entity_kind kind_p, Entity_kind kind_d, cEntity_ID_View* setents) const;
   template<class Entity_ID_View_Type>
   std::map<Entity_ID, int> EnforceOneLayerOfGhosts_(const std::string& setname, Entity_kind kind,
                                                     Entity_ID_View_Type* setents) const;
 
- private: 
-  Teuchos::RCP<const Mesh> parent_mesh_;
+ private:
+  Teuchos::RCP<const MeshHost> parent_mesh_;
 
   // owned ids are enforced to be first in the child -> parent map
   mutable std::map<Entity_kind, Entity_ID> nents_owned_, nents_ghost_;
   mutable std::map<Entity_kind, Entity_ID_View> entid_to_parent_;
   mutable std::map<Entity_kind, std::map<Entity_ID, Entity_ID> > parent_to_entid_;  // reverse to previous map
-  mutable std::map<Entity_kind, Teuchos::RCP<const Epetra_Map>> ent_map_wghost_;
+  mutable std::map<Entity_kind, Map_ptr_type> ent_map_wghost_;
 
   mutable bool flattened_;
 };

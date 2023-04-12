@@ -27,6 +27,8 @@
 // Amanzi
 #include "MeshFactory.hh"
 #include "GMVMesh.hh"
+#include "LinearOperatorPCG.hh"
+#include "LinearOperatorGMRES.hh"
 #include "Tensor.hh"
 #include "WhetStoneMeshUtils.hh"
 
@@ -79,6 +81,7 @@ RunTest(int icase, const std::string& solver, double mu, double lambda, bool fla
   // -- general information about mesh
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nnodes = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::OWNED);
+  int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
   int nnodes_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
 
@@ -86,17 +89,19 @@ RunTest(int icase, const std::string& solver, double mu, double lambda, bool fla
   // boundary conditions
   AnalyticElasticity01 ana(mesh, mu, lambda, flag);
 
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   for (int c = 0; c < ncells; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.Tensor(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.Tensor(xc, 0.0);
     K->push_back(Kc);
   }
 
   // create a PDE: operator and boundary conditions
-  // -- XML list speficies discretization method and location of degrees of freedom
-  // -- (called schema). This seems redundant but only when use a low-order method.
+  // -- XML list speficies discretization method and location of degrees of
+  // freedom
+  // -- (called schema). This seems redundant but only when use a low-order
+  // method.
   Teuchos::RCP<PDE_Elasticity> op = Teuchos::rcp(new PDE_Elasticity(op_list, mesh));
 
   // populate boundary conditions: type (called model) and value
@@ -200,7 +205,7 @@ RunTest(int icase, const std::string& solver, double mu, double lambda, bool fla
   // create and initialize solution
   const CompositeVectorSpace& cvs = op->global_operator()->DomainMap();
   CompositeVector solution(cvs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
   // create source
   CompositeVector source(cvs);
@@ -220,6 +225,8 @@ RunTest(int icase, const std::string& solver, double mu, double lambda, bool fla
   Teuchos::RCP<Operator> global_op = op->global_operator();
   global_op->UpdateRHS(source, true); // FIXME
   op->ApplyBCs(true, true, true);
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
 
   // create preconditoner using the base operator class
   global_op->set_inverse_parameters(
@@ -234,8 +241,15 @@ RunTest(int icase, const std::string& solver, double mu, double lambda, bool fla
     ver.CheckPreconditionerSPD(1e-12, true, true);
   }
 
+  // solve the problem
+  Teuchos::ParameterList lop_list =
+    plist.sublist("solvers").sublist("PCG").sublist("pcg parameters");
+  AmanziSolvers::LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace> pcg(global_op,
+                                                                                        global_op);
+  pcg.Init(lop_list);
+
   CompositeVector& rhs = *global_op->rhs();
-  global_op->ApplyInverse(rhs, solution);
+  int ierr = pcg.ApplyInverse(rhs, solution);
 
   if (icase == 1 || icase == 2) { ver.CheckResidual(solution, 1.0e-13); }
 
@@ -254,7 +268,7 @@ RunTest(int icase, const std::string& solver, double mu, double lambda, bool fla
 
   if (MyPID == 0) {
     ul2_err /= unorm;
-    printf("L2(u)=%12.8g  Inf(u)=%12.8g  itr=%3d\n", ul2_err, uinf_err, global_op->num_itrs());
+    printf("L2(u)=%12.8g  Inf(u)=%12.8g  itr=%3d\n", ul2_err, uinf_err, pcg.num_itrs());
 
     CHECK(ul2_err < 1e-10);
     CHECK(global_op->num_itrs() < 15);

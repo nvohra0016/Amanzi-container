@@ -27,6 +27,7 @@
 // Amanzi
 #include "MFD3D_Diffusion_Edge.hh"
 #include "MeshFactory.hh"
+#include "LinearOperatorPCG.hh"
 #include "Tensor.hh"
 
 // Operators
@@ -38,9 +39,9 @@
 #include "Verification.hh"
 
 /* *****************************************************************
-* This test diffusion solver with full tensor and source term.
-* The degrees of freedom are on mesh edges.
-* **************************************************************** */
+ * This test diffusion solver with full tensor and source term.
+ * The degrees of freedom are on mesh edges.
+ * **************************************************************** */
 template <class Analytic>
 void
 TestDiffusionEdges(int dim, double tol, std::string filename)
@@ -52,7 +53,7 @@ TestDiffusionEdges(int dim, double tol, std::string filename)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0)
     std::cout << "\nTest: elliptic solver, edge discretization, d=" << dim << ", file: " << filename
@@ -65,29 +66,27 @@ TestDiffusionEdges(int dim, double tol, std::string filename)
 
   // create an SIMPLE mesh framework
   Teuchos::RCP<GeometricModel> gm;
-  auto fac_list = Teuchos::rcp(new Teuchos::ParameterList());
-  fac_list->set<bool>("request edges", true);
-  fac_list->set<bool>("request faces", true);   
-  MeshFactory meshfactory(comm, gm, fac_list);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  MeshFactory meshfactory(comm, gm);
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
   RCP<const Mesh> mesh;
-  if (dim == 2) mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 6, 7);
+  if (dim == 2) mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 6, 7, true, true);
   // mesh = meshfactory.create("test/median32x33.exo", true, true);
   else
-    mesh = meshfactory.create(filename);
-  // mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2, 1, 1, true, true);
+    mesh = meshfactory.create(filename, true, true);
+  // mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2, 1, 1, true,
+  // true);
 
   // modify diffusion coefficient
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nedges_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::EDGE, AmanziMesh::Parallel_kind::ALL);
 
   Analytic ana(mesh);
 
   for (int c = 0; c < ncells; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.TensorDiffusivity(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.TensorDiffusivity(xc, 0.0);
     K->push_back(Kc);
   }
 
@@ -98,7 +97,7 @@ TestDiffusionEdges(int dim, double tol, std::string filename)
 
   int d = dim - 1;
   for (int e = 0; e < nedges_wghost; ++e) {
-    const Point& xe = mesh->getEdgeCentroid(e);
+    const Point& xe = mesh.getEdgeCentroid(e);
     if (fabs(xe[0]) < 1e-6 || fabs(xe[0] - 1.0) < 1e-6 || fabs(xe[1]) < 1e-6 ||
         fabs(xe[1] - 1.0) < 1e-6 || fabs(xe[d]) < 1e-6 || fabs(xe[d] - 1.0) < 1e-6) {
       bc_model[e] = OPERATOR_BC_DIRICHLET;
@@ -115,13 +114,14 @@ TestDiffusionEdges(int dim, double tol, std::string filename)
   // create source and add it to the operator
   CompositeVector source(cvs);
   Epetra_MultiVector& src = *source.ViewComponent("edge", true);
-  src.PutScalar(0.0);
+  src.putScalar(0.0);
 
   for (int c = 0; c < ncells; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    double volume = mesh->getCellVolume(c);
+    const Point& xc = mesh->getCellCentroid(c)
+    double volume = mesh->getCellVolume(c)
 
-    auto edges = mesh->getCellEdges(c);
+    AmanziMesh::Entity_ID_List edges;
+    mesh->getCellEdges(c, edges);
     int nedges = edges.size();
 
     for (int k = 0; k < nedges; k++) {
@@ -141,29 +141,35 @@ TestDiffusionEdges(int dim, double tol, std::string filename)
 
   // apply BCs (primary=true, eliminate=true) and assemble
   op->ApplyBCs(true, true, true);
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
 
   // create preconditoner using the base operator class
-  global_op->set_inverse_parameters(
-    "Hypre AMG", plist.sublist("preconditioners"), "AztecOO CG", plist.sublist("solvers"));
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  ParameterList slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
 
   // Test SPD properties of the preconditioner.
   VerificationCV ver(global_op);
-  ver.CheckPreconditionerSPD(1.0e-11);
+  ver.CheckPreconditionerSPD();
+
+  // solve the problem
+  ParameterList lop_list = plist.sublist("solvers").sublist("AztecOO CG").sublist("pcg parameters");
+  AmanziSolvers::LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace> solver(
+    global_op, global_op);
+  solver.Init(lop_list);
 
   CompositeVector rhs = *global_op->rhs();
   CompositeVector solution(rhs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
-  global_op->ApplyInverse(rhs, solution);
+  int ierr = solver.ApplyInverse(rhs, solution);
 
   if (MyPID == 0) {
-    std::cout << "pressure solver (pcg): ||r||=" << global_op->residual()
-              << " itr=" << global_op->num_itrs() << " code=" << global_op->returned_code()
-              << std::endl;
+    std::cout << "pressure solver (pcg): ||r||=" << solver.residual()
+              << " itr=" << solver.num_itrs() << " code=" << solver.returned_code() << std::endl;
   }
-  CHECK(global_op->num_itrs() < 10);
+  CHECK(solver.num_itrs() < 10);
 
   // compute error
   solution.ScatterMasterToGhosted();
@@ -175,7 +181,7 @@ TestDiffusionEdges(int dim, double tol, std::string filename)
   if (MyPID == 0) {
     pl2_err /= pnorm;
     ph1_err /= hnorm;
-    printf("L2(p)=%9.6f  H1(p)=%9.6f  itr=%3d\n", pl2_err, ph1_err, global_op->num_itrs());
+    printf("L2(p)=%9.6f  H1(p)=%9.6f  itr=%3d\n", pl2_err, ph1_err, solver.num_itrs());
 
     CHECK(pl2_err < tol && ph1_err < tol);
   }

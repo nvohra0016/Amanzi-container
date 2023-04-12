@@ -29,8 +29,8 @@ void test2D(const Teuchos::RCP<Mesh_type>& mesh)
   // Deform the mesh
   int nnodes = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE,
           AmanziMesh::Parallel_kind::OWNED);
-  AmanziMesh::Entity_ID_View nodeids("nodeids", nnodes);
-  AmanziMesh::Point_View newpos("newpos", nnodes);
+  typename Mesh_type::Entity_ID_View nodeids("nodeids", nnodes);
+  typename Mesh_type::Point_View newpos("newpos", nnodes);
 
   for (int j = 0; j < nnodes; j++) {
     nodeids[j] = j;
@@ -41,8 +41,7 @@ void test2D(const Teuchos::RCP<Mesh_type>& mesh)
   }
 
   int ncells_1 = mesh->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::ALL);
-  int ierr = MeshAlgorithms::deform(*mesh, nodeids, newpos);
-  CHECK_EQUAL(ierr, 0);
+  deform(*mesh, nodeids, newpos);
 
   // If the deformation was successful, the cell volumes should be half
   // of what they were
@@ -62,8 +61,8 @@ void test3D(const Teuchos::RCP<Mesh_type>& mesh)
   // Deform the mesh
   int nnodes = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE,
           AmanziMesh::Parallel_kind::OWNED);
-  AmanziMesh::Entity_ID_View nodeids("nodesids", nnodes);
-  AmanziMesh::Point_View newpos("newpos", nnodes);
+  typename Mesh_type::Entity_ID_View nodeids("nodesids", nnodes);
+  typename Mesh_type::Point_View newpos("newpos", nnodes);
 
   for (int j = 0; j < nnodes; j++) {
     nodeids[j] = j;
@@ -72,13 +71,13 @@ void test3D(const Teuchos::RCP<Mesh_type>& mesh)
     newcoord.set(oldcoord[0], oldcoord[1], oldcoord[2]/2.0);
     newpos[j] = newcoord;
   }
-  int ierr = MeshAlgorithms::deform(*mesh, nodeids, newpos);
-  CHECK_EQUAL(ierr, 0);
+  deform(*mesh, nodeids, newpos);
 
   // check geometry
   testMeshAudit<MeshAudit_type, Mesh_type>(mesh);
   testGeometryCube<Mesh_type>(mesh, 3,3,3);
 }
+
 
 TEST(MESH_CACHED_DEFORM2D)
 {
@@ -109,7 +108,7 @@ TEST(MESH_CACHED_DEFORM2D)
 TEST(MESH_CACHED_GENERATED_DEFORM3D)
 {
   auto comm = getDefaultComm();
-  const int nproc(comm->NumProc());
+  const int nproc(comm->getSize());
   if (nproc != 1) {
     std::cout << "Parallel deformation not implemented" << std::endl;
     return;

@@ -19,7 +19,6 @@
 #include <strings.h>
 
 // TPLs
-#include "Ifpack.h"
 #include "Teuchos_RCP.hpp"
 
 // Amanzi
@@ -29,113 +28,29 @@
 
 // Operators
 #include "PDE_DiffusionFV.hh"
-#include "PDE_DiffusionWithGravity.hh"
 
 namespace Amanzi {
 namespace Operators {
 
 class BCs;
 
-class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV, public PDE_DiffusionWithGravity {
+class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV {
  public:
   PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist, const Teuchos::RCP<Operator>& global_op)
-    : PDE_Diffusion(global_op),
-      PDE_DiffusionFV(plist, global_op),
-      PDE_DiffusionWithGravity(global_op)
-  {
-    pde_type_ = PDE_DIFFUSION_FV_GRAVITY;
-    Init_(plist);
-  }
+    : PDE_DiffusionFV(plist, global_op)
+  {}
 
   PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
                              const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : PDE_Diffusion(mesh), PDE_DiffusionFV(plist, mesh), PDE_DiffusionWithGravity(mesh)
-  {
-    pde_type_ = PDE_DIFFUSION_FV_GRAVITY;
-    Init_(plist);
-  }
+    : PDE_DiffusionFV(plist, mesh)
+  {}
 
-  PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
-                             const Teuchos::RCP<Operator>& global_op,
-                             const AmanziGeometry::Point& g)
-    : PDE_Diffusion(global_op),
-      PDE_DiffusionFV(plist, global_op),
-      PDE_DiffusionWithGravity(global_op)
-  {
-    pde_type_ = PDE_DIFFUSION_FV_GRAVITY;
-    Init_(plist);
-
-    SetGravity(g);
-  }
-
-  PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
-                             const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
-                             const AmanziGeometry::Point& g)
-    : PDE_Diffusion(mesh), PDE_DiffusionFV(plist, mesh), PDE_DiffusionWithGravity(mesh)
-  {
-    pde_type_ = PDE_DIFFUSION_FV_GRAVITY;
-    Init_(plist);
-
-    SetGravity(g);
-  }
-
-  PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
-                             const Teuchos::RCP<Operator>& global_op,
-                             double rho,
-                             const AmanziGeometry::Point& g)
-    : PDE_Diffusion(global_op),
-      PDE_DiffusionFV(plist, global_op),
-      PDE_DiffusionWithGravity(global_op)
-  {
-    pde_type_ = PDE_DIFFUSION_FV_GRAVITY;
-    Init_(plist);
-
-    SetGravity(g);
-    SetDensity(rho);
-  }
-
-  PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
-                             const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
-                             double rho,
-                             const AmanziGeometry::Point& g)
-    : PDE_Diffusion(mesh), PDE_DiffusionFV(plist, mesh), PDE_DiffusionWithGravity(mesh)
-  {
-    pde_type_ = PDE_DIFFUSION_FV_GRAVITY;
-    Init_(plist);
-
-    SetGravity(g);
-    SetDensity(rho);
-  }
+  virtual void Init() override;
 
   // main virtual members
   // -- setup
   virtual void SetDensity(const Teuchos::RCP<const CompositeVector>& rho) override;
   virtual void SetDensity(double rho) override;
-
-  using PDE_Diffusion::Setup;
-  void Setup(const Teuchos::RCP<std::vector<WhetStone::Tensor>>& K,
-             const Teuchos::RCP<const CompositeVector>& k,
-             const Teuchos::RCP<const CompositeVector>& dkdp,
-             double rho,
-             const AmanziGeometry::Point& g)
-  {
-    SetGravity(g);
-    SetDensity(rho);
-    SetTensorCoefficient(K);
-    SetScalarCoefficient(k, dkdp);
-  }
-
-  void Setup(const Teuchos::RCP<std::vector<WhetStone::Tensor>>& K,
-             const Teuchos::RCP<const CompositeVector>& k,
-             const Teuchos::RCP<const CompositeVector>& dkdp,
-             const Teuchos::RCP<const CompositeVector>& rho,
-             const AmanziGeometry::Point& g)
-  {
-    SetGravity(g);
-    SetDensity(rho);
-    SetTensorCoefficient(K);
-    SetScalarCoefficient(k, dkdp);
-  }
 
   // -- create a lineratized operator
   virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& flux,
@@ -149,29 +64,23 @@ class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV, public PDE_DiffusionW
   virtual void ScaleMassMatrices(double s) override
   {
     ComputeTransmissibility_(gravity_term_);
-    transmissibility_->Scale(s);
+    transmissibility_->scale(s);
   };
+
+
+  virtual void AnalyticJacobian_(const CompositeVector& solution) override;
 
   // Developments
   // -- interface to solvers for treating nonlinear BCs.
-  virtual double ComputeGravityFlux(int f) const override;
+  // virtual double ComputeGravityFlux(int f) const override;
 
   // access
   const CompositeVector& gravity_terms() { return *gravity_term_; }
 
- protected:
-  virtual void ComputeJacobianLocal_(int mcells,
-                                     int f,
-                                     int face_dir_0to1,
-                                     int bc_model,
-                                     double bc_value,
-                                     double* pres,
-                                     double* dkdp_cell,
-                                     WhetStone::DenseMatrix& Jpp) override;
 
+ public:
+  // Neeed to be public for kokkos
   void ComputeTransmissibility_(Teuchos::RCP<CompositeVector> g_cv);
-
-  void Init_(Teuchos::ParameterList& plist);
 
  protected:
   Teuchos::RCP<CompositeVector> gravity_term_;

@@ -23,22 +23,21 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Constructor from a bilinear form
-****************************************************************** */
-void
-Schema::Init(Teuchos::RCP<const WhetStone::BilinearForm> form,
-             Teuchos::RCP<const AmanziMesh::Mesh> mesh,
-             AmanziMesh::Entity_kind base)
-{
-  base_ = base;
-  items_ = form->schema();
-  Finalize(mesh);
-}
+ * Constructor from a bilinear form
+ ****************************************************************** */
+// void Schema::Init(Teuchos::RCP<const WhetStone::BilinearForm> form,
+//                   Teuchos::RCP<const AmanziMesh::Mesh> mesh,
+//                   AmanziMesh::Entity_kind base)
+// {
+//   base_ = base;
+//   items_ = form->schema();
+//   Finalize(mesh);
+// }
 
 
 /* ******************************************************************
-* Backward compatibility: takes the old schema as input.
-****************************************************************** */
+ * Backward compatibility: takes the old schema as input.
+ ****************************************************************** */
 void
 Schema::Init(int i)
 {
@@ -75,8 +74,8 @@ Schema::Init(int i)
 
 
 /* ******************************************************************
-* Backward compatibility: takes kind as input.
-****************************************************************** */
+ * Backward compatibility: takes kind as input.
+ ****************************************************************** */
 void
 Schema::Init(AmanziMesh::Entity_kind kind, int nvec)
 {
@@ -88,8 +87,8 @@ Schema::Init(AmanziMesh::Entity_kind kind, int nvec)
 
 
 /* ******************************************************************
-* Compute offsets (starting position of DOF ids).
-****************************************************************** */
+ * Compute offsets (starting position of DOF ids).
+ ****************************************************************** */
 void
 Schema::Finalize(Teuchos::RCP<const AmanziMesh::Mesh> mesh)
 {
@@ -109,13 +108,16 @@ Schema::Finalize(Teuchos::RCP<const AmanziMesh::Mesh> mesh)
 
 
 /* ******************************************************************
-* Compute local (cell-based) offsets
-****************************************************************** */
+ * Compute local (cell-based) offsets
+ ****************************************************************** */
 void
 Schema::ComputeOffset(int c,
                       Teuchos::RCP<const AmanziMesh::Mesh> mesh,
                       std::vector<int>& offset) const
 {
+  AmanziMesh::Entity_ID_View faces;
+  AmanziMesh::Entity_ID_List nodes, edges;
+
   offset.clear();
   offset.push_back(0);
 
@@ -126,10 +128,10 @@ Schema::ComputeOffset(int c,
     std::tie(kind, std::ignore, num) = *it;
 
     if (kind == AmanziMesh::Entity_kind::NODE) {
-      auto nodes = mesh->getCellNodes(c);
+       nodes = mesh->getCellNodes(c);
       ndofs = nodes.size();
     } else if (kind == AmanziMesh::Entity_kind::EDGE) {
-      const auto& edges = mesh->getCellEdges(c);
+       edges = mesh->getCellNodes(c);
       ndofs = edges.size();
     } else if (kind == AmanziMesh::Entity_kind::FACE) {
       ndofs = mesh->getCellNumFaces(c);
@@ -143,8 +145,8 @@ Schema::ComputeOffset(int c,
 
 
 /* ******************************************************************
-* Compatibility: returns old schema
-****************************************************************** */
+ * Compatibility: returns old schema
+ ****************************************************************** */
 int
 Schema::OldSchema() const
 {
@@ -182,8 +184,8 @@ Schema::OldSchema() const
 
 
 /* ******************************************************************
-* Returns standard name for geometric location of DOF.
-****************************************************************** */
+ * Returns standard name for geometric location of DOF.
+ ****************************************************************** */
 std::string
 Schema::KindToString(AmanziMesh::Entity_kind kind) const
 {
@@ -203,20 +205,29 @@ Schema::KindToString(AmanziMesh::Entity_kind kind) const
 
 
 /* ******************************************************************
-* Returns standard mesh id for geometric location of DOF.
-****************************************************************** */
+ * Returns standard mesh id for geometric location of DOF.
+ ****************************************************************** */
 AmanziMesh::Entity_kind
-Schema::StringToKind(const std::string& name) const
+Schema::StringToKind(std::string& name) const
 {
-  return AmanziMesh::createEntityKind(name);
+  if (name == "node") {
+    return AmanziMesh::Entity_kind::NODE;
+  } else if (name == "edge") {
+    return AmanziMesh::Entity_kind::EDGE;
+  } else if (name == "face") {
+    return AmanziMesh::Entity_kind::FACE;
+  } else if (name == "cell") {
+    return AmanziMesh::Entity_kind::CELL;
+  }
+  return AmanziMesh::UNKNOWN;
 }
 
 
 /* ******************************************************************
-* Returns standard mesh id for geometric location of DOF.
-****************************************************************** */
+ * Returns standard mesh id for geometric location of DOF.
+ ****************************************************************** */
 WhetStone::DOF_Type
-Schema::StringToType(const std::string& name) const
+Schema::StringToType(std::string& name) const
 {
   if (name == "scalar") {
     return WhetStone::DOF_Type::SCALAR;
@@ -234,8 +245,8 @@ Schema::StringToType(const std::string& name) const
 
 
 /* ******************************************************************
-* Auxiliary routine creates new name.
-****************************************************************** */
+ * Auxiliary routine creates new name.
+ ****************************************************************** */
 std::string
 Schema::CreateUniqueName() const
 {
@@ -248,6 +259,7 @@ Schema::CreateUniqueName() const
     name.append(c);
     name.append(KindToString(kind));
     name.append(std::to_string(num));
+    c = "+";
   }
 
   std::transform(name.begin(), name.end(), name.begin(), ::toupper);

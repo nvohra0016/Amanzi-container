@@ -29,10 +29,10 @@ class Analytic05 : public AnalyticBase {
   Analytic05(Teuchos::RCP<const Amanzi::AmanziMesh::Mesh> mesh) : AnalyticBase(mesh){};
   ~Analytic05(){};
 
-  Amanzi::WhetStone::Tensor TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t)
+  Amanzi::WhetStone:Tensor<> TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t)
   {
     double x = p[0];
-    Amanzi::WhetStone::Tensor K(2, 2);
+    Amanzi::WhetStone:Tensor<> K(2, 2);
     K(0, 0) = 1.0;
     K(1, 1) = 0.5;
     K(0, 1) = -x * x;

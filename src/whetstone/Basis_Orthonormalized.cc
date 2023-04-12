@@ -37,11 +37,11 @@ void
 Basis_Orthonormalized::Init(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
                             int c,
                             int order,
-                            Polynomial& integrals)
+                            Polynomial<>& integrals)
 {
   int d = mesh->getSpaceDimension();
-  monomial_scales_.Reshape(d, order);
-  monomial_ortho_.Reshape(d, order);
+  monomial_scales_.reshape(d, order);
+  monomial_ortho_.reshape(d, order);
 
   NumericalIntegration numi(mesh);
   numi.UpdateMonomialIntegralsCell(c, 2 * order, integrals);
@@ -78,7 +78,7 @@ Basis_Orthonormalized::Init(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
 * Transformation from natural basis to my basis: A_new = R^T A_old R.
 ****************************************************************** */
 void
-Basis_Orthonormalized::BilinearFormNaturalToMy(DenseMatrix& A) const
+Basis_Orthonormalized::BilinearFormNaturalToMy(DenseMatrix<>& A) const
 {
   AMANZI_ASSERT(A.NumRows() == monomial_scales_.size());
 
@@ -111,7 +111,7 @@ Basis_Orthonormalized::BilinearFormNaturalToMy(DenseMatrix& A) const
 void
 Basis_Orthonormalized::BilinearFormNaturalToMy(std::shared_ptr<Basis> bl,
                                                std::shared_ptr<Basis> br,
-                                               DenseMatrix& A) const
+                                               DenseMatrix<>& A) const
 {
   int nrows = A.NumRows();
   int m(nrows / 2);
@@ -165,7 +165,7 @@ Basis_Orthonormalized::BilinearFormNaturalToMy(std::shared_ptr<Basis> bl,
 * Transformation from natural basis to my basis: f_new = R^T f_old.
 ****************************************************************** */
 void
-Basis_Orthonormalized::LinearFormNaturalToMy(DenseVector& f) const
+Basis_Orthonormalized::LinearFormNaturalToMy(DenseVector<>& f) const
 {
   int nrows = f.NumRows();
   AmanziMesh::Double_List a(nrows), b(nrows);
@@ -191,7 +191,7 @@ Basis_Orthonormalized::LinearFormNaturalToMy(DenseVector& f) const
 * Transformation from my to natural bases: v_old = R * v_new.
 ****************************************************************** */
 void
-Basis_Orthonormalized::ChangeBasisMyToNatural(DenseVector& v) const
+Basis_Orthonormalized::ChangeBasisMyToNatural(DenseVector<>& v) const
 {
   AMANZI_ASSERT(v.NumRows() == monomial_scales_.size());
 
@@ -212,7 +212,7 @@ Basis_Orthonormalized::ChangeBasisMyToNatural(DenseVector& v) const
 * Transformation from natural to my bases: v_new = inv(R) * v_old.
 ****************************************************************** */
 void
-Basis_Orthonormalized::ChangeBasisNaturalToMy(DenseVector& v) const
+Basis_Orthonormalized::ChangeBasisNaturalToMy(DenseVector<>& v) const
 {
   AMANZI_ASSERT(v.NumRows() == monomial_scales_.size());
 
@@ -233,11 +233,11 @@ Basis_Orthonormalized::ChangeBasisNaturalToMy(DenseVector& v) const
 * Recover polynomial in the natural basis from vector coefs of
 * coefficients in the orthonormalized basis.
 ****************************************************************** */
-Polynomial
+Polynomial<>
 Basis_Orthonormalized::CalculatePolynomial(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
                                            int c,
                                            int order,
-                                           DenseVector& coefs) const
+                                           const DenseVector<>& coefs) const
 {
   Polynomial poly(monomial_scales_);
   poly.set_origin(mesh->getCellCentroid(c));

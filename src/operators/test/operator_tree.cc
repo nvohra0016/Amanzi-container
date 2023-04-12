@@ -80,12 +80,12 @@ SUITE(SURFACE_SUBSURFACE)
     CHECK_EQUAL(ncells_subsurf, supermap->Indices(1, "cell", 0).front());
     CHECK_EQUAL(ncells_surf + ncells_subsurf - 1, supermap->Indices(1, "cell", 0).back());
 
-    Epetra_Vector supervec(*supermap->Map(), 1);
-    CHECK_EQUAL(ncells_subsurf + ncells_surf, supervec.MyLength());
+    Epetra_Vector supervec(*supermap->getMap(), 1);
+    CHECK_EQUAL(ncells_subsurf + ncells_surf, supervec.getLocalLength());
 
     TreeVector tv(tvs_global);
-    tv.SubVector(0)->Data()->PutScalar(1.0);
-    tv.SubVector(1)->Data()->PutScalar(2.0);
+    tv.SubVector(0)->Data()->putScalar(1.0);
+    tv.SubVector(1)->Data()->putScalar(2.0);
     Operators::copyToSuperVector(*supermap, tv, supervec);
     CHECK_EQUAL(1, supervec[0]);
     CHECK_EQUAL(1, supervec[ncells_subsurf - 1]);
@@ -167,7 +167,7 @@ SUITE(SURFACE_SUBSURFACE)
       int f = mesh_surf->getEntityParent(AmanziMesh::Entity_kind::CELL, sc);
       auto cells = mesh_subsurf->getFaceCells(f, AmanziMesh::Parallel_kind::OWNED);
       AMANZI_ASSERT(cells.size() == 1);
-      parents[sc] = cell_map.GID(cells[0]);
+      parents[sc] = cell_map.getGlobalElement(cells[0]);
     }
     auto injection = Teuchos::rcp(new Epetra_Map(-1, parents.size(), parents.data(), 0, *comm));
 
@@ -214,8 +214,8 @@ SUITE(SURFACE_SUBSURFACE)
 
     gop_surf_subsurf->Init();
     gop_subsurf_surf->Init();
-    lop_surf_subsurf->diag->PutScalar(0.1);
-    lop_subsurf_surf->diag->PutScalar(0.2);
+    lop_surf_subsurf->diag->putScalar(0.1);
+    lop_subsurf_surf->diag->putScalar(0.2);
 
     global_op.AssembleMatrix();
 
@@ -319,7 +319,7 @@ SUITE(SURFACE_SUBSURFACE)
       int f = mesh_surf->getEntityParent(AmanziMesh::Entity_kind::CELL, sc);
       auto cells = mesh_subsurf->getFaceCells(f, AmanziMesh::Parallel_kind::OWNED);
       AMANZI_ASSERT(cells.size() == 1);
-      parents[sc] = cell_map.GID(cells[0]);
+      parents[sc] = cell_map.getGlobalElement(cells[0]);
     }
     auto injection = Teuchos::rcp(new Epetra_Map(-1, parents.size(), parents.data(), 0, *comm));
 
@@ -402,39 +402,39 @@ SUITE(SURFACE_SUBSURFACE)
     // ok, fill it...
     diff1_subsurf.global_operator()->Init();
     CompositeVector vals1(diff1_subsurf.global_operator()->DomainMap());
-    vals1.PutScalar(1.);
+    vals1.putScalar(1.);
     diff1_subsurf.AddAccumulationTerm(vals1, "cell");
 
     diff2_subsurf.global_operator()->Init();
     CompositeVector vals2(diff2_subsurf.global_operator()->DomainMap());
-    vals2.PutScalar(2.);
+    vals2.putScalar(2.);
     diff2_subsurf.AddAccumulationTerm(vals2, "cell");
 
     diff1_surf.global_operator()->Init();
     CompositeVector vals3(diff1_surf.global_operator()->DomainMap());
-    vals3.PutScalar(3.);
+    vals3.putScalar(3.);
     diff1_surf.AddAccumulationTerm(vals3, "cell");
 
     diff2_surf.global_operator()->Init();
     CompositeVector vals4(diff2_surf.global_operator()->DomainMap());
-    vals4.PutScalar(4.);
+    vals4.putScalar(4.);
     diff2_surf.AddAccumulationTerm(vals4, "cell");
 
     // fill the coupling flux terms
     gop_surf_subsurf_flow->Init();
     gop_subsurf_surf_flow->Init();
-    lop_surf_subsurf_flow->diag->PutScalar(0.1);
-    lop_subsurf_surf_flow->diag->PutScalar(0.2);
+    lop_surf_subsurf_flow->diag->putScalar(0.1);
+    lop_subsurf_surf_flow->diag->putScalar(0.2);
 
     // fill the tightly coupled flow/energy terms
     dWC_dT.global_operator()->Init();
     CompositeVector dWC_dT_values(dWC_dT.global_operator()->DomainMap());
-    dWC_dT_values.PutScalar(1.e-2);
+    dWC_dT_values.putScalar(1.e-2);
     dWC_dT.AddAccumulationTerm(dWC_dT_values, "cell");
 
     dE_dp_surf.global_operator()->Init();
     CompositeVector dE_dp_surf_values(dE_dp_surf.global_operator()->DomainMap());
-    dE_dp_surf_values.PutScalar(2.e-2);
+    dE_dp_surf_values.putScalar(2.e-2);
     dE_dp_surf.AddAccumulationTerm(dE_dp_surf_values, "cell");
 
     op_global.AssembleMatrix();
@@ -443,15 +443,15 @@ SUITE(SURFACE_SUBSURFACE)
     // apply it to the ones vector and make sure we get the right answer...
 
     // apply in assembled form
-    Epetra_Vector ones(*op_global.get_supermap()->Map());
-    ones.PutScalar(1.0);
+    Epetra_Vector ones(*op_global.get_supermap()->getMap());
+    ones.putScalar(1.0);
     ones[0] = 1.0001;
     Epetra_Vector result(ones);
-    result.PutScalar(0.);
+    result.putScalar(0.);
     op_global.A()->Apply(ones, result);
     result.Print(std::cout);
 
-    CHECK_EQUAL(6, result.MyLength());      // size
+    CHECK_EQUAL(6, result.getLocalLength());      // size
     CHECK_CLOSE(1.0101, result[0], 1.e-10); // subsurface flow + dWC_dT
     CHECK_CLOSE(1.21, result[2], 1.e-10);   // subsurface flow + dwc_dt + coupling to surface
 
@@ -464,11 +464,11 @@ SUITE(SURFACE_SUBSURFACE)
 
     // apply in unassembled form
     TreeVector ones_t(op_global.DomainMap());
-    ones_t.PutScalar(1.0);
+    ones_t.putScalar(1.0);
     // make sure we get the right subsurface gid in our restriction operation
     (*ones_t.SubVector(0)->SubVector(0)->Data()->ViewComponent("cell", false))[0][0] = 1.0001;
     TreeVector result_t(op_global.RangeMap());
-    result_t.PutScalar(0.0);
+    result_t.putScalar(0.0);
     op_global.Apply(ones_t, result_t);
 
 
@@ -629,32 +629,32 @@ SUITE(SURFACE_SUBSURFACE)
     // add data
     diff1.global_operator()->Init();
     CompositeVector val1(diff1.global_operator()->DomainMap());
-    val1.PutScalar(1.0);
+    val1.putScalar(1.0);
     diff1.AddAccumulationTerm(val1, "cell");
 
     diff2a.global_operator()->Init();
     CompositeVector val2a(diff2a.global_operator()->DomainMap());
-    val2a.PutScalar(2.1);
+    val2a.putScalar(2.1);
     diff2a.AddAccumulationTerm(val2a, "cell");
 
     diff2b.global_operator()->Init();
     CompositeVector val2b(diff2b.global_operator()->DomainMap());
-    val2b.PutScalar(2.2);
+    val2b.putScalar(2.2);
     diff2b.AddAccumulationTerm(val2b, "cell");
 
     diff3a.global_operator()->Init();
     CompositeVector val3a(diff3a.global_operator()->DomainMap());
-    val3a.PutScalar(3.1);
+    val3a.putScalar(3.1);
     diff3a.AddAccumulationTerm(val3a, "cell");
 
     diff3b.global_operator()->Init();
     CompositeVector val3b(diff3b.global_operator()->DomainMap());
-    val3b.PutScalar(3.2);
+    val3b.putScalar(3.2);
     diff3b.AddAccumulationTerm(val3b, "cell");
 
     diff3c.global_operator()->Init();
     CompositeVector val3c(diff3c.global_operator()->DomainMap());
-    val3c.PutScalar(3.3);
+    val3c.putScalar(3.3);
     diff3c.AddAccumulationTerm(val3c, "cell");
 
     // auto values12 = std::make_shared<std::vector<double> >(4);
@@ -673,10 +673,10 @@ SUITE(SURFACE_SUBSURFACE)
     // std::cout << *op123->A() << std::endl;
 
     // verify matrix
-    Epetra_Vector ones(*op123->get_supermap()->Map());
+    Epetra_Vector ones(*op123->get_supermap()->getMap());
     Epetra_Vector result(ones);
 
-    ones.PutScalar(1.0);
+    ones.putScalar(1.0);
     op123->A()->Apply(ones, result);
     // CHECK_CLOSE(result[0], -3.1, 1e-12);
     CHECK_CLOSE(result[4], -2.1, 1e-12);

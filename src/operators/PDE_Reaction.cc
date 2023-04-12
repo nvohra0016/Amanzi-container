@@ -26,8 +26,8 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Initialize operator from parameter list.
-****************************************************************** */
+ * Initialize operator from parameter list.
+ ****************************************************************** */
 void
 PDE_Reaction::InitReaction_(Teuchos::ParameterList& plist)
 {
@@ -60,38 +60,39 @@ PDE_Reaction::InitReaction_(Teuchos::ParameterList& plist)
 
     global_op_ =
       Teuchos::rcp(new Operator_Schema(cvs, cvs, plist, global_schema_row_, global_schema_col_));
+    local_op_ = Teuchos::rcp(new Op_Cell_Schema(global_schema_row_, global_schema_col_, mesh_));
 
   } else {
     // constructor was given an Operator
     global_schema_row_ = global_op_->schema_row();
     global_schema_col_ = global_op_->schema_col();
 
-    mesh_ = global_op_->DomainMap().Mesh();
+    mesh_ = global_op_->DomainMap().getMesh();
     local_schema_row_.Init(mfd_, mesh_, base);
     local_schema_col_ = local_schema_row_;
+
+    local_op_ = Teuchos::rcp(new Op_Cell_Schema(global_schema_row_, global_schema_col_, mesh_));
   }
 
   // register the advection Op
-  local_op_ = Teuchos::rcp(new Op_Cell_Schema(global_schema_row_, global_schema_col_, mesh_));
   global_op_->OpPushBack(local_op_);
 }
 
 
 /* ******************************************************************
-* Collection of local matrices.
-* NOTE: Not all input parameters are used yet.
-****************************************************************** */
+ * Collection of local matrices.
+ ****************************************************************** */
 void
-PDE_Reaction::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
-                             const Teuchos::Ptr<const CompositeVector>& p)
+PDE_Reaction::UpdateMatrices()
 {
-  std::vector<WhetStone::DenseMatrix>& matrix = local_op_->matrices;
+  std::vector<WhetStone::DenseMatrix<>>& matrix = local_op_->matrices;
+  std::vector<WhetStone::DenseMatrix<>>& matrix_shadow = local_op_->matrices_shadow;
 
   AmanziMesh::Entity_ID_View nodes;
   int d = mesh_->getSpaceDimension();
 
-  WhetStone::DenseMatrix Mcell;
-  WhetStone::Tensor Kc(d, 1);
+  WhetStone::DenseMatrix<> Mcell;
+  WhetStone:Tensor<> Kc(d, 1);
 
   for (int c = 0; c < ncells_owned; ++c) {
     if (Kpoly_.get()) {
@@ -107,15 +108,15 @@ PDE_Reaction::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
 
 
 /* ******************************************************************
-* Populate containers of elemental matrices using MFD factory.
-****************************************************************** */
+ * Populate containers of elemental matrices using MFD factory.
+ ****************************************************************** */
 void
 PDE_Reaction::UpdateMatrices(double t)
 {
   // verify type of coefficient
   AMANZI_ASSERT(Kpoly_st_.get());
 
-  std::vector<WhetStone::DenseMatrix>& matrix = local_op_->matrices;
+  std::vector<WhetStone::DenseMatrix<>>& matrix = local_op_->matrices;
 
   for (int c = 0; c < ncells_owned; ++c) {
     double tmp(t);
@@ -131,8 +132,8 @@ PDE_Reaction::UpdateMatrices(double t)
 
 
 /* *******************************************************************
-* Apply boundary condition to the local matrices
-******************************************************************* */
+ * Apply boundary condition to the local matrices
+ ******************************************************************* */
 void
 PDE_Reaction::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
 {
@@ -141,12 +142,13 @@ PDE_Reaction::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
 
 
 /* *******************************************************************
-* Space-time coefficients can be pre-processed.
-******************************************************************* */
+ * Space-time coefficients can be pre-processed.
+ ******************************************************************* */
 void
 PDE_Reaction::CreateStaticMatrices_()
 {
-  WhetStone::DenseMatrix Mcell;
+  int d(mesh_->getSpaceDimension());
+  WhetStone::DenseMatrix<> Mcell;
 
   static_matrices_.resize(ncells_owned);
 

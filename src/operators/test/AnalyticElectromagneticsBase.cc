@@ -13,13 +13,12 @@
   Base class for verifying numerical schemes for Maxwell's equations.
 */
 
-#include "Epetra_MultiVector.h"
 
 #include "AnalyticElectromagneticsBase.hh"
 
 /* ******************************************************************
-* Error calculation of faces.
-****************************************************************** */
+ * Error calculation of faces.
+ ****************************************************************** */
 void
 AnalyticElectromagneticsBase::ComputeFaceError(Epetra_MultiVector& u,
                                                double t,
@@ -34,24 +33,25 @@ AnalyticElectromagneticsBase::ComputeFaceError(Epetra_MultiVector& u,
   int nfaces =
     mesh_->getNumEntities(Amanzi::AmanziMesh::Entity_kind::FACE, Amanzi::AmanziMesh::Parallel_kind::OWNED);
   for (int f = 0; f < nfaces; f++) {
-    double area = mesh_->getFaceArea(f);
-    const Amanzi::AmanziGeometry::Point& normal = mesh_->getFaceNormal(f);
-    const Amanzi::AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f);
+    double area = mesh_->getFaceArea(f)
+    const Amanzi::AmanziGeometry::Point& normal = mesh_->getFaceNormal(f)
+    const Amanzi::AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f)
     const Amanzi::AmanziGeometry::Point& B = magnetic_exact(xf, t);
     double tmp = (normal * B) / area;
 
     l2_err += std::pow((tmp - u[0][f]), 2.0);
     inf_err = std::max(inf_err, fabs(tmp - u[0][f]));
     unorm += std::pow(tmp, 2.0);
-    // std::cout << f << " x=" << xf << "  normal=" << normal << " " << u[0][f] << " " << tmp << std::endl;
+    // std::cout << f << " x=" << xf << "  normal=" << normal << " " << u[0][f]
+    // << " " << tmp << std::endl;
   }
 #ifdef HAVE_MPI
   double tmp = unorm;
-  mesh_->getComm()->SumAll(&tmp, &unorm, 1);
+  Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &unorm);
   tmp = l2_err;
-  mesh_->getComm()->SumAll(&tmp, &l2_err, 1);
+  Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &l2_err);
   tmp = inf_err;
-  mesh_->getComm()->MaxAll(&tmp, &inf_err, 1);
+  Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_MAX, 1,&tmp, &inf_err);
 #endif
   unorm = sqrt(unorm);
   l2_err = sqrt(l2_err);
@@ -59,8 +59,8 @@ AnalyticElectromagneticsBase::ComputeFaceError(Epetra_MultiVector& u,
 
 
 /* ******************************************************************
-* Error calculation of edges.
-****************************************************************** */
+ * Error calculation of edges.
+ ****************************************************************** */
 void
 AnalyticElectromagneticsBase::ComputeEdgeError(Epetra_MultiVector& u,
                                                double t,
@@ -75,9 +75,9 @@ AnalyticElectromagneticsBase::ComputeEdgeError(Epetra_MultiVector& u,
   int nedges =
     mesh_->getNumEntities(Amanzi::AmanziMesh::Entity_kind::EDGE, Amanzi::AmanziMesh::Parallel_kind::OWNED);
   for (int e = 0; e < nedges; e++) {
-    double len = mesh_->getEdgeLength(e);
-    const Amanzi::AmanziGeometry::Point& tau = mesh_->getEdgeVector(e);
-    const Amanzi::AmanziGeometry::Point& xe = mesh_->getEdgeCentroid(e);
+    double len = mesh_->getEdgeLength(e)
+    const Amanzi::AmanziGeometry::Point& tau = mesh_->getEdgeVector(e)
+    const Amanzi::AmanziGeometry::Point& xe = mesh_.getEdgeCentroid(e);
 
     const Amanzi::AmanziGeometry::Point& E = electric_exact(xe, t);
     double tmp = (E * tau) / len;
@@ -85,7 +85,8 @@ AnalyticElectromagneticsBase::ComputeEdgeError(Epetra_MultiVector& u,
     l2_err += std::pow(tmp - u[0][e], 2.0);
     inf_err = std::max(inf_err, fabs(tmp - u[0][e]));
     unorm += std::pow(tmp, 2.0);
-    // std::cout << e << " xe=" << xe << " E=" << u[0][e] << " Eex=" << tmp << " L2err=" << l2_err << std::endl;
+    // std::cout << e << " xe=" << xe << " E=" << u[0][e] << " Eex=" << tmp << "
+    // L2err=" << l2_err << std::endl;
   }
 #ifdef HAVE_MPI
   GlobalOp("sum", &unorm, 1);
@@ -98,8 +99,8 @@ AnalyticElectromagneticsBase::ComputeEdgeError(Epetra_MultiVector& u,
 
 
 /* ******************************************************************
-* Error calculation of nodes.
-****************************************************************** */
+ * Error calculation of nodes.
+ ****************************************************************** */
 void
 AnalyticElectromagneticsBase::ComputeNodeError(Epetra_MultiVector& u,
                                                double t,
@@ -111,7 +112,7 @@ AnalyticElectromagneticsBase::ComputeNodeError(Epetra_MultiVector& u,
   l2_err = 0.0;
   inf_err = 0.0;
 
-  int d = mesh_->getSpaceDimension();
+  int d = mesh_->get_space_dimension();
   Amanzi::AmanziGeometry::Point xv(d);
 
   Amanzi::AmanziMesh::Entity_ID_View nodes;
@@ -119,9 +120,9 @@ AnalyticElectromagneticsBase::ComputeNodeError(Epetra_MultiVector& u,
     mesh_->getNumEntities(Amanzi::AmanziMesh::Entity_kind::CELL, Amanzi::AmanziMesh::Parallel_kind::OWNED);
 
   for (int c = 0; c < ncells; c++) {
-    double volume = mesh_->getCellVolume(c);
+    double volume = mesh_->getCellVolume(c)
 
-    nodes = mesh_->getCellNodes(c);
+    mesh_->getCellNodes(c, nodes);
     int nnodes = nodes.size();
 
     for (int k = 0; k < nnodes; k++) {
@@ -129,7 +130,8 @@ AnalyticElectromagneticsBase::ComputeNodeError(Epetra_MultiVector& u,
       xv = mesh_->getNodeCoordinate(v);
       double tmp = (electric_exact(xv, t))[2];
 
-      // std::cout << v << " at " << xv << " error: " << tmp << " " << u[0][v] << std::endl;
+      // std::cout << v << " at " << xv << " error: " << tmp << " " << u[0][v]
+      // << std::endl;
       l2_err += std::pow(tmp - u[0][v], 2.0) * volume / nnodes;
       inf_err = std::max(inf_err, fabs(tmp - u[0][v]));
       unorm += std::pow(tmp, 2.0) * volume / nnodes;
@@ -146,8 +148,8 @@ AnalyticElectromagneticsBase::ComputeNodeError(Epetra_MultiVector& u,
 
 
 /* ******************************************************************
-* Collective communications.
-****************************************************************** */
+ * Collective communications.
+ ****************************************************************** */
 void
 AnalyticElectromagneticsBase::GlobalOp(std::string op, double* val, int n)
 {
@@ -155,9 +157,9 @@ AnalyticElectromagneticsBase::GlobalOp(std::string op, double* val, int n)
   for (int i = 0; i < n; ++i) val_tmp[i] = val[i];
 
   if (op == "sum")
-    mesh_->getComm()->SumAll(val_tmp, val, n);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, n,val_tmp, val);
   else if (op == "max")
-    mesh_->getComm()->MaxAll(val_tmp, val, n);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_MAX, n,val_tmp, val);
 
   delete[] val_tmp;
 }

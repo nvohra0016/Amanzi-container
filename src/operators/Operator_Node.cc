@@ -28,8 +28,8 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Apply a source which may or may not have node volume included already.
-****************************************************************** */
+ * Apply a source which may or may not have node volume included already.
+ ****************************************************************** */
 void
 Operator_Node::UpdateRHS(const CompositeVector& source, bool volume_included)
 {
@@ -37,14 +37,16 @@ Operator_Node::UpdateRHS(const CompositeVector& source, bool volume_included)
     Operator::UpdateRHS(source);
   } else {
     rhs_->PutScalarGhosted(0.0);
-    Epetra_MultiVector& rhs_v = *rhs_->ViewComponent("node", true);
-    const Epetra_MultiVector& source_v = *source.ViewComponent("node", true);
+    Epetra_MultiVector& rhs_v = *rhs_->viewComponent("node", true);
+    const Epetra_MultiVector& source_v = *source.viewComponent("node", true);
+
+    AmanziMesh::Entity_ID_List nodes;
 
     for (int c = 0; c != ncells_owned; ++c) {
-      auto nodes = mesh_->getCellNodes(c);
+      mesh_->getCellNodes(c, nodes);
       int nnodes = nodes.size();
 
-      double volume = mesh_->getCellVolume(c);
+      double volume = mesh_->getCellVolume(c)
       for (int n = 0; n < nnodes; ++n) {
         int v = nodes[n];
         rhs_v[0][v] += source_v[0][v] * volume / nnodes;
@@ -56,47 +58,54 @@ Operator_Node::UpdateRHS(const CompositeVector& source, bool volume_included)
 
 
 /* ******************************************************************
-* Apply the local matrices directly as schemas match.
-****************************************************************** */
+ * Apply the local matrices directly as schemas match.
+ ****************************************************************** */
 int
 Operator_Node::ApplyMatrixFreeOp(const Op_Cell_Node& op,
                                  const CompositeVector& X,
                                  CompositeVector& Y) const
 {
   AMANZI_ASSERT(op.matrices.size() == ncells_owned);
-  const Epetra_MultiVector& Xn = *X.ViewComponent("node", true);
-  {
-    Epetra_MultiVector& Yn = *Y.ViewComponent("node", true);
 
+  X.ScatterMasterToGhosted();
+  const Epetra_MultiVector& Xn = *X.viewComponent("node", true);
+  Y.PutScalarGhosted(0.0);
+
+  {
+    Epetra_MultiVector& Yn = *Y.viewComponent("node", true);
+
+    AmanziMesh::Entity_ID_List nodes;
     for (int c = 0; c != ncells_owned; ++c) {
-      auto nodes = mesh_->getCellNodes(c);
+      mesh_->getCellNodes(c, nodes);
       int nnodes = nodes.size();
 
-      WhetStone::DenseVector v(nnodes), av(nnodes);
+      WhetStone::DenseVector<> v(nnodes), av(nnodes);
       for (int n = 0; n != nnodes; ++n) { v(n) = Xn[0][nodes[n]]; }
 
-      const WhetStone::DenseMatrix& Acell = op.matrices[c];
+      const WhetStone::DenseMatrix<>& Acell = op.matrices[c];
       Acell.Multiply(v, av, false);
 
       for (int n = 0; n != nnodes; ++n) { Yn[0][nodes[n]] += av(n); }
     }
   }
+
+  Y.GatherGhostedToMaster(Add);
   return 0;
 }
 
 
 /* ******************************************************************
-* Apply the local matrices directly as schemas match.
-****************************************************************** */
+ * Apply the local matrices directly as schemas match.
+ ****************************************************************** */
 int
 Operator_Node::ApplyMatrixFreeOp(const Op_Node_Node& op,
                                  const CompositeVector& X,
                                  CompositeVector& Y) const
 {
-  const Epetra_MultiVector& Xn = *X.ViewComponent("node");
-  Epetra_MultiVector& Yn = *Y.ViewComponent("node");
+  const Epetra_MultiVector& Xn = *X.viewComponent("node");
+  Epetra_MultiVector& Yn = *Y.viewComponent("node");
 
-  for (int i = 0; i < Xn.NumVectors(); ++i) {
+  for (int i = 0; i < Xn.getNumVectors(); ++i) {
     for (int v = 0; v != nnodes_owned; ++v) { Yn[i][v] += Xn[i][v] * (*op.diag)[i][v]; }
   }
   return 0;
@@ -104,9 +113,9 @@ Operator_Node::ApplyMatrixFreeOp(const Op_Node_Node& op,
 
 
 /* ******************************************************************
-* Visit methods for symbolic assemble.
-* Apply the local matrices directly as schemas match.
-****************************************************************** */
+ * Visit methods for symbolic assemble.
+ * Apply the local matrices directly as schemas match.
+ ****************************************************************** */
 void
 Operator_Node::SymbolicAssembleMatrixOp(const Op_Cell_Node& op,
                                         const SuperMap& map,
@@ -122,24 +131,25 @@ Operator_Node::SymbolicAssembleMatrixOp(const Op_Cell_Node& op,
   const std::vector<int>& node_col_inds = map.GhostIndices(my_block_col, "node", 0);
 
   int ierr(0);
+  AmanziMesh::Entity_ID_List nodes;
   for (int c = 0; c != ncells_owned; ++c) {
-    auto nodes = mesh_->getCellNodes(c);
+    mesh_->getCellNodes(c, nodes);
     int nnodes = nodes.size();
 
     for (int n = 0; n != nnodes; ++n) {
       lid_r[n] = node_row_inds[nodes[n]];
       lid_c[n] = node_col_inds[nodes[n]];
     }
-    ierr |= graph.InsertMyIndices(nnodes, lid_r.data(), nnodes, lid_c.data());
+    ierr |= graph.insertLocalIndices(nnodes, lid_r.data(), nnodes, lid_c.data());
   }
   AMANZI_ASSERT(!ierr);
 }
 
 
 /* ******************************************************************
-* Visit methods for symbolic assemble.
-* Insert the diagonal at nodes
-****************************************************************** */
+ * Visit methods for symbolic assemble.
+ * Insert the diagonal at nodes
+ ****************************************************************** */
 void
 Operator_Node::SymbolicAssembleMatrixOp(const Op_Node_Node& op,
                                         const SuperMap& map,
@@ -155,16 +165,16 @@ Operator_Node::SymbolicAssembleMatrixOp(const Op_Node_Node& op,
     int row = node_row_inds[v];
     int col = node_col_inds[v];
 
-    ierr |= graph.InsertMyIndices(row, 1, &col);
+    ierr |= graph.insertLocalIndices(row, 1, &col);
   }
   AMANZI_ASSERT(!ierr);
 }
 
 
 /* ******************************************************************
-* Visit methods for assemble
-* Apply the local matrices directly as schemas match.
-****************************************************************** */
+ * Visit methods for assemble
+ * Apply the local matrices directly as schemas match.
+ ****************************************************************** */
 void
 Operator_Node::AssembleMatrixOp(const Op_Cell_Node& op,
                                 const SuperMap& map,
@@ -182,8 +192,9 @@ Operator_Node::AssembleMatrixOp(const Op_Cell_Node& op,
   const std::vector<int>& node_col_inds = map.GhostIndices(my_block_col, "node", 0);
 
   int ierr(0);
+  AmanziMesh::Entity_ID_List nodes;
   for (int c = 0; c != ncells_owned; ++c) {
-    auto nodes = mesh_->getCellNodes(c);
+    mesh_->getCellNodes(c, nodes);
     int nnodes = nodes.size();
 
     for (int n = 0; n != nnodes; ++n) {
@@ -191,16 +202,16 @@ Operator_Node::AssembleMatrixOp(const Op_Cell_Node& op,
       lid_c[n] = node_col_inds[nodes[n]];
     }
 
-    ierr |= mat.SumIntoMyValues(lid_r.data(), lid_c.data(), op.matrices[c]);
+    ierr |= mat.sumIntoLocalValues(lid_r.data(), lid_c.data(), op.matrices[c]);
   }
   AMANZI_ASSERT(!ierr);
 }
 
 
 /* ******************************************************************
-* Visit methods for assemble
-* Insert each diagonal values for edges.
-****************************************************************** */
+ * Visit methods for assemble
+ * Insert each diagonal values for edges.
+ ****************************************************************** */
 void
 Operator_Node::AssembleMatrixOp(const Op_Node_Node& op,
                                 const SuperMap& map,
@@ -208,7 +219,7 @@ Operator_Node::AssembleMatrixOp(const Op_Node_Node& op,
                                 int my_block_row,
                                 int my_block_col) const
 {
-  AMANZI_ASSERT(op.diag->NumVectors() == 1);
+  AMANZI_ASSERT(op.diag->getNumVectors() == 1);
 
   const std::vector<int>& node_row_inds = map.GhostIndices(my_block_row, "node", 0);
   const std::vector<int>& node_col_inds = map.GhostIndices(my_block_col, "node", 0);
@@ -218,19 +229,9 @@ Operator_Node::AssembleMatrixOp(const Op_Node_Node& op,
     int row = node_row_inds[v];
     int col = node_col_inds[v];
 
-    ierr |= mat.SumIntoMyValues(row, 1, &(*op.diag)[0][v], &col);
+    ierr |= mat.sumIntoLocalValues(row, 1, &(*op.diag)[0][v], &col);
   }
   AMANZI_ASSERT(!ierr);
-}
-
-
-/* ******************************************************************
-* Copy constructor.
-****************************************************************** */
-Teuchos::RCP<Operator>
-Operator_Node::Clone() const
-{
-  return Teuchos::rcp(new Operator_Node(*this));
 }
 
 } // namespace Operators

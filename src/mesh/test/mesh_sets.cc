@@ -18,6 +18,7 @@
 #include "framework_meshes.hh"
 #include "set_harnesses.hh"
 
+
 TEST(MESH_SETS_3CUBE)
 {
   // create the comm and gm
@@ -33,7 +34,7 @@ TEST(MESH_SETS_3CUBE)
   if (framework_enabled(Framework::MSTK)) {
     frameworks.push_back(Framework::MSTK);
   }
-  if (getDefaultComm()->NumProc() == 1)
+  if (getDefaultComm()->getSize() == 1)
     frameworks.push_back(Framework::SIMPLE);
 
   for (const auto& frm : frameworks) {
@@ -62,7 +63,7 @@ TEST(MESH_SETS_3CUBE_EXO)
     frameworks.push_back(Framework::MSTK);
   }
   if (framework_enabled(Framework::MOAB) &&
-      getDefaultComm()->NumProc() == 1) {
+      getDefaultComm()->getSize() == 1) {
     // moab only reads exo in serial, otherwise must read par
     frameworks.push_back(Framework::MOAB);
   }
@@ -82,7 +83,7 @@ TEST(MESH_SETS_3CUBE_EXO)
 // {
 //   // create the comm and gm
 //   auto comm = Amanzi::getDefaultComm();
-//   int nprocs = comm->NumProc();
+//   int nprocs = comm->getSize();
 //   if (nprocs != 2) return;
 
 //   std::string infilename = "test/hex_3x3x3.xml";
@@ -105,7 +106,8 @@ TEST(MESH_SETS_3CUBE_EXO)
 //               << "Testing 3D Box 3x3x3 Par with " << AmanziMesh::to_string(frm) << std::endl
 //               << "------------------------------------------------" << std::endl;
 //     auto mesh = createUnstructured(Preference{frm}, "test/hex_3x3x3_sets.par", comm, gm);
-//     testHexMeshSets3x3x3(mesh, true, frm);
+//     auto mesh_host = Teuchos::rcpFromRef(onMemSpace<MemSpace_kind::HOST>(*mesh));
+//     testHexMeshSets3x3x3(mesh_host, true, frm);
 //   }
 // }
 

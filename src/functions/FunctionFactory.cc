@@ -8,7 +8,7 @@
 */
 
 #include "Teuchos_ParameterList.hpp"
-#include "Epetra_SerialDenseMatrix.h"
+#include "Teuchos_SerialDenseMatrix.hpp"
 
 #include "errors.hh"
 #include "HDF5Reader.hh"
@@ -113,8 +113,14 @@ FunctionFactory::Create(Teuchos::ParameterList& list) const
         Exceptions::amanzi_throw(m);
       }
       // strip the function-
+      if (!Keys::starts_with(function_type, "function-")) {
+        Errors::Message m;
+        m << "FunctionFactory: unknown function type: \"" << function_type << "\"";
+        Exceptions::amanzi_throw(m);
+      }
+
       Teuchos::ParameterList& function_params = list.sublist(function_type);
-      function_type = function_type.substr(9, std::string::npos);
+      function_type = function_type.substr(std::string("function-").size(), std::string::npos);
       function_type = Keys::replace_all(function_type, "-", " ");
       f = Create(function_type, function_params);
     }
@@ -167,41 +173,23 @@ FunctionFactory::create_tabular(Teuchos::ParameterList& params) const
       xi = 3;
     std::string y = params.get<std::string>("y header");
 
-    std::vector<double> vec_x;
-    std::vector<double> vec_y;
+    Kokkos::View<double*, Kokkos::HostSpace> vec_x;
+    Kokkos::View<double*, Kokkos::HostSpace> vec_y;
     reader.ReadData(x, vec_x);
     reader.ReadData(y, vec_y);
     if (params.isParameter("forms")) {
-      std::vector<FunctionTabular::Form> form;
-      if (params.isType<Teuchos::Array<std::string>>("forms")) {
-        Teuchos::Array<std::string> form_strings(params.get<Teuchos::Array<std::string>>("forms"));
-        form.resize(form_strings.size());
-        for (int i = 0; i < form_strings.size(); ++i) {
-          if (form_strings[i] == "linear")
-            form[i] = FunctionTabular::LINEAR;
-          else if (form_strings[i] == "constant")
-            form[i] = FunctionTabular::CONSTANT;
-          else {
-            Errors::Message m;
-            m << "unknown form \"" << form_strings[i].c_str() << "\"";
-            Exceptions::amanzi_throw(m);
-          }
-        }
-      } else if (params.isType<std::string>("forms")) {
-        std::string form_string = params.get<std::string>("forms");
-
-        if (form_string == "linear") {
-          form.resize(vec_x.size() - 1, FunctionTabular::LINEAR);
-        } else if (form_string == "constant") {
-          form.resize(vec_x.size() - 1, FunctionTabular::CONSTANT);
-        } else {
+      Teuchos::Array<std::string> form_strings(params.get<Teuchos::Array<std::string>>("forms"));
+      Kokkos::View<FunctionTabular::Form*, Kokkos::HostSpace> form("form", form_strings.size());
+      for (int i = 0; i < form_strings.size(); ++i) {
+        if (form_strings[i] == "linear")
+          form[i] = FunctionTabular::LINEAR;
+        else if (form_strings[i] == "constant")
+          form[i] = FunctionTabular::CONSTANT;
+        else {
           Errors::Message m;
-          m << "unknown form \"" << form_string << "\"";
+          m << "unknown form \"" << form_strings[i] << "\"";
           Exceptions::amanzi_throw(m);
         }
-      } else {
-        Errors::Message m("Parameter \"forms\" in \"function-tabular\" passed of invalid type.");
-        Exceptions::amanzi_throw(m);
       }
       f = std::make_unique<FunctionTabular>(vec_x, vec_y, xi, form);
     } else {
@@ -211,17 +199,20 @@ FunctionFactory::create_tabular(Teuchos::ParameterList& params) const
     // }
     // catch (Teuchos::Exceptions::InvalidParameter& msg) {
     //   Errors::Message m;
-    //   m << "FunctionFactory: function-tabular parameter error: " << msg.what();
-    //   Exceptions::amanzi_throw(m);
+    //   m << "FunctionFactory: function-tabular parameter error: " <<
+    //   msg.what(); Exceptions::amanzi_throw(m);
     // }
     // catch (Errors::Message& msg) {
     //   Errors::Message m;
-    //   m << "FunctionFactory: function-tabular parameter error: " << msg.what();
-    //   Exceptions::amanzi_throw(m);
+    //   m << "FunctionFactory: function-tabular parameter error: " <<
+    //   msg.what(); Exceptions::amanzi_throw(m);
     // }
   } else {
     try {
-      std::vector<double> x(params.get<Teuchos::Array<double>>("x values").toVector());
+      std::vector<double> x_vec(params.get<Teuchos::Array<double>>("x values").toVector());
+      Kokkos::View<double*, Kokkos::HostSpace> x("x", x_vec.size());
+      for (int i = 0; i < x.extent(0); ++i) x(i) = x_vec[i];
+
       std::string xc = params.get<std::string>("x coordinate", "t");
       int xi = 0;
       if (xc.compare(0, 1, "t") == 0)
@@ -233,11 +224,14 @@ FunctionFactory::create_tabular(Teuchos::ParameterList& params) const
       else if (xc.compare(0, 1, "z") == 0)
         xi = 3;
 
-      std::vector<double> y(params.get<Teuchos::Array<double>>("y values").toVector());
+      std::vector<double> y_vec(params.get<Teuchos::Array<double>>("y values").toVector());
+      Kokkos::View<double*, Kokkos::HostSpace> y("y", y_vec.size());
+      for (int i = 0; i < y.extent(0); ++i) y(i) = y_vec[i];
+
       if (params.isParameter("forms")) {
         Teuchos::Array<std::string> form_strings(params.get<Teuchos::Array<std::string>>("forms"));
         int nforms = form_strings.size();
-        std::vector<FunctionTabular::Form> form(nforms);
+        Kokkos::View<FunctionTabular::Form*, Kokkos::HostSpace> form("form", nforms);
 
         bool flag_func(false);
         std::vector<std::unique_ptr<Function>> func(nforms);
@@ -313,8 +307,14 @@ FunctionFactory::create_polynomial(Teuchos::ParameterList& params) const
 {
   std::unique_ptr<Function> f;
   try {
-    std::vector<double> c(params.get<Teuchos::Array<double>>("coefficients").toVector());
-    std::vector<int> p(params.get<Teuchos::Array<int>>("exponents").toVector());
+    std::vector<double> c_vec(params.get<Teuchos::Array<double>>("coefficients").toVector());
+    std::vector<int> p_vec(params.get<Teuchos::Array<int>>("exponents").toVector());
+
+    Kokkos::View<double*, Kokkos::HostSpace> c("c", c_vec.size());
+    for (int i = 0; i < c.extent(0); ++i) c(i) = c_vec[i];
+    Kokkos::View<int*, Kokkos::HostSpace> p("p", p_vec.size());
+    for (int i = 0; i < p.extent(0); ++i) p(i) = p_vec[i];
+
     double x0 = params.get<double>("reference point", 0.0);
     f = std::make_unique<FunctionPolynomial>(c, p, x0);
   } catch (Teuchos::Exceptions::InvalidParameter& msg) {
@@ -335,8 +335,12 @@ FunctionFactory::create_monomial(Teuchos::ParameterList& params) const
   std::unique_ptr<Function> f;
   try {
     double c = params.get<double>("c");
-    std::vector<double> x0(params.get<Teuchos::Array<double>>("x0").toVector());
-    std::vector<int> p(params.get<Teuchos::Array<int>>("exponents").toVector());
+    std::vector<double> x0_vec(params.get<Teuchos::Array<double>>("x0").toVector());
+    std::vector<int> p_vec(params.get<Teuchos::Array<int>>("exponents").toVector());
+    Kokkos::View<double*, Kokkos::HostSpace> x0("x0", x0_vec.size());
+    for (int i = 0; i < x0.extent(0); ++i) x0(i) = x0_vec[i];
+    Kokkos::View<int*, Kokkos::HostSpace> p("p", p_vec.size());
+    for (int i = 0; i < p.extent(0); ++i) p(i) = p_vec[i];
     f = std::make_unique<FunctionMonomial>(c, x0, p);
   } catch (Teuchos::Exceptions::InvalidParameter& msg) {
     Errors::Message m;
@@ -356,9 +360,15 @@ FunctionFactory::create_linear(Teuchos::ParameterList& params) const
   std::unique_ptr<Function> f;
   try {
     double y0 = params.get<double>("y0");
-    std::vector<double> grad(params.get<Teuchos::Array<double>>("gradient").toVector());
-    Teuchos::Array<double> zero(grad.size(), 0.0);
-    std::vector<double> x0(params.get<Teuchos::Array<double>>("x0", zero).toVector());
+    std::vector<double> grad_vec(params.get<Teuchos::Array<double>>("gradient").toVector());
+    Teuchos::Array<double> zero(grad_vec.size(), 0.0);
+    std::vector<double> x0_vec(params.get<Teuchos::Array<double>>("x0", zero).toVector());
+
+    Kokkos::View<double*, Kokkos::HostSpace> grad("grad", grad_vec.size());
+    for (int i = 0; i < grad.extent(0); ++i) grad(i) = grad_vec[i];
+    Kokkos::View<double*, Kokkos::HostSpace> x0("x0", x0_vec.size());
+    for (int i = 0; i < x0.extent(0); ++i) x0(i) = x0_vec[i];
+
     f = std::make_unique<FunctionLinear>(y0, grad, x0);
   } catch (Teuchos::Exceptions::InvalidParameter& msg) {
     Errors::Message m;
@@ -537,7 +547,9 @@ FunctionFactory::create_standard_math(Teuchos::ParameterList& params) const
   std::unique_ptr<Function> f;
   FunctionFactory factory;
   try {
-    std::string op = params.get<std::string>("operator");
+    std::string op_string = params.get<std::string>("operator");
+    char op[10];
+    strcpy(op, op_string.c_str());
     double amplitude = params.get<double>("amplitude", 1.0);
     double param = params.get<double>("parameter", 1.0);
     double shift = params.get<double>("shift", 0.0);
@@ -577,11 +589,14 @@ FunctionFactory::create_bilinear(Teuchos::ParameterList& params) const
         xi = 3;
       else {
         Errors::Message m;
-        m << "FunctionFactory: function-bilinear parameter error: invalid \"row coordinate\" \""
+        m << "FunctionFactory: function-bilinear parameter error: invalid "
+             "\"row coordinate\" \""
           << xdim << "\" must be one of \"t,\" \"x,\" \"y,\" \"z.\"";
         Exceptions::amanzi_throw(m);
         xi = 0;
       }
+      Kokkos::View<double*, Kokkos::HostSpace> vec_x;
+      reader.ReadData(x, vec_x);
 
       std::string y = params.get<std::string>("column header");
       std::string ydim = params.get<std::string>("column coordinate");
@@ -595,18 +610,17 @@ FunctionFactory::create_bilinear(Teuchos::ParameterList& params) const
         yi = 3;
       else {
         Errors::Message m;
-        m << "FunctionFactory: function-bilinear parameter error: invalid \"column coordinate\" \""
+        m << "FunctionFactory: function-bilinear parameter error: invalid "
+             "\"column coordinate\" \""
           << ydim << "\" must be one of \"t,\" \"x,\" \"y,\" \"z.\"";
         Exceptions::amanzi_throw(m);
         yi = 0;
       }
-
-      std::vector<double> vec_x;
-      std::vector<double> vec_y;
-      std::string v = params.get<std::string>("value header");
-      Epetra_SerialDenseMatrix mat_v;
-      reader.ReadData(x, vec_x);
+      Kokkos::View<double*, Kokkos::HostSpace> vec_y;
       reader.ReadData(y, vec_y);
+
+      std::string v = params.get<std::string>("value header");
+      Kokkos::View<double**, Kokkos::HostSpace> mat_v;
       reader.ReadMatData(v, mat_v);
       f = std::make_unique<FunctionBilinear>(vec_x, vec_y, mat_v, xi, yi);
     } catch (Teuchos::Exceptions::InvalidParameter& msg) {
@@ -631,8 +645,14 @@ FunctionFactory::create_distance(Teuchos::ParameterList& params) const
 {
   std::unique_ptr<Function> f;
   try {
-    std::vector<double> x0(params.get<Teuchos::Array<double>>("x0").toVector());
-    std::vector<double> metric(params.get<Teuchos::Array<double>>("metric").toVector());
+    std::vector<double> x0_vec(params.get<Teuchos::Array<double>>("x0").toVector());
+    std::vector<double> metric_vec(params.get<Teuchos::Array<double>>("metric").toVector());
+
+    Kokkos::View<double*, Kokkos::HostSpace> x0("x0", x0_vec.size());
+    for (int i = 0; i < x0.extent(0); ++i) x0(i) = x0_vec[i];
+    Kokkos::View<double*, Kokkos::HostSpace> metric("metric", metric_vec.size());
+    for (int i = 0; i < metric.extent(0); ++i) metric(i) = metric_vec[i];
+
     f = std::make_unique<FunctionDistance>(x0, metric);
   } catch (Teuchos::Exceptions::InvalidParameter& msg) {
     Errors::Message m;
@@ -651,8 +671,14 @@ FunctionFactory::create_squaredistance(Teuchos::ParameterList& params) const
 {
   std::unique_ptr<Function> f;
   try {
-    std::vector<double> x0(params.get<Teuchos::Array<double>>("x0").toVector());
-    std::vector<double> metric(params.get<Teuchos::Array<double>>("metric").toVector());
+    std::vector<double> x0_vec(params.get<Teuchos::Array<double>>("x0").toVector());
+    std::vector<double> metric_vec(params.get<Teuchos::Array<double>>("metric").toVector());
+
+    Kokkos::View<double*, Kokkos::HostSpace> x0("x0", x0_vec.size());
+    for (int i = 0; i < x0.extent(0); ++i) x0(i) = x0_vec[i];
+    Kokkos::View<double*, Kokkos::HostSpace> metric("metric", metric_vec.size());
+    for (int i = 0; i < metric.extent(0); ++i) metric(i) = metric_vec[i];
+
     f = std::make_unique<FunctionSquareDistance>(x0, metric);
   } catch (Teuchos::Exceptions::InvalidParameter& msg) {
     Errors::Message m;

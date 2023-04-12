@@ -9,14 +9,15 @@
 #include "MeshCache.hh"
 
 #include "MeshFrameworkColumn.hh"
+#include "Mesh_Algorithms_impl.hh"
 
 namespace Amanzi {
 namespace AmanziMesh {
 
 std::pair<double, AmanziGeometry::Point>
-MeshFrameworkColumnAlgorithms::computeCellGeometry(const Mesh& mesh, const Entity_ID c) const
+MeshColumnAlgorithms::computeCellGeometry(const MeshHost& mesh, const Entity_ID c) const
 {
-  return MeshAlgorithms::computeMeshColumnCellGeometry(mesh, c);
+  return Impl::computeMeshColumnCellGeometry(mesh, c);
 }
 
 // -----------------------------------------------------------------------------
@@ -62,7 +63,7 @@ void MeshFrameworkColumn::computeSpecialNodeCoordinates_()
   // error will be zero.
 
   // Create a cached object, so that we can use columns.
-  MeshCache<MemSpace_kind::HOST> col3D_mesh(col3D_mesh_, Teuchos::rcp(new AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null);
+  MeshCache<MemSpace_kind::HOST> col3D_mesh(col3D_mesh_, Teuchos::rcp(new AmanziMesh::MeshAlgorithms()), Teuchos::null);
   col3D_mesh.buildColumns();
 
   // Get the ordered face indexes of the column

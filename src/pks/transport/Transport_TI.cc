@@ -191,7 +191,7 @@ Transport_PK::FunctionalTimeDerivative_MUSCL_(double t,
 
   int flag_tmp(flag);
   mesh_->getComm()->MaxAll(&flag_tmp, &flag, 1);
-  if (flag == 1) func.GatherGhostedToMaster("cell");
+  if (flag == 1) func.gatherGhostedToMaster("cell");
 
   // process external sources
   if (srcs_.size() != 0) {
@@ -353,7 +353,7 @@ Transport_PK::FunctionalTimeDerivative_FCT_(double t,
       residual_c[0][cells[0]] -= tcc_flux;
     }
   }
-  residual.GatherGhostedToMaster();
+  residual.gatherGhostedToMaster();
 
   for (int c = 0; c < ncells_owned; ++c) { f_c[0][c] = residual_c[0][c]; }
 

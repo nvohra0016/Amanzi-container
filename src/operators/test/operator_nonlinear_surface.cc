@@ -26,6 +26,7 @@
 
 // Amanzi
 #include "GMVMesh.hh"
+#include "LinearOperatorGMRES.hh"
 #include "MeshFactory.hh"
 #include "Mesh_MSTK.hh"
 #include "Tensor.hh"
@@ -62,17 +63,17 @@ class HeatConduction {
   void UpdateValues(const CompositeVector& u)
   {
     const Epetra_MultiVector& uc = *u.ViewComponent("cell", true);
-    Epetra_MultiVector& values_c = *values_->ViewComponent("cell", true);
+    const Epetra_MultiVector& values_c = *values_->ViewComponent("cell", true);
 
     int ncells = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
     for (int c = 0; c < ncells; c++) { values_c[0][c] = 0.3 + uc[0][c]; }
 
     const Epetra_MultiVector& uf = *u.ViewComponent("face", true);
-    Epetra_MultiVector& values_f = *values_->ViewComponent("face", true);
+    const Epetra_MultiVector& values_f = *values_->ViewComponent("face", true);
     int nfaces = mesh_->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
     for (int f = 0; f < nfaces; f++) { values_f[0][f] = 0.3 + uf[0][f]; }
 
-    derivatives_->PutScalar(1.0);
+    derivatives_->putScalar(1.0);
   }
 
   Teuchos::RCP<CompositeVector> values() { return values_; }
@@ -90,9 +91,9 @@ class HeatConduction {
 namespace {
 
 /* *****************************************************************
-* This test replaves tensor and boundary conditions by continuous
-* functions. This is a prototype forheat conduction solvers.
-* **************************************************************** */
+ * This test replaves tensor and boundary conditions by continuous
+ * functions. This is a prototype forheat conduction solvers.
+ * **************************************************************** */
 void
 RunTest(std::string op_list_name)
 {
@@ -103,7 +104,7 @@ RunTest(std::string op_list_name)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0)
     std::cout << "\nTest: Singular-perturbed nonlinear Laplace Beltrami solver" << std::endl;
@@ -125,15 +126,16 @@ RunTest(std::string op_list_name)
   std::vector<std::string> setnames;
   setnames.push_back(std::string("Top surface"));
 
-  RCP<Mesh> surfmesh = meshfactory.create(mesh, setnames, AmanziMesh::Entity_kind::FACE);
+  RCP<const Mesh> surfmesh = meshfactory.create(mesh, setnames, AmanziMesh::Entity_kind::FACE);
 
   // modify diffusion coefficient
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells_owned = surfmesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+  int nfaces_wghost = surfmesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
   for (int c = 0; c < ncells_owned; c++) {
-    WhetStone::Tensor Kc(2, 1);
+    WhetStone:Tensor<> Kc(2, 1);
     Kc(0, 0) = 1.0;
     K->push_back(Kc);
   }
@@ -141,8 +143,8 @@ RunTest(std::string op_list_name)
   // create boundary data (no mixed bc)
   Teuchos::RCP<BCs> bc =
     Teuchos::rcp(new BCs(surfmesh, AmanziMesh::Entity_kind::FACE, WhetStone::DOF_Type::SCALAR));
-  bc->bc_model(); // allocate
-  bc->bc_value(); // memory
+  std::vector<int>& bc_model = bc->bc_model();
+  std::vector<double>& bc_value = bc->bc_value();
 
   // create solution map.
   Teuchos::RCP<CompositeVectorSpace> cvs = Teuchos::rcp(new CompositeVectorSpace());
@@ -155,10 +157,10 @@ RunTest(std::string op_list_name)
   // create and initialize state variables.
   Teuchos::RCP<CompositeVector> solution = Teuchos::rcp(new CompositeVector(*cvs));
   Teuchos::RCP<CompositeVector> flux = Teuchos::rcp(new CompositeVector(*cvs));
-  solution->PutScalar(0.0); // solution at time T=0
+  solution->putScalar(0.0); // solution at time T=0
 
   CompositeVector phi(*cvs);
-  phi.PutScalar(0.2);
+  phi.putScalar(0.2);
 
   // create source and add it to the operator
   CompositeVector source(*cvs);
@@ -181,7 +183,7 @@ RunTest(std::string op_list_name)
 
     Teuchos::ParameterList olist = plist.sublist("PK operator").sublist(op_list_name);
     PDE_DiffusionMFD op(olist, surfmesh);
-    op.Init(olist);
+    op.Init();
     op.SetBCs(bc, bc);
 
     // get the global operator
@@ -199,43 +201,49 @@ RunTest(std::string op_list_name)
     // apply BCs and assemble
     global_op->UpdateRHS(source, false);
     op.ApplyBCs(true, true, true);
+    global_op->SymbolicAssembleMatrix();
+    global_op->AssembleMatrix();
+
+    // create preconditoner
+    ParameterList slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+    global_op->InitializePreconditioner(slist);
+    global_op->UpdatePreconditioner();
 
     // Test SPD properties of the matrix and preconditioner.
     VerificationCV ver(global_op);
     if (loop == 2) {
-      global_op->set_inverse_parameters("Hypre AMG", plist.sublist("preconditioners"));
-      global_op->InitializeInverse();
-      global_op->ComputeInverse();
       ver.CheckMatrixSPD(true, true);
       ver.CheckPreconditionerSPD(1e-12, true, true);
     }
 
-    // create solver (GMRES with Hypre preconditioner)
-    CompositeVector rhs = *global_op->rhs();
+    // solve the problem
+    ParameterList lop_list =
+      plist.sublist("solvers").sublist("Amanzi GMRES").sublist("gmres parameters");
+    auto solver = Teuchos::rcp(
+      new AmanziSolvers::LinearOperatorGMRES<Operator, CompositeVector, CompositeVectorSpace>(
+        global_op, global_op));
+    solver->Init(lop_list);
 
-    global_op->set_inverse_parameters(
-      "Hypre AMG", plist.sublist("preconditioners"), "Amanzi GMRES", plist.sublist("solvers"));
-    global_op->InitializeInverse();
-    global_op->ComputeInverse();
-    global_op->ApplyInverse(rhs, *solution);
+    CompositeVector rhs = *global_op->rhs();
+    int ierr = solver->ApplyInverse(rhs, *solution);
 
     if (op_list_name == "diffusion operator") ver.CheckResidual(*solution, 1.0e-12);
 
-    int num_itrs = global_op->num_itrs();
+    int num_itrs = solver->num_itrs();
     CHECK(num_itrs > 5 && num_itrs < 15);
 
     if (MyPID == 0) {
       double a;
       rhs.Norm2(&a);
-      std::cout << "pressure solver (gmres): ||r||=" << global_op->residual() << " itr=" << num_itrs
-                << "  ||f||=" << a << " code=" << global_op->returned_code() << std::endl;
+      std::cout << "pressure solver (gmres): ||r||=" << solver->residual() << " itr=" << num_itrs
+                << "  ||f||=" << a << " code=" << solver->returned_code() << std::endl;
     }
 
     // derive diffusion flux.
     op.UpdateFlux(solution.ptr(), flux.ptr());
 
     // turn off the source
-    source.PutScalar(0.0);
+    source.putScalar(0.0);
   }
 
   if (MyPID == 0) {

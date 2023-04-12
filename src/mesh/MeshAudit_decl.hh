@@ -104,7 +104,7 @@ class MeshAudit_Maps : public MeshAudit_Geometry<Mesh_type> {
   bool check_cell_to_nodes_ghost_data() const;
   bool check_cell_to_faces_ghost_data() const;
 
-  bool check_maps(const Epetra_Map&, const Epetra_Map&) const;
+  bool check_maps(const Map_type&, const Map_type&) const;
   bool check_node_partition() const;
   bool check_face_partition() const;
 
@@ -140,9 +140,9 @@ class MeshAudit_Sets : public MeshAudit_Maps<Mesh_type> {
 
   bool check_get_set_ids(AmanziMesh::Entity_kind) const;
   bool check_valid_set_id(AmanziMesh::Entity_kind) const;
-  bool check_sets(AmanziMesh::Entity_kind, const Epetra_Map&, const Epetra_Map&) const;
-  bool check_get_set(AmanziMesh::Set_ID, AmanziMesh::Entity_kind, AmanziMesh::Parallel_kind, const Epetra_Map&) const;
-  bool check_used_set(AmanziMesh::Set_ID, AmanziMesh::Entity_kind, const Epetra_Map&, const Epetra_Map&) const;
+  bool check_sets(AmanziMesh::Entity_kind, const Map_type&, const Map_type&) const;
+  bool check_get_set(AmanziMesh::Set_ID, AmanziMesh::Entity_kind, AmanziMesh::Parallel_kind, const Map_type&) const;
+  bool check_used_set(AmanziMesh::Set_ID, AmanziMesh::Entity_kind, const Map_type&, const Map_type&) const;
 
 protected:
   using MeshAudit_Base<Mesh_type>::mesh_;

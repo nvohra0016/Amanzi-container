@@ -18,7 +18,11 @@
 
 #include <string>
 
+#include "Mesh.hh"
+#include "InputOutputHDF5.hh"
+
 // Amanzi::State
+#include "Mesh.hh"
 #include "Checkpoint.hh"
 #include "ObservationData.hh"
 #include "State.hh"
@@ -26,14 +30,7 @@
 
 namespace Amanzi {
 
-// Visualization
-void
-WriteVis(Visualization& vis, const State& S);
-
 // Checkpointing
-void
-ReadCheckpoint(const Comm_ptr_type& comm, State& S, const std::string& filename);
-
 double
 ReadCheckpointInitialTime(const Comm_ptr_type& comm, std::string filename);
 
@@ -45,12 +42,38 @@ ReadCheckpointObservations(const Comm_ptr_type& comm,
                            std::string filename,
                            Amanzi::ObservationData& obs_data);
 
+// Writing mesh info to vis or checkpoint
+template<class VisOrChkp>
 void
-DeformCheckpointMesh(State& S, Key domain);
+WriteMeshCentroids(const std::string& domain, const AmanziMesh::Mesh& mesh, VisOrChkp& obj)
+{
+  int dim = mesh.getSpaceDimension();
+  MultiVector_type centroids(mesh.getMap(AmanziMesh::Entity_kind::CELL, false), dim);
+  auto mesh_on_host = AmanziMesh::onMemSpace<MemSpace_kind::HOST>(mesh);
 
-// Reading from files
-void
-ReadVariableFromExodusII(Teuchos::ParameterList& plist, CompositeVector& var);
+  {
+    auto centroids_hv = centroids.getLocalViewHost(Tpetra::Access::ReadWrite);
+    for (int n = 0; n != centroids.getLocalLength(); ++n) {
+      const AmanziGeometry::Point& xc = mesh.getCellCentroid(n);
+      for (int i = 0; i != dim; ++i) {
+        centroids_hv(n,i) = xc[i];
+      }
+    }
+  }
+
+  Teuchos::ParameterList attrs(domain+"_cell_centroids");
+  Teuchos::Array<std::string> subfieldnames(dim);
+  subfieldnames[0] = "x";
+  subfieldnames[1] = "y";
+  if (dim == 3) subfieldnames[2] = "z";
+  attrs.set("subfieldnames", subfieldnames);
+  attrs.set("location", AmanziMesh::Entity_kind::CELL);
+  obj.write(attrs, centroids);
+}
+
+// // Reading from files
+// void
+// ReadVariableFromExodusII(Teuchos::ParameterList& plist, CompositeVector& var);
 
 // Statistics
 void
@@ -59,6 +82,8 @@ WriteStateStatistics(const State& S,
                      const Teuchos::EVerbosityLevel vl = Teuchos::VERB_HIGH);
 void
 WriteStateStatistics(const State& S);
+
+
 
 } // namespace Amanzi
 

@@ -54,8 +54,7 @@ add_amanzi_library(whetstone
                           BilinearFormFactory.cc
                           nlfv.cc 
                           NumericalIntegration.cc
-                          Tensor.cc DenseMatrix.cc DenseVector.cc
-                          Polynomial.cc SpaceTimePolynomial.cc VectorObjects.cc
+                          SpaceTimePolynomial.cc VectorObjects.cc
                           MeshMaps.cc
                           MeshMaps_FEM.cc MeshMaps_VEM.cc
                           SplinePolynomial.cc

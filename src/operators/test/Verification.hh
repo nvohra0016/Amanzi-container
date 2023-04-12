@@ -15,7 +15,7 @@
 #ifndef AMANZI_OPERATOR_VERIFICATION_HH_
 #define AMANZI_OPERATOR_VERIFICATION_HH_
 
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 
 #include "CompositeVector.hh"
 #include "DenseMatrix.hh"
@@ -46,12 +46,12 @@ class Verification {
       }
 
       double ahb, bha, aha, bhb;
-      a.Dot(hb, &ahb);
-      b.Dot(ha, &bha);
-      a.Dot(ha, &aha);
-      b.Dot(hb, &bhb);
+      a.dot(hb, &ahb);
+      b.dot(ha, &bha);
+      a.dot(ha, &aha);
+      b.dot(hb, &bhb);
 
-      if (a.Comm()->MyPID() == 0) {
+      if (a.Comm()->getRank() == 0) {
         if (n == 0) std::cout << "Matrix (assembled=" << assembled << "):\n";
         if (symmetry) printf("  Symmetry test: %21.14e = %21.14e\n", ahb, bha);
         if (pos_def) std::cout << "  Positivity test: " << aha << " " << bhb << std::endl;
@@ -74,16 +74,16 @@ class Verification {
     op_->ApplyInverse(b, hb);
 
     double ahb, bha, aha, bhb;
-    a.Dot(hb, &ahb);
-    b.Dot(ha, &bha);
-    a.Dot(ha, &aha);
-    b.Dot(hb, &bhb);
+    a.dot(hb, &ahb);
+    b.dot(ha, &bha);
+    a.dot(ha, &aha);
+    b.dot(hb, &bhb);
 
-    if (a.Comm()->MyPID() == 0) {
+    if (a.Comm()->getRank() == 0) {
       int size = (op_->A() != Teuchos::null) ? op_->A()->NumGlobalRows() : -1;
-      std::cout << "Preconditioner: size=" << size << "\n";
-      if (symmetry) printf("  Symmetry test: %21.14e = %21.14e\n", ahb, bha);
-      if (pos_def) std::cout << "  Positivity test: " << aha << " " << bhb << std::endl;
+      std::cout << "  Preconditioner: size=" << size << "\n";
+      if (symmetry) printf("  Symmetry test: %21.14e == %21.14e\n", ahb, bha);
+      if (pos_def) std::cout << "  Positivity test (>0): " << aha << " " << bhb << std::endl;
     }
     if (symmetry) CHECK_CLOSE(ahb, bha, rtol * fabs(ahb));
     if (pos_def) {
@@ -100,8 +100,8 @@ class Verification {
     r.Update(1.0, b, -1.0);
 
     double tmp, xnorm;
-    r.Dot(r, &tmp);
-    x.Dot(x, &xnorm);
+    r.dot(r, &tmp);
+    x.dot(x, &xnorm);
     CHECK_CLOSE(0.0, tmp, tol * tol * xnorm * xnorm);
   }
 
@@ -120,12 +120,12 @@ class Verification {
     for (auto it = op_->begin(); it != op_->end(); ++it) {
       auto& matrices = (*it)->matrices;
       for (int i = 0; i < matrices.size(); i++) {
-        Amanzi::WhetStone::DenseMatrix Acell(matrices[i]);
+        Amanzi::WhetStone::DenseMatrix<> Acell(matrices[i]);
         int n = Acell.NumRows();
 
         int info, ldv(1), lwork = 4 * n;
         double VL, VR, dmem2[n], dwork[lwork];
-        Amanzi::WhetStone::DenseVector dmem1(n);
+        Amanzi::WhetStone::DenseVector<> dmem1(n);
 
         Amanzi::WhetStone::DGEEV_F77("N",
                                      "N",

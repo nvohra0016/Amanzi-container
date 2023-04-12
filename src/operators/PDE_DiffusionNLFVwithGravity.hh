@@ -36,84 +36,22 @@ namespace Operators {
 
 class BCs;
 
-class PDE_DiffusionNLFVwithGravity : public PDE_DiffusionNLFV, public PDE_DiffusionWithGravity {
+class PDE_DiffusionNLFVwithGravity : public PDE_DiffusionNLFV {
  public:
   PDE_DiffusionNLFVwithGravity(Teuchos::ParameterList& plist,
-                               const Teuchos::RCP<Operator>& global_op,
-                               double rho,
-                               const AmanziGeometry::Point& g)
-    : PDE_Diffusion(global_op),
-      PDE_DiffusionNLFV(plist, global_op),
-      PDE_DiffusionWithGravity(global_op)
-  {
-    pde_type_ = PDE_DIFFUSION_NLFV_GRAVITY;
-    SetGravity(g);
-    SetDensity(rho);
-  }
+                               const Teuchos::RCP<Operator>& global_op)
+    : PDE_DiffusionNLFV(plist, global_op)
+  {}
 
   PDE_DiffusionNLFVwithGravity(Teuchos::ParameterList& plist,
                                const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : PDE_Diffusion(mesh), PDE_DiffusionNLFV(plist, mesh), PDE_DiffusionWithGravity(mesh)
-  {
-    pde_type_ = PDE_DIFFUSION_NLFV_GRAVITY;
-  }
+    : PDE_DiffusionNLFV(plist, mesh)
+  {}
 
-  PDE_DiffusionNLFVwithGravity(Teuchos::ParameterList& plist,
-                               const Teuchos::RCP<Operator>& global_op)
-    : PDE_Diffusion(global_op),
-      PDE_DiffusionNLFV(plist, global_op),
-      PDE_DiffusionWithGravity(global_op)
-  {
-    pde_type_ = PDE_DIFFUSION_NLFV_GRAVITY;
-  }
 
-  PDE_DiffusionNLFVwithGravity(Teuchos::ParameterList& plist,
-                               const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
-                               double rho,
-                               const AmanziGeometry::Point& g)
-    : PDE_Diffusion(mesh), PDE_DiffusionNLFV(plist, mesh), PDE_DiffusionWithGravity(mesh)
+  virtual void SetDensity(const Teuchos::RCP<const CompositeVector>& rho) override
   {
-    pde_type_ = PDE_DIFFUSION_NLFV_GRAVITY;
-    SetGravity(g);
-    SetDensity(rho);
-  }
-
-  PDE_DiffusionNLFVwithGravity(Teuchos::ParameterList& plist,
-                               const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
-                               const Teuchos::RCP<const CompositeVector>& rho,
-                               const AmanziGeometry::Point& g)
-    : PDE_Diffusion(mesh), PDE_DiffusionNLFV(plist, mesh), PDE_DiffusionWithGravity(mesh)
-  {
-    pde_type_ = PDE_DIFFUSION_NLFV_GRAVITY;
-    SetGravity(g);
-    SetDensity(rho);
-  }
-
-  // main virtual members
-  // -- setup
-  using PDE_Diffusion::Setup;
-  void Setup(const Teuchos::RCP<std::vector<WhetStone::Tensor>>& K,
-             const Teuchos::RCP<const CompositeVector>& k,
-             const Teuchos::RCP<const CompositeVector>& dkdp,
-             double rho,
-             const AmanziGeometry::Point& g)
-  {
-    SetGravity(g);
-    SetDensity(rho);
-    SetTensorCoefficient(K);
-    SetScalarCoefficient(k, dkdp);
-  }
-
-  void Setup(const Teuchos::RCP<std::vector<WhetStone::Tensor>>& K,
-             const Teuchos::RCP<const CompositeVector>& k,
-             const Teuchos::RCP<const CompositeVector>& dkdp,
-             const Teuchos::RCP<const CompositeVector>& rho,
-             const AmanziGeometry::Point& g)
-  {
-    SetGravity(g);
-    SetDensity(rho);
-    SetTensorCoefficient(K);
-    SetScalarCoefficient(k, dkdp);
+    Exceptions::amanzi_throw("PDE_DiffusionNLFVwithGravity does not support vector density.");
   }
 
   // -- create an operator
@@ -124,15 +62,11 @@ class PDE_DiffusionNLFVwithGravity : public PDE_DiffusionNLFV, public PDE_Diffus
   virtual void UpdateFlux(const Teuchos::Ptr<const CompositeVector>& u,
                           const Teuchos::Ptr<CompositeVector>& flux) override;
 
-  // -- modify an operator
-  virtual void ModifyMatrices(const CompositeVector& u) override{};
-  virtual void ScaleMassMatrices(double s) override{};
-
   // Developments
   // -- interface to solvers for treating nonlinear BCs.
   virtual double ComputeGravityFlux(int f) const override
   {
-    AMANZI_ASSERT(0);
+    Exceptions::amanzi_throw("PDE_DiffusionNLFVwithGravity::ComputeGravityFlux not implemented.");
     return 0.;
   };
 

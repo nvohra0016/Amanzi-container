@@ -15,7 +15,7 @@
 
 #include "Teuchos_RCP.hpp"
 
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 
 #include "FCT.hh"
 
@@ -34,18 +34,18 @@ FCT::Compute(const CompositeVector& flux_lo,
   int nfaces_owned = mesh0_->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int ncells_owned = mesh0_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
 
-  const auto& flux_lo_f = *flux_lo.ViewComponent("face");
-  const auto& flux_ho_f = *flux_ho.ViewComponent("face");
-  auto& flux_f = *flux.ViewComponent("face");
+  const auto& flux_lo_f = *flux_lo.viewComponent("face");
+  const auto& flux_ho_f = *flux_ho.viewComponent("face");
+  auto& flux_f = *flux.viewComponent("face");
 
   // allocate memory
   CompositeVectorSpace cvs;
   cvs.SetMesh(mesh0_)->SetGhosted(true)->AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1);
   CompositeVector dlo(cvs), pos(cvs), neg(cvs);
 
-  auto& dlo_c = *dlo.ViewComponent("cell", true);
-  auto& pos_c = *pos.ViewComponent("cell", true);
-  auto& neg_c = *neg.ViewComponent("cell", true);
+  auto& dlo_c = *dlo.viewComponent("cell", true);
+  auto& pos_c = *pos.viewComponent("cell", true);
+  auto& neg_c = *neg.viewComponent("cell", true);
 
   // collect positive and negative fluxes in each mesh cell
   int dir;
@@ -82,7 +82,7 @@ FCT::Compute(const CompositeVector& flux_lo,
   else
     bounds =
       limiter_->BoundsForCells(*field_, bc_model, bc_value, OPERATOR_LIMITER_STENCIL_C2C_ALL);
-  auto& bounds_c = *bounds->ViewComponent("cell");
+  auto& bounds_c = *bounds->viewComponent("cell");
 
   double Qmin, Qmax;
   std::vector<double> alpha(nfaces_owned, 1.0);
@@ -131,7 +131,7 @@ FCT::Compute(const CompositeVector& flux_lo,
   }
 
   double tmp(alpha_mean_);
-  mesh0_->getComm()->SumAll(&tmp, &alpha_mean_, 1);
+  Teuchos::reduceAll<int>(*mesh0_->getComm(),Teuchos::REDUCE_SUM, 1,&tmp, &alpha_mean_);
   alpha_mean_ /= flux_f.GlobalLength();
 }
 

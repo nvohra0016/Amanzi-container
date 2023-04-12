@@ -128,7 +128,7 @@ class PK {
 
     //  some tests provide nullptr
     if (solution.get())
-      vo_ = Teuchos::rcp(new VerboseObject(solution->Comm(), name_, *vo_plist));
+      vo_ = Teuchos::rcp(new VerboseObject(solution->getComm(), name_, *vo_plist));
     else
       vo_ = Teuchos::rcp(new VerboseObject(getDefaultComm(), name_, *vo_plist));
   };

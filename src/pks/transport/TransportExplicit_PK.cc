@@ -423,7 +423,7 @@ TransportExplicit_PK::AdvanceDonorUpwind(double dt_cycle)
 
   int flag_tmp(flag);
   mesh_->getComm()->MaxAll(&flag_tmp, &flag, 1);
-  if (flag == 1) tcc_tmp->GatherGhostedToMaster();
+  if (flag == 1) tcc_tmp->gatherGhostedToMaster();
 
   // process external sources
   if (srcs_.size() != 0) {

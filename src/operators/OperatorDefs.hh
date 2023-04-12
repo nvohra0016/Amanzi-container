@@ -18,39 +18,6 @@
 namespace Amanzi {
 namespace Operators {
 
-// general information about an operator, e.g. a preconditioner may
-// be wrapped up in an iterative solver or be of a "raw" matrix type
-typedef enum {
-  OPERATOR_MATRIX,
-  OPERATOR_PRECONDITIONER,
-  OPERATOR_PRECONDITIONER_RAW,
-  OPERATOR_TERM_DIFFUSION
-} OperatorType;
-
-// this is not used currently and my go away
-typedef enum {
-  PDE_DIFFUSION,
-  PDE_DIFFUSION_MFD,
-  PDE_DIFFUSION_FV,
-  PDE_DIFFUSION_FV_MANIFOLDS,
-  PDE_DIFFUSION_NLFV,
-  PDE_DIFFUSION_NLFVFACES,
-  PDE_DIFFUSION_MFD_GRAVITY,
-  PDE_DIFFUSION_FV_GRAVITY,
-  PDE_DIFFUSION_NLFV_GRAVITY,
-  PDE_DIFFUSION_NLFVFACES_GRAVITY,
-  PDE_DIFFUSION_MFD_XMOF,
-  PDE_DIFFUSION_MFD_TRACER,
-  PDE_DIFFUSION_DG,
-  PDE_DIFFUSION_FRACTURED_MATRIX,
-  PDE_DIFFUSION_FD,
-  PDE_ADVECTION,
-  PDE_ACCUMULATION,
-  PDE_ELASTICITY,
-  PDE_ELECTROMAGNETICS,
-  PDE_MAGNETIC_DIFFUSION
-} PDEType;
-
 // coefficient type
 typedef enum {
   CONSTANT = 0, // includes tensorial coefficients
@@ -60,9 +27,6 @@ typedef enum {
   MATRIX_POLYNOMIAL,
   FUNCTION
 } CoefType;
-
-// weight type
-typedef enum { WT_CONSTANT = 0, WT_INVERSE_DISTANCE } WeightType;
 
 // Constants in the next block must powers of 2.
 const int OPERATOR_SCHEMA_DOFS_FACE = 1;
@@ -81,7 +45,6 @@ const int OPERATOR_SCHEMA_INDICES = 512;
 // schemas
 const int OPERATOR_SCHEMA_RULE_EXACT = 1;
 const int OPERATOR_SCHEMA_RULE_SUBSET = 2;
-const int OPERATOR_SCHEMA_RULE_SUPERSET = 3;
 
 // Boundary Conditions:
 //   Dirichlet, Neumann and Mixed are conventional boundary conditions
@@ -109,6 +72,8 @@ const int OPERATOR_QUAD_FACES = 4; // Quadrilateral is the common element
 const int OPERATOR_QUAD_NODES = 4;
 const int OPERATOR_QUAD_EDGES = 4;
 
+const int OPERATOR_MAX_FACES = 20;
+
 // Newton-correction options
 const int OPERATOR_DIFFUSION_JACOBIAN_NONE = 0;
 const int OPERATOR_DIFFUSION_JACOBIAN_TRUE = 1;
@@ -122,24 +87,27 @@ const int OPERATOR_UPWIND_GRAVITY = 4;
 const int OPERATOR_UPWIND_DIVK = 8;
 const int OPERATOR_UPWIND_ARITHMETIC_AVERAGE = 16;
 const int OPERATOR_UPWIND_FLUX_SECOND_ORDER = 32;
-const int OPERATOR_UPWIND_FLUX_MANIFOLDS = 64;
 const double OPERATOR_UPWIND_RELATIVE_TOLERANCE = 1e-12;
 
 // method for nonlinear coefficient (use power of 2)
 const int OPERATOR_LITTLE_K_NONE = 0;
 const int OPERATOR_LITTLE_K_UPWIND = 1;
-const int OPERATOR_LITTLE_K_DIVK_BASE = 2;  // base (only face component)
-const int OPERATOR_LITTLE_K_DIVK = 6;       // add cell component
-const int OPERATOR_LITTLE_K_DIVK_TWIN = 10; // add twin component
+const int OPERATOR_LITTLE_K_DIVK_BASE = 2;       // base (only face component)
+const int OPERATOR_LITTLE_K_DIVK = 6;            // add cell component
+const int OPERATOR_LITTLE_K_DIVK_TWIN = 10;      // add twin component
+const int OPERATOR_LITTLE_K_DIVK_TWIN_GRAD = 18; // add grad component
 const int OPERATOR_LITTLE_K_STANDARD = 32;
-const int OPERATOR_LITTLE_K_ARITHMETIC_MEAN = 64;
 
 // method for gravity
 const int OPERATOR_GRAVITY_HH = 1;
 const int OPERATOR_GRAVITY_FV = 2;
 
+// special properties of operators
+const int OPERATOR_PROPERTY_DATA_READ_ONLY = 1; // must be power of 2
+const int OPERATOR_PROPERTY_MAP_CONSTANT = 2;
+
 // reconstruction options
-const double OPERATOR_RECONSTRUCTION_MATRIX_CORRECTION = 1e-12;
+const double OPERATOR_RECONSTRUCTION_MATRIX_CORRECTION = 1e-15;
 
 // limiting options
 const int OPERATOR_LIMITER_BARTH_JESPERSEN = 1;
@@ -151,7 +119,6 @@ const int OPERATOR_LIMITER_KUZMIN = 6;
 const int OPERATOR_LIMITER_BARTH_JESPERSEN_DG_HIERARCHICAL = 7;
 
 const double OPERATOR_LIMITER_TOLERANCE = 1e-14;
-const double OPERATOR_LIMITER_FIELD_TOLERANCE = 1e-200;
 const double OPERATOR_LIMITER_INFINITY = 1e+99;
 
 // stencil for calculating limiting bounds
@@ -160,8 +127,6 @@ const int OPERATOR_LIMITER_STENCIL_E2C = 20;
 const int OPERATOR_LIMITER_STENCIL_F2C = 30;
 const int OPERATOR_LIMITER_STENCIL_C2C_CLOSEST = 40;
 const int OPERATOR_LIMITER_STENCIL_C2C_ALL = 41;
-
-const int OPERATOR_MAX_NUM_FACES = 10; // wild guess at this point...
 
 } // namespace Operators
 } // namespace Amanzi

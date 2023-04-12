@@ -29,6 +29,7 @@ namespace AmanziMesh {
 
 class SingleFaceMesh : public AmanziMesh::Mesh {
  public:
+  
   SingleFaceMesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
                  int f,
                  const AmanziGeometry::SurfaceCoordinateSystem& coordsys)
@@ -67,17 +68,17 @@ class SingleFaceMesh : public AmanziMesh::Mesh {
       nedges_owned = fn.size(); 
       nedges_all = nedges_owned;
     }
-    AmanziMesh::cEntity_ID_View cfedges, cfnodes, cenodes;
-    AmanziMesh::Entity_ID_View fedges, enodes, cells; 
+    cEntity_ID_View cfedges, cfnodes, cenodes;
+    Entity_ID_View fedges, enodes, cells; 
     mc->getFaceNodes(f, cfnodes);
     nnodes_owned = cfnodes.size();
     nnodes_all = nnodes_owned; 
-    cEntity_Direction_View fdirs; 
+    cDirection_View fdirs; 
 
     if (has_edges_) { 
       mc->getFaceEdgesAndDirs(f, cfedges, &fdirs);   
     } else { 
-      Entity_Direction_View tfdirs("", nnodes_owned);
+      Direction_View tfdirs("", nnodes_owned);
       Kokkos::deep_copy(tfdirs, 1);
       fdirs = tfdirs;    
     }
@@ -196,9 +197,9 @@ class SingleFaceMesh : public AmanziMesh::Mesh {
 
 private: 
   int nnodes_;
-  AmanziMesh::Entity_ID_View cell_node_ids_;
+  Entity_ID_View cell_node_ids_;
   Point_List cell_coords_;
-  std::vector<AmanziMesh::Entity_ID_View> face_node_ids_;
+  std::vector<Entity_ID_View> face_node_ids_;
 };
 
 } // namespace AmanziMesh

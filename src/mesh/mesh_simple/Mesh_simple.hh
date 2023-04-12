@@ -66,25 +66,25 @@ class Mesh_simple : public MeshFramework {
 
   virtual void getCellFacesAndDirs(
     const Entity_ID c,
-    View_type<const Entity_ID,MemSpace_kind::HOST>& faces,
-    View_type<const Direction_type,MemSpace_kind::HOST> * const dirs) const override;
+    cEntity_ID_View& faces,
+    cDirection_View* const dirs) const override;
 
   virtual void getFaceEdgesAndDirs(const Entity_ID f,
-          View_type<const Entity_ID,MemSpace_kind::HOST>& edges,
-          View_type<const Direction_type,MemSpace_kind::HOST> * const dirs=nullptr) const override;
+          cEntity_ID_View& edges,
+          cDirection_View * const dirs=nullptr) const override;
 
-  virtual void getFaceNodes(const Entity_ID f, View_type<const Entity_ID,MemSpace_kind::HOST>& nodes) const override;
+  virtual void getFaceNodes(const Entity_ID f, cEntity_ID_View& nodes) const override;
 
-  virtual void getEdgeNodes(const Entity_ID e, View_type<const Entity_ID,MemSpace_kind::HOST>& nodes) const override;
+  virtual void getEdgeNodes(const Entity_ID e, cEntity_ID_View& nodes) const override;
 
 
   virtual void getFaceCells(const Entity_ID f,
                           const Parallel_kind ptype,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& cells) const override;
+                          cEntity_ID_View& cells) const override;
 
   virtual void getNodeFaces(const Entity_ID nodeid,
                             const Parallel_kind ptype,
-                            View_type<const Entity_ID,MemSpace_kind::HOST>& faceids) const override;
+                            cEntity_ID_View& faceids) const override;
 
  private:
   void CreateCache_();
@@ -121,8 +121,8 @@ private:
   Entity_ID_View face_to_cell_;
 
   // orientation arrays
-  Entity_Direction_View cell_to_face_dirs_;
-  Entity_Direction_View face_to_edge_dirs_;
+  Direction_View cell_to_face_dirs_;
+  Direction_View face_to_edge_dirs_;
 };
 
 

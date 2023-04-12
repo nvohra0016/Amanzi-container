@@ -27,8 +27,21 @@ class Op_SurfaceCell_SurfaceCell : public Op_Cell_Cell {
  public:
   Op_SurfaceCell_SurfaceCell(const std::string& name,
                              const Teuchos::RCP<const AmanziMesh::Mesh> surf_mesh_)
-    : Op_Cell_Cell(name, surf_mesh_), surf_mesh(surf_mesh_)
+    : Op_Cell_Cell(name, surf_mesh_)
   {}
+
+  virtual void SumLocalDiag(CompositeVector& X) const
+  {
+    auto Xv = X.viewComponent("face", false);
+    auto diag_v = diag->getLocalViewDevice(Tpetra::Access::ReadOnly);
+
+    const AmanziMesh::Mesh* mesh_ = mesh.get();
+    Kokkos::parallel_for(
+      "Op_Surfacecell_Surfacecell::SumLocalDiag", diag_v.extent(0), KOKKOS_LAMBDA(const int& sc) {
+        auto f = mesh_->getEntityParent(AmanziMesh::Entity_kind::CELL, sc);
+        Xv(f, 0) += diag_v(sc, 0);
+      });
+  }
 
   virtual void
   ApplyMatrixFreeOp(const Operator* assembler, const CompositeVector& X, CompositeVector& Y) const
@@ -56,26 +69,26 @@ class Op_SurfaceCell_SurfaceCell : public Op_Cell_Cell {
 
   virtual void Rescale(const CompositeVector& scaling)
   {
-    if (scaling.HasComponent("cell") &&
-        scaling.ViewComponent("cell", false)->MyLength() ==
-          surf_mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED)) {
+    if (scaling.hasComponent("cell") &&
+        scaling.getComponent("cell", false)->getLocalLength() ==
+          mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED)) {
       Op_Cell_Cell::Rescale(scaling);
     }
-    if (scaling.HasComponent("face") &&
-        scaling.ViewComponent("face", false)->MyLength() ==
-          mesh_->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED)) {
-      const Epetra_MultiVector& s_f = *scaling.ViewComponent("face", false);
-      for (int k = 0; k != s_f.NumVectors(); ++k) {
-        for (int sc = 0; sc != diag->MyLength(); ++sc) {
-          auto f = surf_mesh->getEntityParent(AmanziMesh::Entity_kind::CELL, sc);
-          (*diag)[k][sc] *= s_f[0][f];
-        }
-      }
+
+    if (scaling.hasComponent("face") &&
+        scaling.getComponent("face", false)->getLocalLength() ==
+          mesh->parent()->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED)) {
+      const auto s_f = scaling.viewComponent("face", false);
+      auto diag_v = diag->getLocalViewDevice(Tpetra::Access::ReadWrite);
+      const AmanziMesh::Mesh* mesh_ = mesh.get();
+
+      Kokkos::parallel_for(
+        "Op_SurfaceCell_SurfaceCell::Rescale", diag_v.extent(0), KOKKOS_LAMBDA(const int& sc) {
+          auto f = mesh_->getEntityParent(AmanziMesh::Entity_kind::CELL, sc);
+          diag_v(sc, 0) *= s_f(f, 0);
+        });
     }
   }
-
- public:
-  Teuchos::RCP<const AmanziMesh::Mesh> surf_mesh;
 };
 
 } // namespace Operators

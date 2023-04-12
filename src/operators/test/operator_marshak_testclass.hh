@@ -18,46 +18,55 @@
 
 #include "Teuchos_RCP.hpp"
 
-#include "Mesh_Algorithms.hh"
-
 namespace Amanzi {
 
 class HeatConduction {
  public:
   HeatConduction(Teuchos::RCP<const AmanziMesh::Mesh> mesh, double T0)
-    : TemperatureSource(100.0), TemperatureFloor(T0), mesh_(mesh)
+    : mesh_(mesh), TemperatureFloor(T0), TemperatureSource(100.0)
   {
-    CompositeVectorSpace cvs;
-    cvs.SetMesh(mesh_)
+    auto cvs = Teuchos::rcp(new CompositeVectorSpace());
+    cvs->SetMesh(mesh_)
       ->SetGhosted(true)
       ->AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1)
-      ->AddComponent("face", AmanziMesh::Entity_kind::FACE, 1);
+      ->AddComponent("face", AmanziMesh::Entity_kind::FACE, 1)
+      ->AddComponent("dirichlet_faces", AmanziMesh::Entity_kind::BOUNDARY_FACE, 1);
 
-    values_ = Teuchos::RCP<CompositeVector>(new CompositeVector(cvs, true));
-    derivatives_ = Teuchos::RCP<CompositeVector>(new CompositeVector(cvs, true));
+    values_ = cvs->Create();
+    derivatives_ = cvs->Create();
   }
   ~HeatConduction(){};
 
   // main members
-  void UpdateValues(const CompositeVector& u,
-                    const std::vector<int>& bc_model,
-                    const std::vector<double>& bc_value)
+  void UpdateValues(const CompositeVector& u, Operators::BCs& bcs)
   {
-    const Epetra_MultiVector& uc = *u.ViewComponent("cell", true);
-    Epetra_MultiVector& values_c = *values_->ViewComponent("cell", true);
+    const auto uc = u.ViewComponent<Amanzi::MirrorHost>("cell", true);
+    auto values_c = values_->ViewComponent<Amanzi::MirrorHost>("cell", true);
+    auto derivs_c = derivatives_->ViewComponent<Amanzi::MirrorHost>("cell", true);
+    auto bc_value = bcs.bc_value();
+    auto bc_model = bcs.bc_model();
 
     int ncells = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
-    for (int c = 0; c < ncells; c++) { values_c[0][c] = std::pow(uc[0][c], 3.0); }
-
-    // add boundary face component
-    Epetra_MultiVector& values_f = *values_->ViewComponent("face", true);
-    for (int f = 0; f != bc_model.size(); ++f) {
-      if (bc_model[f] == Operators::OPERATOR_BC_DIRICHLET) {
-        values_f[0][f] = std::pow(bc_value[f], 3.0);
-      }
+    for (int c = 0; c < ncells; c++) {
+      values_c(c, 0) = std::pow(uc(c, 0), 3.0);
+      derivs_c(c, 0) = 3.0 * std::pow(uc(c, 0), 2.0);
     }
 
-    derivatives_->PutScalar(1.0);
+    // add boundary face component
+    auto vbf = values_->ViewComponent<Amanzi::MirrorHost>("dirichlet_faces", true);
+    auto dbf = derivatives_->ViewComponent<Amanzi::MirrorHost>("dirichlet_faces", true);
+    auto ext_face_map = mesh_->exterior_face_map(true);
+    auto face_map = mesh_->getMap(AmanziMesh::Entity_kind::FACE,true);
+    for (int f = 0; f != face_map->getLocalNumElements(); ++f) {
+      if (bc_model[f] == Operators::OPERATOR_BC_DIRICHLET) {
+        AmanziMesh::Entity_ID_View cells;
+        mesh_->face_get_cells(f, AmanziMesh::Parallel_kind::ALL, cells);
+        AMANZI_ASSERT(cells.size() == 1);
+        int bf = ext_face_map->getLocalElement(face_map->getGlobalElement(f));
+        vbf(bf, 0) = std::pow(bc_value[f], 3.0);
+        dbf(bf, 0) = 3.0 * std::pow(bc_value[f], 2.0);
+      }
+    }
   }
 
   double Conduction(int c, double T) const { return T * T * T; }

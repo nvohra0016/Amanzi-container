@@ -22,14 +22,14 @@
   facilitate that, the needed mesh interface is:
 
     - getSpaceDimension()
-    - getNumEntities(CELL,FACE,NODE)
-    - getFaceCells()
-    - getCellFacesAndDirections()
-    - getMap(AmanziMesh::Entity_kind::CELL,)
-    - getFaceArea()
-    - getFaceNormal()
-    - getFaceCentroid()
-    - getCellCentroid()
+    - num_entities(CELL,FACE,NODE)
+    - face_get_cells()
+    - cell_get_faces_and_dirs()
+    - cell_map()
+    - face_area()
+    - face_normal()
+    - face_centroid()
+    - cell_centroid()
 
     NOTE: actually, cell-to-cell distance, face-to-cell distance, not
     necessarily centroid locations are necessary, but this is not in
@@ -57,34 +57,21 @@ namespace Operators {
 
 class BCs;
 
-class PDE_DiffusionFV : public virtual PDE_Diffusion {
+class PDE_DiffusionFV : public PDE_Diffusion {
  public:
   PDE_DiffusionFV(Teuchos::ParameterList& plist, const Teuchos::RCP<Operator>& global_op)
-    : PDE_Diffusion(global_op), transmissibility_initialized_(false)
-  {
-    pde_type_ = PDE_DIFFUSION_FV;
-    Init_(plist);
-  }
+    : PDE_Diffusion(plist, global_op), transmissibility_initialized_(false)
+  {}
 
   PDE_DiffusionFV(Teuchos::ParameterList& plist, const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : PDE_Diffusion(mesh), transmissibility_initialized_(false)
-  {
-    pde_type_ = PDE_DIFFUSION_FV;
-    Init_(plist);
-  }
+    : PDE_Diffusion(plist, mesh), transmissibility_initialized_(false)
+  {}
 
-  PDE_DiffusionFV(Teuchos::ParameterList& plist, const Teuchos::RCP<AmanziMesh::Mesh>& mesh)
-    : PDE_Diffusion(mesh), transmissibility_initialized_(false)
-  {
-    pde_type_ = PDE_DIFFUSION_FV;
-    Init_(plist);
-  }
+  virtual void Init() override;
 
   // main virtual members
   // -- setup
-  using PDE_Diffusion::Setup;
-  virtual void
-  SetTensorCoefficient(const Teuchos::RCP<const std::vector<WhetStone::Tensor>>& K) override;
+  virtual void SetTensorCoefficient(const Teuchos::RCP<const TensorVector>& K) override;
   virtual void SetScalarCoefficient(const Teuchos::RCP<const CompositeVector>& k,
                                     const Teuchos::RCP<const CompositeVector>& dkdp) override;
 
@@ -105,40 +92,49 @@ class PDE_DiffusionFV : public virtual PDE_Diffusion {
 
   // -- modify an operator
   virtual void ApplyBCs(bool primary, bool eliminate, bool essential_eqn) override;
+  virtual void ApplyBCsJacobian() override;
+
   virtual void ModifyMatrices(const CompositeVector& u) override{};
   virtual void ScaleMassMatrices(double s) override{};
   virtual void ScaleMatricesColumns(const CompositeVector& s) override;
 
-  // Developments
-  // -- interface to solvers for treating nonlinear BCs.
-  virtual double ComputeTransmissibility(int f) const override;
-  virtual double ComputeGravityFlux(int f) const override { return 0.0; }
-
   // access
   const CompositeVector& transmissibility() { return *transmissibility_; }
 
+  virtual CompositeVectorSpace scalar_coefficient_derivative_space() const override
+  {
+    CompositeVectorSpace out;
+    out.SetMesh(mesh_);
+    out.SetGhosted();
+    if (little_k_type_ != OPERATOR_LITTLE_K_NONE) { out.AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1); }
+    return out;
+  }
+
+
  protected:
+  cMultiVectorView_type_<DefaultDevice, double> ScalarCoefficientFaces(bool scatter) const
+  {
+    if (k_ != Teuchos::null) {
+      if (scatter) k_->ScatterMasterToGhosted("face");
+      if (k_->hasComponent("face")) { return k_->viewComponent<DefaultDevice>("face", true); }
+    }
+    MultiVectorView_type_<DefaultDevice, double> k_face("k_face", nfaces_wghost, 1);
+    Kokkos::deep_copy(k_face, 1.0);
+    return k_face;
+  }
+
+ public:
+  // This function need to be public for Kokkos Lambda
   void ComputeTransmissibility_();
+  virtual void AnalyticJacobian_(const CompositeVector& solution);
 
-  void AnalyticJacobian_(const CompositeVector& solution);
-
-  virtual void ComputeJacobianLocal_(int mcells,
-                                     int f,
-                                     int face_dir_0to1,
-                                     int bc_model,
-                                     double bc_value,
-                                     double* pres,
-                                     double* dkdp_cell,
-                                     WhetStone::DenseMatrix& Jpp);
-
-  void Init_(Teuchos::ParameterList& plist);
+  // virtual void ComputeJacobianLocal_(
+  //     int mcells, int f, int face_dir_0to1, int bc_model, double bc_value,
+  //     double *pres, double *dkdp_cell, WhetStone::DenseMatrix<>& Jpp);
 
  protected:
   Teuchos::RCP<CompositeVector> transmissibility_;
   bool transmissibility_initialized_;
-
-  int newton_correction_;
-  bool exclude_primary_terms_;
 };
 
 } // namespace Operators

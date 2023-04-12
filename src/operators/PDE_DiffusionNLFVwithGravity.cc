@@ -26,20 +26,21 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Populate face-based matrices.
-****************************************************************** */
+ * Populate face-based matrices.
+ ****************************************************************** */
 void
 PDE_DiffusionNLFVwithGravity::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& flux,
                                              const Teuchos::Ptr<const CompositeVector>& u)
 {
   // affine map of u. It is equivalent to calculating hydraulic head.
   Teuchos::RCP<CompositeVector> hh = Teuchos::rcp(new CompositeVector(*u));
-  Epetra_MultiVector& hh_c = *hh->ViewComponent("cell");
-  const Epetra_MultiVector& u_c = *u->ViewComponent("cell");
+  Epetra_MultiVector& hh_c = *hh->viewComponent("cell");
+  const Epetra_MultiVector& u_c = *u->viewComponent("cell");
 
+  AMANZI_ASSERT(is_scalar_);
   double rho_g = rho_ * norm(g_);
   for (int c = 0; c < ncells_owned; ++c) {
-    double zc = (mesh_->getCellCentroid(c))[dim_ - 1];
+    double zc = (mesh_->cell_centroid(c))[dim_ - 1];
     hh_c[0][c] = u_c[0][c] + rho_g * zc;
   }
 
@@ -49,19 +50,21 @@ PDE_DiffusionNLFVwithGravity::UpdateMatrices(const Teuchos::Ptr<const CompositeV
   global_op_->rhs()->PutScalarGhosted(0.0);
 
   const std::vector<int>& bc_model = bcs_trial_[0]->bc_model();
-  Epetra_MultiVector& rhs_cell = *global_op_->rhs()->ViewComponent("cell", true);
+  Epetra_MultiVector& rhs_cell = *global_op_->rhs()->viewComponent("cell", true);
+
+  AmanziMesh::Entity_ID_List cells;
 
   for (int f = 0; f < nfaces_owned; ++f) {
-    WhetStone::DenseMatrix& Aface = local_op_->matrices[f];
+    WhetStone::DenseMatrix<>& Aface = local_op_->matrices[f];
 
-    auto cells = mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+    mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
     int ncells = cells.size();
 
     if (ncells == 2) {
-      WhetStone::DenseVector v(ncells), av(ncells);
+      WhetStone::DenseVector<> v(ncells), av(ncells);
       for (int n = 0; n < ncells; n++) {
         int c = cells[n];
-        double zc = (mesh_->getCellCentroid(c))[dim_ - 1];
+        double zc = (mesh_->cell_centroid(c))[dim_ - 1];
         v(n) = zc * rho_g;
       }
 
@@ -70,8 +73,8 @@ PDE_DiffusionNLFVwithGravity::UpdateMatrices(const Teuchos::Ptr<const CompositeV
       for (int n = 0; n < ncells; n++) { rhs_cell[0][cells[n]] -= av(n); }
     } else if (bc_model[f] == OPERATOR_BC_DIRICHLET) {
       int c = cells[0];
-      double zf = (mesh_->getFaceCentroid(f))[dim_ - 1];
-      double zc = (mesh_->getCellCentroid(c))[dim_ - 1];
+      double zf = (mesh_->face_centroid(f))[dim_ - 1];
+      double zc = (mesh_->cell_centroid(c))[dim_ - 1];
       rhs_cell[0][c] -= Aface(0, 0) * (zc - zf) * rho_g;
     }
   }
@@ -81,21 +84,24 @@ PDE_DiffusionNLFVwithGravity::UpdateMatrices(const Teuchos::Ptr<const CompositeV
 
 
 /* ******************************************************************
-* Calculate flux using cell-centered data.
-* **************************************************************** */
+ * Calculate flux using cell-centered data.
+ * **************************************************************** */
 void
 PDE_DiffusionNLFVwithGravity::UpdateFlux(const Teuchos::Ptr<const CompositeVector>& u,
                                          const Teuchos::Ptr<CompositeVector>& flux)
 {
+  const std::vector<int>& bc_model = bcs_trial_[0]->bc_model();
+
   // Map field u for the local system. For Richards's equation, this
   // is equivalent to calculating the hydraulic head.
   Teuchos::RCP<CompositeVector> hh = Teuchos::rcp(new CompositeVector(*u));
-  Epetra_MultiVector& hh_c = *hh->ViewComponent("cell");
-  const Epetra_MultiVector& u_c = *u->ViewComponent("cell");
+  Epetra_MultiVector& hh_c = *hh->viewComponent("cell");
+  const Epetra_MultiVector& u_c = *u->viewComponent("cell");
 
+  AMANZI_ASSERT(is_scalar_);
   double rho_g = rho_ * norm(g_);
   for (int c = 0; c < ncells_owned; ++c) {
-    double zc = (mesh_->getCellCentroid(c))[dim_ - 1];
+    double zc = (mesh_->cell_centroid(c))[dim_ - 1];
     hh_c[0][c] = u_c[0][c] + rho_g * zc;
   }
 
@@ -104,13 +110,14 @@ PDE_DiffusionNLFVwithGravity::UpdateFlux(const Teuchos::Ptr<const CompositeVecto
 
 
 /* ******************************************************************
-* BCs are typically given in base system and must be re-mapped.
-* **************************************************************** */
+ * BCs are typically given in base system and must be re-mapped.
+ * **************************************************************** */
 double
 PDE_DiffusionNLFVwithGravity::MapBoundaryValue_(int f, double u)
 {
+  AMANZI_ASSERT(is_scalar_);
   double rho_g = rho_ * fabs(g_[dim_ - 1]);
-  double zf = (mesh_->getFaceCentroid(f))[dim_ - 1];
+  double zf = (mesh_->face_centroid(f))[dim_ - 1];
   return u + rho_g * zf;
 }
 

@@ -73,8 +73,9 @@ TEST(MESH_SURFACE_EXTRACTION_GENERATED)
             top_faces, AmanziMesh::Entity_kind::FACE, true);
 
     // make a MeshCache
-    auto mesh = Teuchos::rcp(new Mesh(surface_framework_mesh, Teuchos::rcp(new AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null));
+    auto mesh = Teuchos::rcp(new Mesh(surface_framework_mesh, Teuchos::rcp(new AmanziMesh::MeshAlgorithms()), Teuchos::null));
     mesh->setParentMesh(parent_mesh);
+    cacheAll(*mesh);
 
     // test the surface mesh as a 3x3 quad mesh
     // -- mesh audit
@@ -133,8 +134,9 @@ TEST(MESH_SURFACE_EXTRACTION_EXO)
             top_faces, AmanziMesh::Entity_kind::FACE, true);
 
     // make a MeshCache
-    auto mesh = Teuchos::rcp(new Mesh(surface_framework_mesh, Teuchos::rcp(new AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null));
+    auto mesh = Teuchos::rcp(new Mesh(surface_framework_mesh, Teuchos::rcp(new AmanziMesh::MeshAlgorithms()), Teuchos::null));
     mesh->setParentMesh(parent_mesh);
+    cacheAll(*mesh);
 
     // test the surface mesh as a 3x3 quad mesh
     // -- mesh audit
@@ -194,8 +196,9 @@ TEST(MESH_SURFACE_EXTRACTION_GENERATED_EXTRACTED_MANIFOLD)
     MeshFactory fac(comm, gm, fac_plist);
     fac.set_preference({frm});
 
-    auto parent_mesh_cache = Teuchos::rcp(new Mesh(parent_mesh, Teuchos::rcp(new AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null)); 
+    auto parent_mesh_cache = Teuchos::rcp(new Mesh(parent_mesh, Teuchos::rcp(new AmanziMesh::MeshAlgorithms()), Teuchos::null)); 
     auto mesh = fac.create(parent_mesh_cache, {"Top Face Plane"}, AmanziMesh::Entity_kind::FACE, true);
+    cacheAll(*mesh);
 
     // test the surface mesh as a 3x3 quad mesh
     // -- mesh audit
@@ -258,8 +261,9 @@ TEST(MESH_SURFACE_EXTRACTION_EXO_EXTRACTED_MANIFOLD)
 
     MeshFactory fac(comm, gm, fac_plist);
     fac.set_preference({frm});
-    auto parent_mesh_cache = Teuchos::rcp(new Mesh(parent_mesh, Teuchos::rcp(new AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null)); 
+    auto parent_mesh_cache = Teuchos::rcp(new Mesh(parent_mesh, Teuchos::rcp(new AmanziMesh::MeshAlgorithms()), Teuchos::null)); 
     auto mesh = fac.create(parent_mesh_cache, {"Top Face Plane"}, AmanziMesh::Entity_kind::FACE, true);
+    cacheAll(*mesh);
 
     // test the surface mesh as a 3x3 quad mesh
     // -- mesh audit

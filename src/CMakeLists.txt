@@ -13,15 +13,6 @@ add_subdirectory(functions)
 # Geometry
 add_subdirectory(geometry)
 
-# Grid-option agnostic chemistry and interfaces
-add_subdirectory(common/chemistry)
-
-if (ENABLE_ALQUIMIA)
-  # Use Alquimia as a chemistry engine.
-  add_definitions(-DALQUIMIA_ENABLED)
-  add_subdirectory(common/alquimia)
-endif()
-
 if (ENABLE_Unstructured)
   # Mesh
   add_subdirectory(mesh)
@@ -53,6 +44,15 @@ if (ENABLE_Unstructured)
   # Operators
   add_subdirectory(operators)
 
+endif()
+
+# Grid-option agnostic chemistry and interfaces
+#add_subdirectory(common/chemistry)
+
+if (ENABLE_ALQUIMIA)
+  # Use Alquimia as a chemistry engine.
+#  add_definitions(-DALQUIMIA_ENABLED)
+#  add_subdirectory(common/alquimia)
 endif()
 
 if (ENABLE_AmanziPhysicsModule)

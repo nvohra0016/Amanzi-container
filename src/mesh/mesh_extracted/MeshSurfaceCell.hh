@@ -22,9 +22,7 @@
 #include <algorithm>
 
 #include "Teuchos_ParameterList.hpp"
-#include "Epetra_Map.h"
 #include "AmanziComm.hh"
-#include "Epetra_SerialComm.h"
 
 #include "VerboseObject.hh"
 #include "dbc.hh"
@@ -133,7 +131,7 @@ class MeshSurfaceCell : public MeshFramework {
   virtual
   void getCellFacesAndDirs(const Entity_ID cellid,
                            cEntity_ID_View& faceids,
-                           cEntity_Direction_View * const dirs) const override;
+                           cDirection_View * const dirs) const override;
 
   // Cells connected to a face - this function is implemented in each
   // mesh framework. The results are cached in the base class

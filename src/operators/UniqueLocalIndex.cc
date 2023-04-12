@@ -23,30 +23,31 @@
 #include <iterator>
 #include <set>
 
-#include "Epetra_BlockMap.h"
 #include "Teuchos_RCP.hpp"
 
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 
 namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Local index of cells for common internal face
-****************************************************************** */
+ * Local index of cells for common internal face
+ ****************************************************************** */
 int
 UniqueIndexFaceToCells(const AmanziMesh::Mesh& mesh, int f, int c)
 {
   int pos = 0;
-  auto cells = mesh.getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+  AmanziMesh::Entity_ID_List cells;
+
+  mesh.getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
   int ncells = cells.size();
   if (ncells > 1) {
     std::set<int> gids;
     const Epetra_BlockMap& cmap = mesh.getMap(AmanziMesh::Entity_kind::CELL,true);
 
-    for (int i = 0; i < ncells; ++i) gids.insert(cmap.GID(cells[i]));
+    for (int i = 0; i < ncells; ++i) gids.insert(cmap.getGlobalElement(cells[i]));
 
-    auto it = std::find(gids.begin(), gids.end(), cmap.GID(c));
+    auto it = std::find(gids.begin(), gids.end(), cmap.getGlobalElement(c));
     pos = (it != gids.end()) ? std::distance(gids.begin(), it) : -1;
   }
 

@@ -42,13 +42,13 @@ class MFD3D_BernardiRaugel : public MFD3D {
   virtual std::vector<SchemaItem> schema() const override;
 
   // -- stiffness matrix
-  int H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMatrix& Mc);
-  virtual int StiffnessMatrix(int c, const Tensor& T, DenseMatrix& A) override;
+  int H1consistency(int c, const Tensor<>& T, DenseMatrix<>& N, DenseMatrix<>& Mc);
+  virtual int StiffnessMatrix(int c, const Tensor<>& T, DenseMatrix<>& A) override;
 
   // -- other matrices
-  virtual int DivergenceMatrix(int c, DenseMatrix& A) override;
+  virtual int DivergenceMatrix(int c, DenseMatrix<>& A) override;
   virtual int
-  AdvectionMatrix(int c, const AmanziMesh::Point_List& u, DenseMatrix& A) override;
+  AdvectionMatrix(int c, const std::vector<AmanziGeometry::Point>& u, DenseMatrix<>& A) override;
 
  private:
   static RegisteredFactory<MFD3D_BernardiRaugel> reg_;

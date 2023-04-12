@@ -52,57 +52,63 @@ InputAnalysis::RegionAnalysis()
 
     for (int i = 0; i < regions.size(); i++) {
       int nblock(0), nblock_tmp, nvofs;
-      double volume(0.0), frac;
-      AmanziMesh::Entity_ID_View block;
-      AmanziMesh::Double_View vofs;
+      double volume(0.0);
+
+      typename AmanziMesh::Mesh::cEntity_ID_View block;
+      typename AmanziMesh::Mesh::cDouble_View vofs;
 
       try {
-        std::tie(block, vofs) = mesh_->getSetEntitiesAndVolumeFractions(
+        Kokkos::make_pair(block, vofs) = mesh_->getSetEntitiesAndVolumeFractions(
           regions[i], AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
         nblock = block.size();
         nvofs = vofs.size();
 
-        for (int n = 0; n < nblock; n++) {
-          frac = (nvofs == 0) ? 1.0 : vofs[n];
-          volume += mesh_->getCellVolume(block[n]) * frac;
-        }
+        Kokkos::parallel_reduce("InputAnalysis", nblock,
+                KOKKOS_LAMBDA(const int& n, double& lvolume) {
+                  double frac = (nvofs == 0) ? 1.0 : vofs[n];
+                  lvolume += mesh_->getCellVolume(block[n]) * frac;
+                }, volume);
       } catch (...) {
         nblock = -1;
       }
 
       // identify if we failed on some cores
-      mesh_->getComm()->MinAll(&nblock, &nblock_tmp, 1);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MIN, 1, &nblock, &nblock_tmp);
       if (nblock_tmp < 0) {
-        std::tie(block, vofs) = mesh_->getSetEntitiesAndVolumeFractions(
+        Kokkos::make_pair(block, vofs) = mesh_->getSetEntitiesAndVolumeFractions(
           regions[i], AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
         nblock = block.size();
         nvofs = vofs.size();
 
-        volume = 0.0;
-        for (int n = 0; n < nblock; n++) {
-          frac = (nvofs == 0) ? 1.0 : vofs[n];
-          volume += mesh_->getFaceArea(block[n]) * frac;
-        }
+        double volume = 0.0;
+        Kokkos::parallel_reduce("InputAnalysis", nblock,
+                KOKKOS_LAMBDA(const int& n, double& lvolume) {
+                  double frac = (nvofs == 0) ? 1.0 : vofs[n];
+                  lvolume += mesh_->getFaceArea(block[n]) * frac;
+                }, volume);
       }
 
-      double vofs_min(1.0), vofs_max(0.0);
-      for (int n = 0; n < nvofs; ++n) {
-        vofs_min = std::min(vofs_min, vofs[n]);
-        vofs_max = std::max(vofs_max, vofs[n]);
+      Kokkos::pair<double,double> vof_extrema = {1.0, 0.0};
+      if (nvofs == 0) {
+        vof_extrema.second = 1.0;
+      } else {
+        Kokkos::parallel_reduce("InputAnalysis", nvofs,
+                KOKKOS_LAMBDA(const int& n, Kokkos::pair<double,double>& extrema) {
+                  extrema.first = fmin(extrema.first, vofs[n]);
+                  extrema.second = fmax(extrema.second, vofs[n]);
+                }, vof_extrema);
       }
-      if (nvofs == 0) vofs_max = 1.0;
 
       nblock_tmp = nblock;
       int nvofs_tmp(nvofs);
-      double volume_tmp(volume), vofs_min_tmp(vofs_min), vofs_max_tmp(vofs_max);
+      double volume_tmp(volume), vofs_min, vofs_max;
 
-      mesh_->getComm()->SumAll(&nblock_tmp, &nblock, 1);
-      mesh_->getComm()->SumAll(&nvofs_tmp, &nvofs, 1);
-      mesh_->getComm()->SumAll(&volume_tmp, &volume, 1);
-      mesh_->getComm()->MinAll(&vofs_min_tmp, &vofs_min, 1);
-      mesh_->getComm()->MaxAll(&vofs_max_tmp, &vofs_max, 1);
-
-      if (vo_->getVerbLevel() >= Teuchos::VERB_MEDIUM) {
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &nblock_tmp, &nblock);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &nvofs_tmp, &nvofs);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &volume_tmp, &volume);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MIN, 1, &vof_extrema.first, &vofs_min);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MAX, 1, &vof_extrema.second, &vofs_max);
+      if (vo_->os_OK(Teuchos::VERB_MEDIUM)) {
         std::string name(regions[i]);
         name.resize(std::min(40, (int)name.size()));
         *vo_->os() << "src: \"" << name << "\" has " << nblock << " cells"
@@ -122,25 +128,31 @@ InputAnalysis::RegionAnalysis()
     std::vector<std::string> regions =
       alist.get<Teuchos::Array<std::string>>("used boundary condition regions").toVector();
     regions.erase(SelectUniqueEntries(regions.begin(), regions.end()), regions.end());
-    AmanziMesh::Entity_ID_View block;
-    AmanziMesh::Double_View vofs;
 
     for (int i = 0; i < regions.size(); i++) {
-      std::tie(block, vofs) = mesh_->getSetEntitiesAndVolumeFractions(
+      auto [bblock, vvofs] = mesh_->getSetEntitiesAndVolumeFractions(
         regions[i], AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
+      auto vofs = vvofs; // structured binding compiler/standard bug?
+      auto block = bblock;
       int nblock = block.size();
       int nvofs = vofs.size();
 
-      double frac, area(0.0);
-      for (int n = 0; n < nblock; n++) {
-        frac = (nvofs == 0) ? 1.0 : vofs[n];
-        area += mesh_->getFaceArea(block[n]) * frac;
-      }
+      double area(0.0);
+      Kokkos::parallel_reduce("InputAnalysis", nblock,
+              KOKKOS_LAMBDA(const int& n, double& lvolume) {
+                double frac = (nvofs == 0) ? 1.0 : vofs[n];
+                lvolume += mesh_->getFaceArea(block[n]) * frac;
+              }, area);
 
-      double vofs_min(1.0), vofs_max(0.0);
-      for (int n = 0; n < nvofs; ++n) {
-        vofs_min = std::min(vofs_min, vofs[n]);
-        vofs_max = std::max(vofs_max, vofs[n]);
+      Kokkos::pair<double,double> vof_extrema = {1.0, 0.0};
+      if (nvofs == 0) {
+        vof_extrema.second = 1.0;
+      } else {
+        Kokkos::parallel_reduce("InputAnalysis", nvofs,
+                KOKKOS_LAMBDA(const int& n, Kokkos::pair<double,double>& extrema) {
+                  extrema.first = fmin(extrema.first, vofs[n]);
+                  extrema.second = fmax(extrema.second, vofs[n]);
+                }, vof_extrema);
       }
 
       // verify that all faces are boundary faces
@@ -151,18 +163,17 @@ InputAnalysis::RegionAnalysis()
         if (cells.size() != 1) bc_flag = 0;
       }
 
-#ifdef HAVE_MPI
       int nblock_tmp(nblock), nvofs_tmp(nvofs), bc_flag_tmp(bc_flag);
-      double area_tmp(area), vofs_min_tmp(vofs_min), vofs_max_tmp(vofs_max);
+      double area_tmp(area), vofs_min, vofs_max;
 
-      mesh_->getComm()->SumAll(&nblock_tmp, &nblock, 1);
-      mesh_->getComm()->SumAll(&nvofs_tmp, &nvofs, 1);
-      mesh_->getComm()->SumAll(&area_tmp, &area, 1);
-      mesh_->getComm()->MinAll(&vofs_min_tmp, &vofs_min, 1);
-      mesh_->getComm()->MaxAll(&vofs_max_tmp, &vofs_max, 1);
-      mesh_->getComm()->MinAll(&bc_flag_tmp, &bc_flag, 1);
-#endif
-      if (vo_->getVerbLevel() >= Teuchos::VERB_MEDIUM) {
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &nblock_tmp, &nblock);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &nvofs_tmp, &nvofs);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &area_tmp, &area);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MIN, 1, &vof_extrema.first, &vofs_min);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MAX, 1, &vof_extrema.second, &vofs_max);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MIN, 1, &bc_flag_tmp, &bc_flag);
+
+      if (vo_->os_OK(Teuchos::VERB_MEDIUM)) {
         std::string name(regions[i]);
         name.resize(std::min(40, (int)name.size()));
         *vo_->os() << "bc: \"" << name << "\" has " << nblock << " faces"
@@ -190,8 +201,6 @@ InputAnalysis::RegionAnalysis()
     for (int i = 0; i < regions.size(); i++) {
       double volume(0.0), volume_tmp;
       std::string type;
-      AmanziMesh::Entity_ID_View block;
-      AmanziMesh::Double_View vofs;
 
       // observation region may use either cells of faces
       if (!mesh_->isValidSetName(regions[i], AmanziMesh::Entity_kind::CELL) &&
@@ -202,33 +211,43 @@ InputAnalysis::RegionAnalysis()
       }
 
       try {
-        std::tie(block, vofs) = mesh_->getSetEntitiesAndVolumeFractions(
+        auto [bblock, vvofs] = mesh_->getSetEntitiesAndVolumeFractions(
           regions[i], AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+        auto vofs = vvofs; // structured binding compiler/standard bug?
+        auto block = bblock;
         nblock_tmp = nblock = block.size();
         type = "cells";
-        for (int n = 0; n < nblock; n++) volume += mesh_->getCellVolume(block[n]);
+        Kokkos::parallel_reduce("InputAnalysis", nblock,
+                KOKKOS_LAMBDA(const int& n, double& lvolume) {
+                  lvolume += mesh_->getCellVolume(block[n]);
+                }, volume);
 
         volume_tmp = volume;
-        mesh_->getComm()->SumAll(&nblock_tmp, &nblock, 1);
-        mesh_->getComm()->SumAll(&volume_tmp, &volume, 1);
+        Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &nblock_tmp, &nblock);
+        Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &volume_tmp, &volume);
       } catch (...) {
         nblock = -1;
       }
 
       // identify if we failed on some cores or region is empty
-      mesh_->getComm()->MinAll(&nblock, &nblock_tmp, 1);
-      mesh_->getComm()->MaxAll(&nblock, &nblock_max, 1);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MIN, 1, &nblock, &nblock_tmp);
+      Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_MAX, 1, &nblock, &nblock_max);
 
       if (nblock_tmp < 0 || nblock_max == 0) {
-        std::tie(block, vofs) = mesh_->getSetEntitiesAndVolumeFractions(
+        auto [bblock, vvofs] = mesh_->getSetEntitiesAndVolumeFractions(
           regions[i], AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
+        auto vofs = vvofs; // structured binding compiler/standard bug?
+        auto block = bblock;
         nblock_tmp = nblock = block.size();
         type = "faces";
-        for (int n = 0; n < nblock; n++) volume += mesh_->getFaceArea(block[n]);
+        Kokkos::parallel_reduce("InputAnalysis", nblock,
+                KOKKOS_LAMBDA(const int& n, double& lvolume) {
+                  lvolume += mesh_->getFaceArea(block[n]);
+                }, volume);
 
         volume_tmp = volume;
-        mesh_->getComm()->SumAll(&nblock_tmp, &nblock, 1);
-        mesh_->getComm()->SumAll(&volume_tmp, &volume, 1);
+        Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &nblock_tmp, &nblock);
+        Teuchos::reduceAll(*mesh_->getComm(), Teuchos::REDUCE_SUM, 1, &volume_tmp, &volume);
       }
 
       if (vo_->getVerbLevel() >= Teuchos::VERB_MEDIUM) {

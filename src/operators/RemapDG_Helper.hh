@@ -39,7 +39,6 @@
 #include <vector>
 
 // TPLs
-#include "Epetra_MultiVector.h"
 #include "Teuchos_RCP.hpp"
 
 // Amanzi
@@ -50,7 +49,7 @@
 #include "WhetStoneDefs.hh"
 
 // Amanzi::Operators
-#include "LimiterCellDG.hh"
+#include "LimiterCell.hh"
 #include "OperatorDefs.hh"
 #include "PDE_Abstract.hh"
 #include "PDE_AdvectionRiemann.hh"
@@ -79,7 +78,7 @@ class RemapDG_Helper {
   void ApplyLimiter(double t, CompositeVector& u);
 
   // access
-  Teuchos::RCP<LimiterCellDG> limiter() { return limiter_; }
+  Teuchos::RCP<LimiterCell> limiter() { return limiter_; }
 
  protected:
   Teuchos::RCP<const AmanziMesh::Mesh> mesh0_;
@@ -103,7 +102,7 @@ class RemapDG_Helper {
 
   // shock inticators and limiters
   std::string smoothness_;
-  Teuchos::RCP<LimiterCellDG> limiter_;
+  Teuchos::RCP<LimiterCell> limiter_;
 
   // intermediate non-conservative quantity
   Teuchos::RCP<CompositeVector> field_;
@@ -116,7 +115,7 @@ class RemapDG_Helper {
   Teuchos::RCP<std::vector<WhetStone::SpaceTimePolynomial>> velf_;
   Teuchos::RCP<std::vector<WhetStone::VectorSpaceTimePolynomial>> velc_;
   Teuchos::RCP<std::vector<WhetStone::SpaceTimePolynomial>> det_;
-  Teuchos::RCP<std::vector<WhetStone::Polynomial>> jac_;
+  Teuchos::RCP<std::vector<WhetStone::Polynomial<>>> jac_;
 
   // statistics
   int nfun_;

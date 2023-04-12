@@ -7,8 +7,6 @@
   Authors:
 */
 
-#include "Epetra_SerialDenseMatrix.h"
-
 #include "errors.hh"
 #include "exceptions.hh"
 #include <memory>
@@ -68,10 +66,49 @@ FunctionBilinearAndTime::FunctionBilinearAndTime(const FunctionBilinearAndTime& 
 
 
 double
-FunctionBilinearAndTime::operator()(const std::vector<double>& x) const
+FunctionBilinearAndTime::operator()(const Kokkos::View<double*, Kokkos::HostSpace>& x) const
+{
+  int interval; double s;
+  std::tie(interval, s) = ComputeAndLoadInterval_(x(0));
+
+  if (interval == -1) {
+    return (*val_after_)(x);
+  } else if (interval == times_.size() - 1) {
+    return (*val_before_)(x);
+  } else {
+    return (*val_after_)(x)*s + (*val_before_)(x) * (1.0 - s);
+  }
+}
+
+
+void
+FunctionBilinearAndTime::apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const
+{
+  int interval; double s;
+  std::tie(interval, s) = ComputeAndLoadInterval_(in(0,0));
+
+  if (interval == -1) {
+    return val_after_->apply(in, out);
+  } else if (interval == times_.size() - 1) {
+    return val_before_->apply(in, out);
+  } else {
+    Kokkos::View<double*> out2("FunctionBilinearAndTime workspace", out.extent(0));
+    val_before_->apply(in, out);
+    val_after_->apply(in, out2);
+
+    Kokkos::parallel_for("FunctionBilinearAndTime::apply", out.extent(0),
+                         KOKKOS_LAMBDA(const int& i) {
+                           out(i) = (1 - s) * out(i) + s * out2(i);
+                         });
+  }
+}
+
+
+std::pair<int,double>
+FunctionBilinearAndTime::ComputeAndLoadInterval_(double time) const
 {
   // get the interval of the current time
-  int interval = std::lower_bound(times_.begin(), times_.end(), x[0]) - times_.begin() - 1;
+  int interval = std::lower_bound(times_.begin(), times_.end(), time) - times_.begin() - 1;
   if (interval != current_interval_) {
     if ((current_interval_ == -2) || (interval != current_interval_ + 1)) {
       // completely uninitialized, or not an increment, load both
@@ -94,27 +131,24 @@ FunctionBilinearAndTime::operator()(const std::vector<double>& x) const
     current_interval_ = interval;
   }
 
-  // interpolate
-  if (interval == -1) {
-    return (*val_after_)(x);
-  } else if (interval == times_.size() - 1) {
-    return (*val_before_)(x);
-  } else {
-    double s = (x[0] - times_[interval]) / (times_[interval + 1] - times_[interval]);
-    return (*val_after_)(x)*s + (*val_before_)(x) * (1.0 - s);
-  }
+  double s = 0.;
+  if (interval == -1) s = -1;
+  else if (interval == times_.size() - 1) s = -1;
+  else s = (time - times_[interval]) / (times_[interval + 1] - times_[interval]);
+  return std::make_pair(interval, s);
 }
+
 
 std::unique_ptr<FunctionBilinear>
 FunctionBilinearAndTime::Load_(const int time_index) const
 {
   HDF5Reader reader(filename_);
 
-  std::vector<double> row, col;
+  Kokkos::View<double*, Kokkos::HostSpace> row, col;
   reader.ReadData(row_header_, row);
   reader.ReadData(col_header_, col);
 
-  Epetra_SerialDenseMatrix values;
+  Kokkos::View<double**, Kokkos::HostSpace> values;
   reader.ReadMatData(val_header_ + "/" + std::to_string(time_index), values);
   return std::make_unique<FunctionBilinear>(row, col, values, row_index_, col_index_);
 }

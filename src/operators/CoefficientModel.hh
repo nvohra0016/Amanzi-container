@@ -41,13 +41,13 @@ class CoefficientModel {
 
 
 /* ******************************************************************
-* Specialization
-****************************************************************** */
+ * Specialization
+ ****************************************************************** */
 template <>
 inline WhetStone::Tensor
-CoefficientModel<WhetStone::Tensor>::get_coef(int c)
+CoefficientModel<WhetStone:Tensor<>>::get_coef(int c)
 {
-  WhetStone::Tensor Kc(2, 1);
+  WhetStone:Tensor<> Kc(2, 1);
   Kc(0, 0) = 1.0;
   return (coef_.get()) ? (*coef_)[c] : Kc;
 }

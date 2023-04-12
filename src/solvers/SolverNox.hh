@@ -130,7 +130,7 @@ class SolverNox : public Solver<VectorClass, VectorSpace> {
 
   // mutators
   void set_tolerance(double tol) { tol_ = tol; }
-  void set_pc_lag(int pc_lag) { pc_lag_ = pc_lag; }
+  void set_pc_lag(double pc_lag) { pc_lag_ = pc_lag; }
   void set_db(const Teuchos::RCP<ResidualDebugger>& db) { db_ = db; }
 
   // access
@@ -150,7 +150,7 @@ class SolverNox : public Solver<VectorClass, VectorSpace> {
   Teuchos::RCP<ResidualDebugger> db_;
   Teuchos::RCP<SolverFnBaseJF<VectorClass, VectorSpace>> jf_fnbase_;
   double tol_;
-  int pc_lag_;
+  double pc_lag_;
 };
 
 } // namespace AmanziSolvers

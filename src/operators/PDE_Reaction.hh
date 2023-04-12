@@ -41,7 +41,6 @@ The structure of the schema is described in the previous section.
 
 #include <string>
 
-#include "Epetra_MultiVector.h"
 
 // Amanzi
 #include "BilinearForm.hh"
@@ -57,8 +56,8 @@ namespace Operators {
 class PDE_Reaction : public PDE_HelperDiscretization {
  public:
   PDE_Reaction(Teuchos::ParameterList& plist, Teuchos::RCP<Operator> global_op)
-    : PDE_HelperDiscretization(global_op),
-      K_(Teuchos::null),
+    : K_(Teuchos::null),
+      PDE_HelperDiscretization(global_op),
       coef_type_(CoefType::CONSTANT),
       static_matrices_initialized_(false)
   {
@@ -66,8 +65,8 @@ class PDE_Reaction : public PDE_HelperDiscretization {
   }
 
   PDE_Reaction(Teuchos::ParameterList& plist, Teuchos::RCP<const AmanziMesh::Mesh> mesh)
-    : PDE_HelperDiscretization(mesh),
-      K_(Teuchos::null),
+    : K_(Teuchos::null),
+      PDE_HelperDiscretization(mesh),
       coef_type_(CoefType::CONSTANT),
       static_matrices_initialized_(false)
   {
@@ -87,15 +86,10 @@ class PDE_Reaction : public PDE_HelperDiscretization {
   void Setup(const Teuchos::RCP<std::vector<T>>& K, bool reset);
 
   // -- generate a linearized operator
-  using PDE_HelperDiscretization::UpdateMatrices;
-  virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
-                              const Teuchos::Ptr<const CompositeVector>& p) override;
+  virtual void UpdateMatrices();
+
   // -- new interface for pre-computed data
   void UpdateMatrices(double t);
-
-  // -- flux calculation has yet no meaning for this operator
-  virtual void UpdateFlux(const Teuchos::Ptr<const CompositeVector>& p,
-                          const Teuchos::Ptr<CompositeVector>& u) override{};
 
   // boundary conditions
   virtual void ApplyBCs(bool primary, bool eliminate, bool essential_eqn) override;
@@ -106,25 +100,28 @@ class PDE_Reaction : public PDE_HelperDiscretization {
 
  protected:
   Teuchos::RCP<const Epetra_MultiVector> K_;
-  Teuchos::RCP<std::vector<WhetStone::Polynomial>> Kpoly_;
+  Teuchos::RCP<std::vector<WhetStone::Polynomial<>>> Kpoly_;
   Teuchos::RCP<std::vector<WhetStone::SpaceTimePolynomial>> Kpoly_st_;
 
   Teuchos::RCP<WhetStone::BilinearForm> mfd_;
 
  private:
+  Schema global_schema_col_, global_schema_row_;
+  Schema local_schema_col_, local_schema_row_;
+
   CoefType coef_type_;
   bool static_matrices_initialized_;
-  std::vector<std::vector<WhetStone::DenseMatrix>> static_matrices_;
+  std::vector<std::vector<WhetStone::DenseMatrix<>>> static_matrices_;
 };
 
 
 /* ******************************************************************
-* Specialization of Setup
-****************************************************************** */
+ * Specialization of Setup
+ ****************************************************************** */
 template <>
 inline void
-PDE_Reaction::Setup<WhetStone::Polynomial>(
-  const Teuchos::RCP<std::vector<WhetStone::Polynomial>>& K,
+PDE_Reaction::Setup<WhetStone::Polynomial<>>(
+  const Teuchos::RCP<std::vector<WhetStone::Polynomial<>>>& K,
   bool reset)
 {
   K_ = Teuchos::null;

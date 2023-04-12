@@ -201,7 +201,7 @@ EvaluatorSecondary::Update(State& S, const Key& request)
     if (comm != Teuchos::null) {
       int update_l = update;
       int update_g = 0;
-      comm->MaxAll(&update_l, &update_g, 1);
+      Teuchos::reduceAll(*comm, Teuchos::REDUCE_MAX, 1, &update_l, &update_g);
       update |= update_g;
     }
   }
@@ -284,7 +284,7 @@ EvaluatorSecondary::UpdateDerivative(State& S,
     if (comm != Teuchos::null) {
       int update_l = update;
       int update_g = 0;
-      comm->MaxAll(&update_l, &update_g, 1);
+      Teuchos::reduceAll(*comm, Teuchos::REDUCE_MAX, 1, &update_l, &update_g);
       update |= update_g;
     }
   }

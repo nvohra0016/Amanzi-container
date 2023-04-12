@@ -25,7 +25,7 @@ namespace Operators {
 class PDE_HelperBCsList {
  public:
   PDE_HelperBCsList(){};
-  virtual ~PDE_HelperBCsList(){};
+  ~PDE_HelperBCsList(){};
 
   // boundary conditions (BC) require information on test and
   // trial spaces. For a single PDE, these BCs could be the same.

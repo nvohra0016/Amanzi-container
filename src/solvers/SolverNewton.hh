@@ -82,13 +82,14 @@ class SolverNewton : public Solver<Vector, VectorSpace> {
 
   SolverNewton(Teuchos::ParameterList& plist,
                const Teuchos::RCP<SolverFnBase<Vector>>& fn,
-               const VectorSpace& map)
+               const Teuchos::RCP<const VectorSpace>& map)
     : plist_(plist)
   {
     Init(fn, map);
   }
 
-  void Init(const Teuchos::RCP<SolverFnBase<Vector>>& fn, const VectorSpace& map);
+  void
+  Init(const Teuchos::RCP<SolverFnBase<Vector>>& fn, const Teuchos::RCP<const VectorSpace>& map);
 
   virtual int Solve(const Teuchos::RCP<Vector>& u)
   {
@@ -98,7 +99,7 @@ class SolverNewton : public Solver<Vector, VectorSpace> {
 
   // mutators
   void set_tolerance(double tol) { tol_ = tol; }
-  void set_pc_lag(int pc_lag){}; // Newton does not need it
+  void set_pc_lag(double pc_lag){}; // Newton does not need it
 
   // access
   double tolerance() { return tol_; }
@@ -137,17 +138,16 @@ class SolverNewton : public Solver<Vector, VectorSpace> {
   bool modify_correction_;
   double residual_;
   ConvergenceMonitor monitor_;
-  int norm_type_;
 };
 
 
 /* ******************************************************************
-* Public Init method.
-****************************************************************** */
+ * Public Init method.
+ ****************************************************************** */
 template <class Vector, class VectorSpace>
 void
 SolverNewton<Vector, VectorSpace>::Init(const Teuchos::RCP<SolverFnBase<Vector>>& fn,
-                                        const VectorSpace& map)
+                                        const Teuchos::RCP<const VectorSpace>& map)
 {
   fn_ = fn;
   Init_();
@@ -155,8 +155,8 @@ SolverNewton<Vector, VectorSpace>::Init(const Teuchos::RCP<SolverFnBase<Vector>>
 
 
 /* ******************************************************************
-* Initialization of the Newton solver
-****************************************************************** */
+ * Initialization of the Newton solver
+ ****************************************************************** */
 template <class Vector, class VectorSpace>
 void
 SolverNewton<Vector, VectorSpace>::Init_()
@@ -172,7 +172,15 @@ SolverNewton<Vector, VectorSpace>::Init_()
   make_one_iteration_ = (plist_.get<bool>("make one iteration", false)) ? 1 : 0;
 
   std::string monitor_name = plist_.get<std::string>("monitor", "monitor update");
-  ParseConvergenceCriteria(monitor_name, &monitor_, &norm_type_);
+  if (monitor_name == "monitor update") {
+    monitor_ = SOLVER_MONITOR_UPDATE; // default value
+  } else if (monitor_name == "monitor residual") {
+    monitor_ = SOLVER_MONITOR_RESIDUAL;
+  } else {
+    Errors::Message m;
+    m << "SolverNewton: Invalid monitor \"" << monitor_name << "\"";
+    Exceptions::amanzi_throw(m);
+  }
 
   fun_calls_ = 0;
   pc_calls_ = 0;
@@ -185,8 +193,8 @@ SolverNewton<Vector, VectorSpace>::Init_()
 
 
 /* ******************************************************************
-* Base Newton solver
-****************************************************************** */
+ * Base Newton solver
+ ****************************************************************** */
 template <class Vector, class VectorSpace>
 int
 SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
@@ -198,14 +206,18 @@ SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
   pc_calls_ = 0;
 
   // create storage
-  Teuchos::RCP<Vector> r = Teuchos::rcp(new Vector(*u));
-  Teuchos::RCP<Vector> du = Teuchos::rcp(new Vector(*u));
+  Teuchos::RCP<Vector> r = Teuchos::rcp(new Vector(u->getMap()));
+  r->putScalar(0.);
+  Teuchos::RCP<Vector> du = Teuchos::rcp(new Vector(*u, Teuchos::Copy));
+
+  // Teuchos::RCP<Vector> du = Teuchos::rcp(new Vector(u->getMap()));
+  // du->assign(*u);
 
   // variables to monitor the progress of the nonlinear solver
   double error(0.0), previous_error(0.0), l2_error(0.0);
   double l2_error_initial(0.0), u_norm(0.);
-  double res_l2(0.0), res_inf(0.0);
-  double du_l2(0.0), du_inf(0.0);
+  // double res_l2(0.0), res_inf(0.0);
+  // double du_l2(0.0), du_inf(0.0);
   double du_norm(1.0), previous_du_norm(1.0);
   int divergence_count(0);
 
@@ -230,8 +242,8 @@ SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
       error = fn_->ErrorNorm(u, r);
       residual_ = error;
 
-      r->Norm2(&l2_error);
-      u->Norm2(&u_norm);
+      l2_error = r->norm2();
+      u_norm = u->norm2();
       if (vo_->os_OK(Teuchos::VERB_HIGH))
         *vo_->os() << "||u||=" << u_norm << " ||r||=" << l2_error << " error=" << error
                    << std::endl;
@@ -263,15 +275,19 @@ SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
 
     // Apply the preconditioner to the nonlinear residual.
     pc_calls_++;
-    r->Norm2(&res_l2);
-    r->NormInf(&res_inf);
+    // res_l2  =
+    // r->norm2();
+    // res_inf =
+    // r->normInf();
 
     if (vo_->os_OK(Teuchos::VERB_EXTREME)) *vo_->os() << "Applying preconditioner" << std::endl;
     int pc_error = fn_->ApplyPreconditioner(r, du);
     if (pc_error < 0) return SOLVER_LINEAR_SOLVER_ERROR;
 
-    du->Norm2(&du_l2);
-    du->NormInf(&du_inf);
+    // du_l2 =
+    // du->norm2();
+    // du_inf =
+    // du->normInf();
 
     // Hack the correction
     if (modify_correction_) {
@@ -281,7 +297,7 @@ SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
 
     // Make sure that we do not diverge and cause numerical overflow.
     previous_du_norm = du_norm;
-    du->NormInf(&du_norm);
+    du_norm = du->normInf();
 
     if ((num_itrs_ > 0) && (du_norm > max_du_growth_factor_ * previous_du_norm)) {
       if (vo_->os_OK(Teuchos::VERB_HIGH))
@@ -314,7 +330,7 @@ SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
     }
 
     // Next solution iterate and error estimate: u  = u - du
-    u->Update(-1.0, *du, 1.0);
+    u->update(-1.0, *du, 1.0);
     fn_->ChangedSolution();
 
     // Increment iteration counter.
@@ -326,7 +342,7 @@ SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
       previous_error = error;
       error = fn_->ErrorNorm(u, du);
       residual_ = error;
-      du->Norm2(&l2_error);
+      l2_error = du->norm2();
 
       int ierr = Newton_ErrorControl_(error, previous_error, l2_error, previous_du_norm, du_norm);
       if (ierr == SOLVER_CONVERGED) return num_itrs_;
@@ -337,8 +353,8 @@ SolverNewton<Vector, VectorSpace>::Newton_(const Teuchos::RCP<Vector>& u)
 
 
 /* ******************************************************************
-* Internal error control
-****************************************************************** */
+ * Internal error control
+ ****************************************************************** */
 template <class Vector, class VectorSpace>
 int
 SolverNewton<Vector, VectorSpace>::Newton_ErrorControl_(double error,

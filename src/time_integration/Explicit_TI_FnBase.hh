@@ -7,11 +7,7 @@
   Authors: Markus Berndt (berndt@lanl.gov)
 */
 
-/*
-  Time Integration
-
-*/
-
+//! <MISSING_ONELINE_DOCSTRING>
 #ifndef AMANZI_EXPLICIT_FNBASE_HH_
 #define AMANZI_EXPLICIT_FNBASE_HH_
 
@@ -23,9 +19,10 @@ namespace Explicit_TI {
 template <class Vector>
 class fnBase {
  public:
-  // modifies solution before each call of functional f(t, u). Since no modifications
-  // is often made for a low-order scheme, we provide the empty body. A DG scheme may
-  // overload this function as the way to limit intermediate solutions.
+  // modifies solution before each call of functional f(t, u). Since no
+  // modifications is often made for a low-order scheme, we provide the empty
+  // body. A DG scheme may overload this function as the way to limit
+  // intermediate solutions.
   virtual void ModifySolution(const double t, Vector& u){};
 
   // computes functional f = f(t,u)

@@ -30,48 +30,41 @@
 #include <vector>
 
 #include "Teuchos_ParameterList.hpp"
-#include "Epetra_Map.h"
 #include "AmanziComm.hh"
-#include "Epetra_SerialComm.h"
 
-#include "VerboseObject.hh"
-#include "dbc.hh"
-#include "errors.hh"
-
-#include "Region.hh"
 #include "Mesh.hh"
 
 namespace Amanzi {
 namespace AmanziMesh {
 
 
-struct MeshLogicalAlgorithms : public MeshFrameworkAlgorithms {
+struct MeshLogicalAlgorithms : public MeshAlgorithms {
   // lumped things for more efficient calculation
   virtual std::pair<double, AmanziGeometry::Point>
-  computeCellGeometry(const Mesh& mesh, const Entity_ID c) const override;
+  computeCellGeometry(const MeshHost& mesh, const Entity_ID c) const override;
 
 
-  virtual std::tuple<double, AmanziGeometry::Point, cPoint_View>
-  computeFaceGeometry(const Mesh& mesh, const Entity_ID f) const override;
+  virtual std::tuple<double, AmanziGeometry::Point, Mesh::cPoint_View>
+  computeFaceGeometry(const MeshHost& mesh, const Entity_ID f) const override;
 
 
   virtual std::pair<AmanziGeometry::Point, AmanziGeometry::Point>
-  computeEdgeGeometry(const Mesh& mesh, const Entity_ID e) const override;
+  computeEdgeGeometry(const MeshHost& mesh, const Entity_ID e) const override;
 
 
   // Get the bisectors, i.e. vectors from cell centroid to face centroids.
-  virtual void getCellFacesAndBisectors(
-          const Mesh& mesh, 
+  virtual void computeCellFacesAndBisectors(
+          const MeshHost& mesh,
           const Entity_ID cellid,
-          cEntity_ID_View& faceids,
-          cPoint_View * const bisectors) const override;
+          Mesh::cEntity_ID_View& faceids,
+          Mesh::cPoint_View * const bisectors) const override;
 
-  virtual double getCellVolume(const Mesh& mesh, const Entity_ID c) const override;
-  virtual AmanziGeometry::Point getCellCentroid(const Mesh& mesh, const Entity_ID c) const override;
+  virtual double computeCellVolume(const MeshHost& mesh, const Entity_ID c) const override;
+  virtual AmanziGeometry::Point computeCellCentroid(const MeshHost& mesh, const Entity_ID c) const override;
 
-  virtual double getFaceArea(const Mesh& mesh, const Entity_ID f) const override;
-  virtual AmanziGeometry::Point getFaceCentroid(const Mesh& mesh, const Entity_ID f) const override;
-  virtual AmanziGeometry::Point getFaceNormal(const Mesh& mesh, const Entity_ID f,
+  virtual double computeFaceArea(const MeshHost& mesh, const Entity_ID f) const override;
+  virtual AmanziGeometry::Point computeFaceCentroid(const MeshHost& mesh, const Entity_ID f) const override;
+  virtual AmanziGeometry::Point computeFaceNormal(const MeshHost& mesh, const Entity_ID f,
           const Entity_ID c, int * const orientation=nullptr) const override;
 
 
@@ -154,12 +147,12 @@ class MeshLogical : public MeshFramework {
   getNodeCoordinate(const Entity_ID node) const override;
 
   virtual void
-  getFaceNodes(const Entity_ID f, cEntity_ID_View& nodes) const override;
+  getFaceNodes(const Entity_ID f, MeshFramework::cEntity_ID_View& nodes) const override;
 
   virtual void
   getNodeFaces(const Entity_ID nodeid,
                const Parallel_kind ptype,
-               cEntity_ID_View& faceids) const override;
+               MeshFramework::cEntity_ID_View& faceids) const override;
 
   //
   // These are the important ones -- MeshLogical defines cell quantities
@@ -167,7 +160,7 @@ class MeshLogical : public MeshFramework {
   virtual void getCellFacesAndDirs(
     const Entity_ID c,
     cEntity_ID_View& faces,
-    cEntity_Direction_View * const dirs) const override;
+    cDirection_View * const dirs) const override;
 
   // Get the bisectors, i.e. vectors from cell centroid to face centroids.
   void getCellFacesAndBisectors(
@@ -203,7 +196,6 @@ class MeshLogical : public MeshFramework {
 
 };
 
-bool viewMeshLogical(const Mesh& m, std::ostream& os=std::cout);
 
 } // namespace AmanziMesh
 } // namespace Amanzi

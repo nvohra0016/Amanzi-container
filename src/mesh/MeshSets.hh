@@ -25,14 +25,11 @@
 #include "RegionLogical.hh"
 #include "RegionPoint.hh"
 #include "MeshDefs.hh"
-//#include "Mesh_Algorithms.hh"
+#include "MeshCache_decl.hh"
 #include "MeshMaps.hh"
 
 namespace Amanzi {
 namespace AmanziMesh {
-
-template<MemSpace_kind>
-class MeshCache;
 
 //
 // This casts as needed to find the right implementation.  Note that some
@@ -47,7 +44,7 @@ View_type<const Entity_ID, MemSpace_kind::HOST> resolveMeshSetVolumeFractions(
   const AmanziGeometry::Region& region,
   const Entity_kind kind,
   const Parallel_kind ptype,
-  Double_View& vol_fracs,
+  typename MeshCache<MemSpace_kind::HOST>::Double_View& vol_fracs,
   const MeshCache<MemSpace_kind::HOST>& mesh);
 
 
@@ -108,10 +105,10 @@ View_type<const Entity_ID, MemSpace_kind::HOST> resolveMeshSetLogical(const Aman
         const Parallel_kind ptype,
         const MeshCache<MemSpace_kind::HOST>& mesh);
 
-cEntity_ID_View resolveMeshSetPoint(const AmanziGeometry::RegionPoint& region,
+View_type<const Entity_ID, MemSpace_kind::HOST> resolveMeshSetPoint(const AmanziGeometry::RegionPoint& region,
         const Entity_kind kind,
         const Parallel_kind ptype,
-	const MeshCache<MemSpace_kind::HOST>& mesh);
+        const MeshCache<MemSpace_kind::HOST>& mesh);
 
 View_type<const Entity_ID, MemSpace_kind::HOST> filterParentEntities(const MeshCache<MemSpace_kind::HOST>& mesh,
         Entity_kind kind,

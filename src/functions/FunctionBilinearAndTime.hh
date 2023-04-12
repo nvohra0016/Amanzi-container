@@ -22,13 +22,16 @@ bilinear interpolation on
 are out of those bounds, and constant at the corner value if both are out of
 bounds.
 
-* `"file`" ``[string]`` HDF5 filename of the data
-* `"time header`" ``[string]`` **time** Name of the temporal dimension indices, the :math:`t_i`.
-* `"row header`" ``[string]`` **x** name of the row dataset, the :math:`x_i`
-* `"row coordinate`" ``[string]`` **x** one of `"x`",`"y`",`"z`"
-* `"column header`" ``[string]`` **y** name of the column dataset, the :math:`y_i`
-* `"column coordinate`" ``[string]`` **y** one of `"x`",`"y`",`"z`"
-* `"value header`" ``[string]`` name of the values dataset, the :math:`u_{{i,j}}`
+.. _function-bilinear-and-time-spec:
+.. admonition:: function-bilinear-and-time-spec
+
+   * `"file`" ``[string]`` HDF5 filename of the data
+   * `"time header`" ``[string]`` **time** Name of the temporal dimension indices, the :math:`t_i`.
+   * `"row header`" ``[string]`` **x** name of the row dataset, the :math:`x_i`
+   * `"row coordinate`" ``[string]`` **x** one of `"x`",`"y`",`"z`"
+   * `"column header`" ``[string]`` **y** name of the column dataset, the :math:`y_i`
+   * `"column coordinate`" ``[string]`` **y** one of `"x`",`"y`",`"z`"
+   * `"value header`" ``[string]`` name of the values dataset, the :math:`u_{{i,j}}`
 
 Example1:
 
@@ -83,10 +86,12 @@ class FunctionBilinearAndTime : public Function {
     return std::make_unique<FunctionBilinearAndTime>(*this);
   }
 
-  double operator()(const std::vector<double>& x) const;
+  double operator()(const Kokkos::View<double*, Kokkos::HostSpace>& x) const;
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const;
 
  private:
   std::unique_ptr<FunctionBilinear> Load_(const int i) const;
+  std::pair<int,double> ComputeAndLoadInterval_(double time) const;
 
  private:
   std::string row_header_, col_header_, val_header_;

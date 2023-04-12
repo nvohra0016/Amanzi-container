@@ -45,7 +45,7 @@ MFD3D_BernardiRaugel::schema() const
 * components at faces. Fixed normal is used for the latter.
 ****************************************************************** */
 int
-MFD3D_BernardiRaugel::H1consistency(int c, const Tensor& K, DenseMatrix& N, DenseMatrix& Ac)
+MFD3D_BernardiRaugel::H1consistency(int c, const Tensor<>& K, DenseMatrix<>& N, DenseMatrix<>& Ac)
 {
   AmanziGeometry::Point xv(d_), tau(d_), v1(d_);
 
@@ -57,29 +57,29 @@ MFD3D_BernardiRaugel::H1consistency(int c, const Tensor& K, DenseMatrix& N, Dens
 
   int nrows = d_ * nnodes + nfaces;
   int nd = d_ * (d_ + 1);
-  N.Reshape(nrows, nd);
-  Ac.Reshape(nrows, nrows);
+  N.reshape(nrows, nd);
+  Ac.reshape(nrows, nrows);
 
   const AmanziGeometry::Point& xm = mesh_->getCellCentroid(c);
   double volume = mesh_->getCellVolume(c);
 
   // convolute tensors for non-zero modes
-  std::vector<Tensor> vT, vKT;
+  std::vector<Tensor<>> vT, vKT;
 
   for (int i = 0; i < d_; ++i) {
     for (int j = i; j < d_; ++j) {
-      Tensor T(d_, 2);
+      Tensor<> T(d_, 2);
       T(i, j) = T(j, i) = 1.0;
       vT.push_back(T);
 
-      Tensor KT(K * T);
+      Tensor<> KT(K * T);
       vKT.push_back(KT);
     }
   }
 
   // calculate exact integration matrix
   int modes = d_ * (d_ + 1) / 2;
-  DenseMatrix coefM(modes, modes);
+  DenseMatrix<> coefM(modes, modes);
 
   for (int i = 0; i < modes; ++i) {
     for (int j = i; j < modes; ++j) {
@@ -90,7 +90,7 @@ MFD3D_BernardiRaugel::H1consistency(int c, const Tensor& K, DenseMatrix& N, Dens
 
   // to calculate matrix R, we use temporary matrix N
   // 2D algorithm is separated out since it is fast
-  N.PutScalar(0.0);
+  N.putScalar(0.0);
 
   if (d_ == 2) {
     for (int n = 0; n < nnodes; n++) {
@@ -133,7 +133,7 @@ MFD3D_BernardiRaugel::H1consistency(int c, const Tensor& K, DenseMatrix& N, Dens
   }
 
   // calculate R coefM^{-1} R^T
-  DenseVector a1(modes), a2(modes), a3(modes);
+  DenseVector<> a1(modes), a2(modes), a3(modes);
   coefM.Inverse();
 
   for (int i = 0; i < nrows; i++) {
@@ -152,7 +152,7 @@ MFD3D_BernardiRaugel::H1consistency(int c, const Tensor& K, DenseMatrix& N, Dens
   }
 
   // calculate N (common algorihtm for 2D and 3D)
-  N.PutScalar(0.0);
+  N.putScalar(0.0);
 
   for (int n = 0; n < nnodes; n++) {
     int v = nodes[n];
@@ -228,9 +228,9 @@ MFD3D_BernardiRaugel::H1consistency(int c, const Tensor& K, DenseMatrix& N, Dens
 * Stiffness matrix: the standard algorithm.
 ****************************************************************** */
 int
-MFD3D_BernardiRaugel::StiffnessMatrix(int c, const Tensor& K, DenseMatrix& A)
+MFD3D_BernardiRaugel::StiffnessMatrix(int c, const Tensor<>& K, DenseMatrix<>& A)
 {
-  DenseMatrix N;
+  DenseMatrix<> N;
 
   int ok = H1consistency(c, K, N, A);
   if (ok) return ok;
@@ -245,8 +245,8 @@ MFD3D_BernardiRaugel::StiffnessMatrix(int c, const Tensor& K, DenseMatrix& A)
 ****************************************************************** */
 int
 MFD3D_BernardiRaugel::AdvectionMatrix(int c,
-                                      const AmanziMesh::Point_List& u,
-                                      DenseMatrix& A)
+                                      const std::vector<AmanziGeometry::Point>& u,
+                                      DenseMatrix<>& A)
 {
   AMANZI_ASSERT(d_ == 2);
 
@@ -257,9 +257,9 @@ MFD3D_BernardiRaugel::AdvectionMatrix(int c,
   int nnodes = nodes.size();
 
   // calculate corner normals and weigths
-  AmanziMesh::Double_List w(nnodes, 0.0);
+  std::vector<double> w(nnodes, 0.0);
   AmanziGeometry::Point xv(d_);
-  AmanziMesh::Point_List N(nnodes, xv);
+  std::vector<AmanziGeometry::Point> N(nnodes, xv);
 
   const AmanziGeometry::Point& xc = mesh_->getCellCentroid(c);
 
@@ -280,8 +280,8 @@ MFD3D_BernardiRaugel::AdvectionMatrix(int c,
 
   // populate matrix
   int ndofs = d_ * nnodes + nfaces;
-  A.Reshape(ndofs, ndofs);
-  A.PutScalar(0.0);
+  A.reshape(ndofs, ndofs);
+  A.putScalar(0.0);
 
   for (int i = 0; i < nnodes; ++i) {
     int i1 = 2 * i;
@@ -303,7 +303,7 @@ MFD3D_BernardiRaugel::AdvectionMatrix(int c,
 * Fixed normal vector is used for the latter.
 ****************************************************************** */
 int
-MFD3D_BernardiRaugel::DivergenceMatrix(int c, DenseMatrix& A)
+MFD3D_BernardiRaugel::DivergenceMatrix(int c, DenseMatrix<>& A)
 {
   auto nodes = mesh_->getCellNodes(c);
 
@@ -311,7 +311,7 @@ MFD3D_BernardiRaugel::DivergenceMatrix(int c, DenseMatrix& A)
   int nfaces = faces.size();
 
   int n1 = d_ * nodes.size();
-  A.Reshape(1, n1 + nfaces);
+  A.reshape(1, n1 + nfaces);
 
   for (int n = 0; n < n1; ++n) A(0, n) = 0.0;
 

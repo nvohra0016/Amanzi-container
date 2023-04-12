@@ -22,7 +22,6 @@
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
-#include "EpetraExt_RowMatrixOut.h"
 #include "UnitTest++.h"
 
 // Amanzi
@@ -50,7 +49,7 @@ TEST(OPERATOR_DIFFUSION_MIXED)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0)
     std::cout << "\nTest: 2D elliptic solver, exactness"
               << " test for mixed discretization" << std::endl;
@@ -65,24 +64,26 @@ TEST(OPERATOR_DIFFUSION_MIXED)
   Teuchos::RCP<GeometricModel> gm = Teuchos::rcp(new GeometricModel(2, region_list, *comm));
 
   MeshFactory meshfactory(comm, gm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
-  //RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 10, 1);
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
+  // RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 10, 1);
   RCP<const Mesh> mesh = meshfactory.create("test/median32x33.exo");
 
   // modify diffusion coefficient
   // -- since rho=mu=1.0, we do not need to scale the diffusion coefficient.
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+  int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
   Analytic02 ana(mesh);
 
   for (int c = 0; c < ncells; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.TensorDiffusivity(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.TensorDiffusivity(xc, 0.0);
     K->push_back(Kc);
   }
+  double rho(1.0), mu(1.0);
   AmanziGeometry::Point g(0.0, -1.0);
 
   // create boundary data
@@ -93,8 +94,8 @@ TEST(OPERATOR_DIFFUSION_MIXED)
 
   for (int f = 0; f < nfaces_wghost; f++) {
     bool flag;
-    const Point& xf = mesh->getFaceCentroid(f);
-    double area = mesh->getFaceArea(f);
+    const Point& xf = mesh->getFaceCentroid(f)
+    double area = mesh->getFaceArea(f)
     Point normal = ana.face_normal_exterior(f, &flag);
 
     if (fabs(xf[0]) < 1e-6) {
@@ -116,7 +117,7 @@ TEST(OPERATOR_DIFFUSION_MIXED)
   // create diffusion operator
   ParameterList op_list = plist.sublist("PK operator").sublist("diffusion operator mixed");
   auto op = Teuchos::rcp(new PDE_DiffusionMFD(op_list, mesh));
-  op->Init(op_list);
+  op->Init();
   op->SetBCs(bc, bc);
   const CompositeVectorSpace& cvs = op->global_operator()->DomainMap();
 
@@ -131,20 +132,21 @@ TEST(OPERATOR_DIFFUSION_MIXED)
   // put in a random set of cell values
   CompositeVector x(cvs);
   x.Random();
-  x.ViewComponent("face")->PutScalar(0.);
+  x.ViewComponent("face")->putScalar(0.);
 
   op->UpdateConsistentFaces(x);
 
   // // dump the schur complement
   // std::stringstream filename_s2;
   // filename_s2 << "consist_face_" << 0 << ".txt";
-  // EpetraExt::RowMatrixToMatlabFile(filename_s2.str().c_str(), *op->consistent_face_operator()->A());
+  // EpetraExt::RowMatrixToMatlabFile(filename_s2.str().c_str(),
+  // *op->consistent_face_operator()->A());
 
   // ensure that (y - A * x) on faces is zero
   CompositeVector res(cvs);
   global_op->ComputeNegativeResidual(x, res);
 
   double norm;
-  res.ViewComponent("face", false)->NormInf(&norm);
+  res.ViewComponent("face", false)->normInf(&norm);
   CHECK_CLOSE(0.0, norm, 1.e-8);
 }

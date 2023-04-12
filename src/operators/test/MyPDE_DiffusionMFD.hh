@@ -59,15 +59,17 @@ MyPDE_DiffusionMFD::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& fl
     k_cell = k_->ViewComponent("cell");
     k_face = k_->ViewComponent("face", true);
     k_grad = k_->ViewComponent("grad");
-    if (k_->HasComponent("twin")) k_twin = k_->ViewComponent("twin", true);
+    if (k_->hasComponent("twin")) k_twin = k_->ViewComponent("twin", true);
   }
 
   // update matrix blocks
   int dim = mesh_->getSpaceDimension();
   WhetStone::MFD3D_Diffusion mfd(mesh_);
-  WhetStone::DenseMatrix Wff;
+  WhetStone::DenseMatrix<> Wff;
 
-  WhetStone::Tensor Kc(mesh_->getSpaceDimension(), 1);
+  AmanziMesh::Entity_ID_List cells;
+
+  WhetStone:Tensor<> Kc(mesh_->getSpaceDimension(), 1);
   Kc(0, 0) = 1.0;
 
   for (int c = 0; c < ncells_owned; c++) {
@@ -85,7 +87,7 @@ MyPDE_DiffusionMFD::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& fl
     } else {
       for (int n = 0; n < nfaces; n++) {
         int f = faces[n];
-        auto cells = mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+        cells = mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
         kf[n] = (c == cells[0]) ? (*k_face)[0][f] : (*k_twin)[0][f];
       }
     }
@@ -93,7 +95,7 @@ MyPDE_DiffusionMFD::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& fl
     if (K_.get()) Kc = (*K_)[c];
     mfd.MassMatrixInverseDivKScaled(c, Kc, kc, kgrad, Wff);
 
-    WhetStone::DenseMatrix Acell(nfaces + 1, nfaces + 1);
+    WhetStone::DenseMatrix<> Acell(nfaces + 1, nfaces + 1);
 
     double matsum = 0.0;
     for (int n = 0; n < nfaces; n++) {

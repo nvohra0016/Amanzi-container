@@ -10,12 +10,13 @@
 /*
   State
 
-  Tests for state as a container of data
+  Tests for state as a container of arbitrary data, and serves as documentation
+  of how to add custom data.
+
   NOTE: this test passes if it compiles!
 */
 
 // TPLs
-#include "Epetra_MpiComm.h"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
 #include "Teuchos_RCP.hpp"
@@ -38,36 +39,35 @@ struct MyPoint {
 
 using MyPointList = std::vector<MyPoint>;
 
-bool inline UserInitialize(Teuchos::ParameterList& plist,
-                           MyPointList& t,
-                           const Amanzi::Key& fieldname,
-                           const std::vector<std::string>* subfieldnames)
+template<>
+bool
+Amanzi::Helpers::Initialize<MyPointList>(Teuchos::ParameterList& plist,
+                           MyPointList& t)
 {
   std::cout << "found it!" << std::endl;
   return true;
 }
 
+template<>
 void
-UserWriteVis(const Amanzi::Visualization& vis,
-             const Amanzi::Key& fieldname,
-             const std::vector<std::string>* subfieldnames,
-             const MyPointList& vec)
+Amanzi::Helpers::WriteVis<MyPointList>(const Amanzi::Visualization& vis,
+                          Teuchos::ParameterList& attrs,
+                          const MyPointList& vec)
 {}
 
+template<>
 void
-UserWriteCheckpoint(const Amanzi::Checkpoint& chkp,
-                    const Amanzi::Key& fieldname,
-                    const std::vector<std::string>* subfieldnames,
-                    const MyPointList& vec)
+Amanzi::Helpers::WriteCheckpoint<MyPointList>(const Amanzi::Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        const MyPointList& vec)
 {}
-bool
-UserReadCheckpoint(const Amanzi::Checkpoint& chkp,
-                   const Amanzi::Key& fieldname,
-                   const std::vector<std::string>* subfieldnames,
-                   MyPointList& vec)
-{
-  return true;
-}
+
+template<>
+void
+Amanzi::Helpers::ReadCheckpoint<MyPointList>(const Amanzi::Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        MyPointList& vec)
+{}
 
 
 TEST(STATE_EXTENSIBILITY_CREATION)
@@ -99,10 +99,9 @@ TEST(STATE_EXTENSIBILITY_CREATION)
   s.InitializeFields();
 
   Visualization vis(plist->sublist("visualization"));
-  vis.set_mesh(m);
-  vis.CreateFiles();
-  WriteVis(vis, s);
+  vis.createFiles();
+  vis.write(s);
 
   Checkpoint chkp(plist->sublist("checkpoint"), s);
-  chkp.Write(s);
+  chkp.write(s);
 }

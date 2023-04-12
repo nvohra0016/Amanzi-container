@@ -20,7 +20,7 @@
 
 #include "DenseMatrix.hh"
 #include "lapack.hh"
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 #include "NumericalIntegration.hh"
 #include "OperatorDefs.hh"
 #include "Point.hh"
@@ -44,11 +44,11 @@ ReconstructionCellPolynomial::Init(Teuchos::ParameterList& plist)
     "cell", AmanziMesh::Entity_kind::CELL, d_ * (d_ + 1) / 2 + d_);
 
   poly_ = Teuchos::RCP<CompositeVector>(new CompositeVector(cvs, true));
-  poly_c_ = poly_->ViewComponent("cell", true);
+  poly_c_ = poly_->viewComponent("cell", true);
 
   cvs2.SetMesh(mesh_)->SetGhosted(true)->SetComponent("cell", AmanziMesh::Entity_kind::CELL, d_ * (d_ + 1) / 2);
   ortho_ = Teuchos::RCP<CompositeVector>(new CompositeVector(cvs2, true));
-  ortho_c_ = ortho_->ViewComponent("cell", true);
+  ortho_c_ = ortho_->viewComponent("cell", true);
 
   // process other parameters
   degree_ = plist.get<int>("polynomial order", 2);
@@ -69,17 +69,17 @@ ReconstructionCellPolynomial::Compute(const AmanziMesh::Entity_ID_View& ids,
   field_ = field;
   component_ = component;
 
-  auto& poly = *poly_->ViewComponent("cell");
+  auto& poly = *poly_->viewComponent("cell");
   std::set<AmanziMesh::Entity_ID> cells, faces;
   AmanziGeometry::Point xcc(d_);
 
-  int npoly = poly.NumVectors();
-  WhetStone::DenseMatrix matrix(npoly, npoly);
-  WhetStone::DenseVector rhs(npoly), coef(npoly);
+  int npoly = poly.getNumVectors();
+  WhetStone::DenseMatrix<> matrix(npoly, npoly);
+  WhetStone::DenseVector<> rhs(npoly), coef(npoly);
 
   int ncells_owned = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
 
-  WhetStone::Polynomial quad(d_, 2);
+  WhetStone::Polynomial<> quad(d_, 2);
   std::vector<const WhetStone::WhetStoneFunction*> funcs(1);
   funcs[0] = &quad;
   WhetStone::NumericalIntegration numi(mesh_);
@@ -102,8 +102,8 @@ ReconstructionCellPolynomial::Compute(const AmanziMesh::Entity_ID_View& ids,
     }
 
     // populate least-squate matrix
-    matrix.PutScalar(0.0);
-    rhs.PutScalar(0.0);
+    matrix.putScalar(0.0);
+    rhs.putScalar(0.0);
 
     for (int c1 : cells) {
       double vol1 = mesh_->getCellVolume(c1);
@@ -157,14 +157,14 @@ ReconstructionCellPolynomial::Compute(const AmanziMesh::Entity_ID_View& ids,
     }
 
     // improve robustness w.r.t degenerate matrices
-    WhetStone::DenseVector rhs_copy(rhs);
-    WhetStone::DenseMatrix matrix_copy(matrix);
+    WhetStone::DenseVector<> rhs_copy(rhs);
+    WhetStone::DenseMatrix<> matrix_copy(matrix);
 
     int info, nrhs = 1;
     WhetStone::DPOSV_F77("U", &npoly, &nrhs, matrix.Values(), &npoly, rhs.Values(), &npoly, &info);
     if (info) {
       // try regularized matrix
-      double norm = matrix_copy.NormInf() * OPERATOR_RECONSTRUCTION_MATRIX_CORRECTION;
+      double norm = matrix_copy.normInf() * OPERATOR_RECONSTRUCTION_MATRIX_CORRECTION;
       for (int i = 0; i < npoly; i++) matrix_copy(i, i) += norm;
 
       WhetStone::DPOSV_F77(
@@ -186,10 +186,10 @@ ReconstructionCellPolynomial::Compute(const AmanziMesh::Entity_ID_View& ids,
 * Assemble a SPD least square matrix
 ****************************************************************** */
 void
-ReconstructionCellPolynomial::PopulateLeastSquareSystem_(WhetStone::DenseVector& coef,
+ReconstructionCellPolynomial::PopulateLeastSquareSystem_(WhetStone::DenseVector<>& coef,
                                                          double field_value,
-                                                         WhetStone::DenseMatrix& matrix,
-                                                         WhetStone::DenseVector& rhs)
+                                                         WhetStone::DenseMatrix<>& matrix,
+                                                         WhetStone::DenseVector<>& rhs)
 {
   int npoly = matrix.NumRows();
   for (int i = 0; i < npoly; i++) {
@@ -291,7 +291,7 @@ ReconstructionCellPolynomial::getValueSlope(int c, const AmanziGeometry::Point& 
 WhetStone::Polynomial
 ReconstructionCellPolynomial::getPolynomial(int c) const
 {
-  WhetStone::Polynomial tmp(d_, 2);
+  WhetStone::Polynomial<> tmp(d_, 2);
   tmp(0) = (*field_)[0][c];
   for (int i = 0; i < d_; i++) tmp(i + 1) = (*poly_c_)[i][c];
 

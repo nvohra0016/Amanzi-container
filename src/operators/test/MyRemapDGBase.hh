@@ -51,8 +51,8 @@ class MyRemapDGBase : public Operators::RemapDG {
 
 
 /* *****************************************************************
-* Initialization of the consistent jacobian determinant
-***************************************************************** */
+ * Initialization of the consistent jacobian determinant
+ ***************************************************************** */
 template <class AnalyticDG>
 double
 MyRemapDGBase<AnalyticDG>::StabilityCondition()
@@ -60,8 +60,8 @@ MyRemapDGBase<AnalyticDG>::StabilityCondition()
   double dt(1e+99), alpha(0.2), tmp;
 
   for (int f = 0; f < nfaces_wghost_; ++f) {
-    double area = mesh0_->getFaceArea(f);
-    const AmanziGeometry::Point& xf = mesh0_->getFaceCentroid(f);
+    double area = mesh0_->getFaceArea(f)
+    const AmanziGeometry::Point& xf = mesh0_->getFaceCentroid(f)
     velf_vec_[f].Value(xf).Norm2(&tmp);
     dt = std::min(dt, area / tmp);
   }
@@ -71,18 +71,18 @@ MyRemapDGBase<AnalyticDG>::StabilityCondition()
 
 
 /* *****************************************************************
-* Compute initial mass
-***************************************************************** */
+ * Compute initial mass
+ ***************************************************************** */
 template <class AnalyticDG>
 double
 MyRemapDGBase<AnalyticDG>::InitialMass(const CompositeVector& p1, int order)
 {
   const Epetra_MultiVector& p1c = *p1.ViewComponent("cell", false);
-  int nk = p1c.NumVectors();
-  int ncells = p1c.MyLength();
+  int nk = p1c.getNumVectors();
+  int ncells = p1c.getLocalLength();
 
   double mass(0.0), mass0;
-  WhetStone::DenseVector data(nk);
+  WhetStone::DenseVector<> data(nk);
   WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh0_);
 
   for (int c = 0; c < ncells; c++) {
@@ -91,14 +91,14 @@ MyRemapDGBase<AnalyticDG>::InitialMass(const CompositeVector& p1, int order)
     mass += numi.IntegratePolynomialCell(c, poly);
   }
 
-  mesh0_->getComm()->SumAll(&mass, &mass0, 1);
+  Teuchos::reduceAll<int>(*mesh0_->get_comm(),Teuchos::REDUCE_SUM, 1,&mass, &mass0);
   return mass0;
 }
 
 
 /* *****************************************************************
-* Print statistics using conservative field u
-***************************************************************** */
+ * Print statistics using conservative field u
+ ***************************************************************** */
 template <class AnalyticDG>
 void
 MyRemapDGBase<AnalyticDG>::CollectStatistics(double t, const CompositeVector& u)
@@ -111,10 +111,10 @@ MyRemapDGBase<AnalyticDG>::CollectStatistics(double t, const CompositeVector& u)
 
     auto& rhs = *op_reac_->global_operator()->rhs();
     op_reac_->global_operator()->Apply(u, rhs);
-    rhs.Dot(u, &l2norm_);
+    rhs.dot(u, &l2norm_);
 
     Epetra_MultiVector& xc = *rhs.ViewComponent("cell");
-    int nk = xc.NumVectors();
+    int nk = xc.getNumVectors();
     double xmax[nk], xmin[nk], lmax(-1.0), lmin(-1.0), lavg(-1.0);
     xc.MaxValue(xmax);
     xc.MinValue(xmin);
@@ -126,9 +126,9 @@ MyRemapDGBase<AnalyticDG>::CollectStatistics(double t, const CompositeVector& u)
       lim.MeanValue(&lavg);
     }
 
-    if (mesh0_->getComm()->MyPID() == 0) {
-      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  limiter: %6.3f %6.3f %6.3f  umax/umin: "
-             "%9.5g %9.5g\n",
+    if (mesh0_->get_comm()->getRank() == 0) {
+      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  limiter: %6.3f %6.3f "
+             "%6.3f  umax/umin: %9.5g %9.5g\n",
              tglob,
              l2norm_,
              nfun_,

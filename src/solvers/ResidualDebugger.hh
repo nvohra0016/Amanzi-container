@@ -6,12 +6,6 @@
 
   Authors: Ethan Coon
 */
-
-/*
-  Solvers
-
-*/
-
 /*!
 
 Debugging object for writing vectors to file within an iterative
@@ -20,11 +14,12 @@ process for use with vis tools.
 .. _residual-debugger-spec:
 .. admonition:: residual-debugger-spec
 
-    * `"file name base`" ``[string]`` **amanzi_dbg** Prefix for output filenames.
+    * `"file name base`" ``[string]`` **amanzi_dbg** Prefix for output
+      filenames.
 
     INCLUDES:
 
-    - ``[io-event-spec]`` An IOEvent_ spec
+    * ``[io-event-spec]`` An IOEvent_ spec
 
 */
 
@@ -39,8 +34,7 @@ process for use with vis tools.
 #include "VerboseObject.hh"
 #include "IOEvent.hh"
 #include "TreeVector.hh"
-#include "TreeVector_Utils.hh"
-#include "HDF5_MPI.hh"
+#include "Output.hh"
 
 namespace Amanzi {
 namespace AmanziSolvers {
@@ -48,7 +42,7 @@ namespace AmanziSolvers {
 class ResidualDebugger : public IOEvent {
  public:
   // Constructor
-  ResidualDebugger(Teuchos::ParameterList& plist) : IOEvent(plist)
+  ResidualDebugger(const Teuchos::RCP<Teuchos::ParameterList>& plist) : IOEvent(*plist)
   {
     filebasename_ = plist_.get<std::string>("file name base", "amanzi_dbg");
   }
@@ -69,7 +63,7 @@ class ResidualDebugger : public IOEvent {
   std::string filebasename_;
   bool on_;
   double time_;
-  std::vector<Teuchos::RCP<HDF5_MPI>> vis_;
+  std::vector<std::unique_ptr<Output>> vis_;
 };
 
 

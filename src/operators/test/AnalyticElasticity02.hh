@@ -24,9 +24,9 @@ class AnalyticElasticity02 : public AnalyticElasticityBase {
     : AnalyticElasticityBase(mesh){};
   ~AnalyticElasticity02(){};
 
-  Amanzi::WhetStone::Tensor Tensor(const Amanzi::AmanziGeometry::Point& p, double t)
+  Amanzi::WhetStone:Tensor<> Tensor(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K(2, 1);
+    Amanzi::WhetStone:Tensor<> K(2, 1);
     K(0, 0) = 1.0;
     return K;
   }

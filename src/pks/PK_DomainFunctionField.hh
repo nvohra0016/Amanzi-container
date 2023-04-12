@@ -31,7 +31,6 @@ the domain function.
 #include <string>
 #include <vector>
 
-#include "Epetra_Vector.h"
 #include "Teuchos_RCP.hpp"
 
 #include "CommonDefs.hh"

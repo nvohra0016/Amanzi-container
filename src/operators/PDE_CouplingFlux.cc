@@ -26,8 +26,8 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Initialize operator from parameter list.
-****************************************************************** */
+ * Initialize operator from parameter list.
+ ****************************************************************** */
 void
 PDE_CouplingFlux::Init_(Teuchos::ParameterList& plist,
                         const Teuchos::RCP<const CompositeVectorSpace>& cvs_row,
@@ -35,10 +35,6 @@ PDE_CouplingFlux::Init_(Teuchos::ParameterList& plist,
                         std::shared_ptr<const std::vector<std::vector<int>>>& row_inds,
                         std::shared_ptr<const std::vector<std::vector<int>>>& col_inds)
 {
-  // diagonal operator may work incorrectly if CVS has more than one component
-  AMANZI_ASSERT(cvs_row->size() == 1);
-  AMANZI_ASSERT(cvs_col->size() == 1);
-
   if (global_op_ == Teuchos::null) {
     global_op_ =
       Teuchos::rcp(new Operator_Diagonal(cvs_row, cvs_col, plist, OPERATOR_SCHEMA_INDICES));
@@ -56,9 +52,9 @@ PDE_CouplingFlux::Init_(Teuchos::ParameterList& plist,
 
 
 /* ******************************************************************
-* Populate containers of elemental matrices using MFD factory.
-* NOTE: input parameters are not yet used.
-****************************************************************** */
+ * Populate containers of elemental matrices using MFD factory.
+ * NOTE: input parameters are not yet used.
+ ****************************************************************** */
 void
 PDE_CouplingFlux::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
                                  const Teuchos::Ptr<const CompositeVector>& p)
@@ -66,8 +62,8 @@ PDE_CouplingFlux::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
   auto& matrices = local_op_->matrices;
   AMANZI_ASSERT(matrices.size() == K_->size());
 
-  WhetStone::DenseMatrix Acell;
-  Acell.Reshape(1, 1);
+  WhetStone::DenseMatrix<> Acell;
+  Acell.reshape(1, 1);
 
   for (int n = 0; n < matrices.size(); ++n) {
     Acell(0, 0) = (*K_)[n] * factor_;

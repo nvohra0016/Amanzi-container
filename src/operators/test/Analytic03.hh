@@ -36,15 +36,15 @@ class Analytic03 : public AnalyticBase {
     a2 = 1.0 / k2;
     b2 = (a1 - a2) / 4;
 
-    dim = mesh_->getSpaceDimension();
+    dim = mesh_->get_space_dimension();
   }
   ~Analytic03(){};
 
-  Amanzi::WhetStone::Tensor TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t)
+  Amanzi::WhetStone:Tensor<> TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t)
   {
     double x = p[0];
     double y = p[1];
-    Amanzi::WhetStone::Tensor K(dim, 1);
+    Amanzi::WhetStone:Tensor<> K(dim, 1);
     if (x < 0.5) {
       K(0, 0) = k1 * (2.0 + x * sin(y));
     } else {
@@ -104,14 +104,15 @@ class Analytic03 : public AnalyticBase {
   double source_exact(const Amanzi::AmanziGeometry::Point& p, double t)
   {
     double x = p[0];
+    double y = p[1];
 
-    double plaplace, kmean;
+    double plaplace, pmean, kmean;
     Amanzi::AmanziGeometry::Point pgrad(dim), kgrad(dim);
 
     kmean = (TensorDiffusivity(p, t))(0, 0);
     kgrad = ScalarTensorGradient(p, t);
 
-    pressure_exact(p, t);
+    pmean = pressure_exact(p, t);
     pgrad = gradient_exact(p, t);
 
     if (x < 0.5) {

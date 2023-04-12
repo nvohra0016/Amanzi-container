@@ -28,8 +28,8 @@
 
 
 /* *****************************************************************
-* This test diffusion solver one dimension: u(x) = x^3, K = 2.
-* **************************************************************** */
+ * This test diffusion solver one dimension: u(x) = x^3, K = 2.
+ * **************************************************************** */
 void
 MiniDiffusion1D_Constant(double bcl, int type_l, double bcr, int type_r)
 {
@@ -42,7 +42,7 @@ MiniDiffusion1D_Constant(double bcl, int type_l, double bcr, int type_r)
   for (int loop = 0; loop < 2; ++loop) {
     int ncells = (loop + 1) * 30;
     double length(1.0);
-    auto mesh = std::make_shared<WhetStone::DenseVector>(WhetStone::DenseVector(ncells + 1));
+    auto mesh = std::make_shared<WhetStone::DenseVector<>>(WhetStone::DenseVector(ncells + 1));
     // make a non-uniform mesh
     double h = length / ncells;
     for (int i = 0; i < ncells + 1; ++i) (*mesh)(i) = h * i;
@@ -56,7 +56,7 @@ MiniDiffusion1D_Constant(double bcl, int type_l, double bcr, int type_r)
       double K(2.0);
       op.Setup(K);
     } else {
-      auto K = std::make_shared<WhetStone::DenseVector>(WhetStone::DenseVector(ncells));
+      auto K = std::make_shared<WhetStone::DenseVector<>>(WhetStone::DenseVector(ncells));
       for (int i = 0; i < ncells; ++i) (*K)(i) = 2.0;
       op.Setup(K, NULL, NULL);
     }
@@ -64,7 +64,7 @@ MiniDiffusion1D_Constant(double bcl, int type_l, double bcr, int type_r)
     op.UpdateMatrices();
 
     // create right-hand side
-    WhetStone::DenseVector& rhs = op.rhs();
+    WhetStone::DenseVector<>& rhs = op.rhs();
     for (int i = 0; i < ncells; ++i) {
       double xc = op.mesh_cell_centroid(i);
       double hc = op.mesh_cell_volume(i);
@@ -75,7 +75,7 @@ MiniDiffusion1D_Constant(double bcl, int type_l, double bcr, int type_r)
     op.ApplyBCs(bcl, type_l, bcr, type_r);
 
     // solve the problem
-    WhetStone::DenseVector sol(rhs);
+    WhetStone::DenseVector<> sol(rhs);
     op.ApplyInverse(rhs, sol);
 
     // compute error
@@ -113,8 +113,8 @@ TEST(OPERATOR_MINI_DIFFUSION_CONSTANT)
 
 
 /* *****************************************************************
-* This test diffusion solver one dimension: u(x) = x^2, K(x) = x+1
-* **************************************************************** */
+ * This test diffusion solver one dimension: u(x) = x^2, K(x) = x+1
+ * **************************************************************** */
 void
 MiniDiffusion1D_Variable(double bcl, int type_l, double bcr, int type_r)
 {
@@ -127,7 +127,7 @@ MiniDiffusion1D_Variable(double bcl, int type_l, double bcr, int type_r)
   for (int loop = 0; loop < 2; ++loop) {
     int ncells = (loop + 1) * 30;
     double length(1.0);
-    auto mesh = std::make_shared<WhetStone::DenseVector>(WhetStone::DenseVector(ncells + 1));
+    auto mesh = std::make_shared<WhetStone::DenseVector<>>(WhetStone::DenseVector(ncells + 1));
     // make a non-uniform mesh
     double h = length / ncells;
     for (int i = 0; i < ncells + 1; ++i) (*mesh)(i) = h * i;
@@ -137,7 +137,7 @@ MiniDiffusion1D_Variable(double bcl, int type_l, double bcr, int type_r)
     Mini_Diffusion1D op;
     op.Init(mesh);
 
-    auto K = std::make_shared<WhetStone::DenseVector>(WhetStone::DenseVector(ncells));
+    auto K = std::make_shared<WhetStone::DenseVector<>>(WhetStone::DenseVector(ncells));
     for (int i = 0; i < ncells; ++i) {
       double xc = op.mesh_cell_centroid(i);
       (*K)(i) = xc + 1.0;
@@ -147,7 +147,7 @@ MiniDiffusion1D_Variable(double bcl, int type_l, double bcr, int type_r)
     op.UpdateMatrices();
 
     // create right-hand side
-    WhetStone::DenseVector& rhs = op.rhs();
+    WhetStone::DenseVector<>& rhs = op.rhs();
     for (int i = 0; i < ncells; ++i) {
       double xc = op.mesh_cell_centroid(i);
       double hc = op.mesh_cell_volume(i);
@@ -158,7 +158,7 @@ MiniDiffusion1D_Variable(double bcl, int type_l, double bcr, int type_r)
     op.ApplyBCs(bcl, type_l, bcr, type_r);
 
     // solve the problem
-    WhetStone::DenseVector sol(rhs);
+    WhetStone::DenseVector<> sol(rhs);
     op.ApplyInverse(rhs, sol);
 
     // compute error

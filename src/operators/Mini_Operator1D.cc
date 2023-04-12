@@ -22,39 +22,31 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Make a hard copy
-****************************************************************** */
-Mini_Operator1D::Mini_Operator1D(const Mini_Operator1D& other)
-  : mesh_(other.mesh_), diag_(other.diag_), up_(other.up_), down_(other.down_), rhs_(other.rhs_)
-{}
-
-
-/* ******************************************************************
-* Initialize 1D uniform mesh with given end-point areas and allocate
-* matrix for FV-type discretizations.
-****************************************************************** */
+ * Initialize 1D uniform mesh with given end-point areas and allocate
+ * matrix for FV-type discretizations.
+ ****************************************************************** */
 void
-Mini_Operator1D::Init(std::shared_ptr<const WhetStone::DenseVector> mesh)
+Mini_Operator1D::Init(std::shared_ptr<const WhetStone::DenseVector<>> mesh)
 {
   mesh_ = mesh;
 
   int ncells = mesh_->NumRows() - 1;
   AMANZI_ASSERT(ncells > 0);
 
-  diag_.Reshape(ncells);
-  up_.Reshape(ncells);
-  down_.Reshape(ncells);
+  diag_.reshape(ncells);
+  up_.reshape(ncells);
+  down_.reshape(ncells);
 
-  rhs_.Reshape(ncells);
-  rhs_.PutScalar(0.0);
+  rhs_.reshape(ncells);
+  rhs_.putScalar(0.0);
 }
 
 
 /* ******************************************************************
-* Update matrix and right-hand side: linear model
-****************************************************************** */
+ * Update matrix and right-hand side: linear model
+ ****************************************************************** */
 void
-Mini_Operator1D::AddAccumulationTerm(double s0, double s1, double dt, WhetStone::DenseVector& sol)
+Mini_Operator1D::AddAccumulationTerm(double s0, double s1, double dt, WhetStone::DenseVector<>& sol)
 {
   int ncells = diag_.NumRows();
   for (int i = 0; i < ncells; ++i) {
@@ -65,10 +57,10 @@ Mini_Operator1D::AddAccumulationTerm(double s0, double s1, double dt, WhetStone:
 }
 
 void
-Mini_Operator1D::AddAccumulationTerm(const WhetStone::DenseVector& s0,
-                                     const WhetStone::DenseVector& s1,
+Mini_Operator1D::AddAccumulationTerm(const WhetStone::DenseVector<>& s0,
+                                     const WhetStone::DenseVector<>& s1,
                                      double dt,
-                                     WhetStone::DenseVector& sol)
+                                     WhetStone::DenseVector<>& sol)
 {
   int ncells = diag_.NumRows();
   for (int i = 0; i < ncells; ++i) {
@@ -79,22 +71,18 @@ Mini_Operator1D::AddAccumulationTerm(const WhetStone::DenseVector& s0,
 }
 
 void
-Mini_Operator1D::AddAccumulationTerm(const WhetStone::DenseVector& s1, bool add_volume)
+Mini_Operator1D::AddAccumulationTerm(const WhetStone::DenseVector<>& s1)
 {
   int ncells = diag_.NumRows();
-  if (add_volume) {
-    for (int i = 0; i < ncells; ++i) { diag_(i) += s1(i) * mesh_cell_volume(i); }
-  } else {
-    diag_ += s1;
-  }
+  for (int i = 0; i < ncells; ++i) { diag_(i) += s1(i) * mesh_cell_volume(i); }
 }
 
 
 /* ******************************************************************
-* Matrix-vector product
-****************************************************************** */
+ * Matrix-vector product
+ ****************************************************************** */
 void
-Mini_Operator1D::Apply(const WhetStone::DenseVector& v, WhetStone::DenseVector& av)
+Mini_Operator1D::Apply(const WhetStone::DenseVector<>& v, WhetStone::DenseVector<>& av)
 {
   int ncells = diag_.NumRows();
   for (int i = 0; i < ncells; ++i) { av(i) = diag_(i) * v(i); }
@@ -104,10 +92,10 @@ Mini_Operator1D::Apply(const WhetStone::DenseVector& v, WhetStone::DenseVector& 
 
 
 /* ******************************************************************
-* Solve linear system using direct method
-****************************************************************** */
+ * Solve linear system using direct method
+ ****************************************************************** */
 void
-Mini_Operator1D::ApplyInverse(const WhetStone::DenseVector& rhs, WhetStone::DenseVector& sol)
+Mini_Operator1D::ApplyInverse(const WhetStone::DenseVector<>& rhs, WhetStone::DenseVector<>& sol)
 {
   int nrhs(1), info;
   int n = diag_.NumRows();
@@ -122,8 +110,8 @@ Mini_Operator1D::ApplyInverse(const WhetStone::DenseVector& rhs, WhetStone::Dens
 
 
 /* ******************************************************************
-* Matrix modifications
-****************************************************************** */
+ * Matrix modifications
+ ****************************************************************** */
 void
 Mini_Operator1D::GetMatrixRow(int i, double* al, double* ad, double* ar) const
 {
@@ -138,26 +126,6 @@ Mini_Operator1D::SetMatrixRow(int i, double al, double ad, double ar)
   down_(i) = al;
   diag_(i) = ad;
   up_(i) = ar;
-}
-
-
-/* ******************************************************************
-* Visualize matrix
-****************************************************************** */
-void
-Mini_Operator1D::Print(int n, const char* format)
-{
-  double zero(0.0);
-  int m = (n > 0) ? n : diag_.NumRows();
-
-  for (int i = 0; i < m; i++) {
-    for (int j = 0; j < i - 1; ++j) printf(format, zero);
-    if (i > 0) printf(format, down_(i));
-    printf(format, diag_(i));
-    if (i < diag_.NumRows() - 1) printf(format, up_(i));
-    for (int j = i + 2; j < m; ++j) printf(format, zero);
-    printf("\n");
-  }
 }
 
 } // namespace Operators

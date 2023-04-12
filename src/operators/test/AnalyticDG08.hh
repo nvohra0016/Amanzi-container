@@ -36,7 +36,7 @@ class AnalyticDG08 : public AnalyticDGBase {
   virtual Amanzi::WhetStone::Tensor
   Tensor(const Amanzi::AmanziGeometry::Point& p, double t) override
   {
-    Amanzi::WhetStone::Tensor K(2, 1);
+    Amanzi::WhetStone:Tensor<> K(2, 1);
     K(0, 0) = 1.0;
     return K;
   }
@@ -44,9 +44,9 @@ class AnalyticDG08 : public AnalyticDGBase {
   // -- solution
   virtual void SolutionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& sol) override
+                              Amanzi::WhetStone::Polynomial<>& sol) override
   {
-    sol.Reshape(d_, order_, true);
+    sol.reshape(d_, order_, true);
     sol.set_origin(p);
 
     double tol(1e-5), x0, y0, dx, dy, sn(std::sin(t)), cs(std::cos(t));
@@ -87,9 +87,9 @@ class AnalyticDG08 : public AnalyticDGBase {
   // -- accumulation
   virtual void AccumulationTaylor(const Amanzi::AmanziGeometry::Point& p,
                                   double t,
-                                  Amanzi::WhetStone::Polynomial& a) override
+                                  Amanzi::WhetStone::Polynomial<>& a) override
   {
-    a.Reshape(d_, 0, true);
+    a.reshape(d_, 0, true);
     a(0, 0) = 1.0;
     a.set_origin(p);
   }
@@ -101,7 +101,7 @@ class AnalyticDG08 : public AnalyticDGBase {
   {
     v.resize(d_);
     for (int i = 0; i < d_; ++i) {
-      v[i].Reshape(d_, 1, true);
+      v[i].reshape(d_, 1, true);
       v[i].set_origin(p);
     }
     v[0](0, 0) = 0.5 - p[1];
@@ -114,18 +114,18 @@ class AnalyticDG08 : public AnalyticDGBase {
   // -- reaction
   virtual void ReactionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& r) override
+                              Amanzi::WhetStone::Polynomial<>& r) override
   {
-    r.Reshape(d_, 0, true);
+    r.reshape(d_, 0, true);
     r.set_origin(p);
   }
 
   // -- source term
   virtual void SourceTaylor(const Amanzi::AmanziGeometry::Point& p,
                             double t,
-                            Amanzi::WhetStone::Polynomial& src) override
+                            Amanzi::WhetStone::Polynomial<>& src) override
   {
-    src.Reshape(d_, 0, true);
+    src.reshape(d_, 0, true);
     src.set_origin(p);
   }
 
@@ -135,10 +135,10 @@ class AnalyticDG08 : public AnalyticDGBase {
 
 
 /* ******************************************************************
-* Distance function for counter clockwise rotated notched circle.
-* Assumptions: (a) circle center is at point (0, 0); (b) distance is
-* positive inside notched circle.
-****************************************************************** */
+ * Distance function for counter clockwise rotated notched circle.
+ * Assumptions: (a) circle center is at point (0, 0); (b) distance is
+ * positive inside notched circle.
+ ****************************************************************** */
 double
 AnalyticDG08::DistanceNotchedCircle_(double x0, double y0, double sn, double cs)
 {

@@ -10,13 +10,9 @@
 
 #pragma once
 
-#include "MeshCache.hh"
-
-namespace Amanzi {
-namespace AmanziMesh {
-
-using Mesh = MeshCache<MemSpace_kind::HOST>;
-
-} // namespace AmanziMesh
-} // namespace Amanzi
+#include "AmanziMap.hh"
+#include "MeshCache_decl.hh"
+#include "Mesh_Algorithms_decl.hh"
+#include "MeshCache_impl.hh"
+#include "Mesh_Algorithms_impl.hh"
 

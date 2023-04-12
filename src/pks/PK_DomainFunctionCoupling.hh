@@ -57,7 +57,6 @@ face f) is shared by two (resp. one) space cells.
 #include <vector>
 
 // TPLs
-#include "Epetra_Vector.h"
 #include "Teuchos_RCP.hpp"
 
 // Amanzi
@@ -219,8 +218,8 @@ PK_DomainFunctionCoupling<FunctionBase>::Compute(double t0, double t1)
 
   if (submodel_ == "field" || submodel_ == "conserved quantity") {
     if (mesh_->getSpaceDimension() == mesh_->getManifoldDimension() && reverse_map_.size() == 0) {
-      const Epetra_Map& cell_map = mesh_out_->getMap(AmanziMesh::Entity_kind::CELL,true);
-      for (int c = 0; c < cell_map.NumMyElements(); ++c) {
+      auto cell_map = mesh_out_->getMap(AmanziMesh::Entity_kind::CELL,true);
+      for (int c = 0; c < cell_map.getNumLocalElements(); ++c) {
         AmanziMesh::Entity_ID f = mesh_out_->getEntityParent(AmanziMesh::Entity_kind::CELL, c);
         reverse_map_[f] = c;
       }

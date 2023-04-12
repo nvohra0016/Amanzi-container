@@ -19,7 +19,7 @@
 #ifndef AMANZI_OPERATOR_ANALYTIC_NONLINEAR_BASE_HH_
 #define AMANZI_OPERATOR_ANALYTIC_NONLINEAR_BASE_HH_
 
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 
 class AnalyticNonlinearCoupledBase {
  public:
@@ -30,27 +30,27 @@ class AnalyticNonlinearCoupledBase {
   virtual bool isBlock(int i, int j) = 0;
 
   // -- diffusion tensor T
-  virtual Amanzi::WhetStone::Tensor Tensor00(const Amanzi::AmanziGeometry::Point& p, double t)
+  virtual Amanzi::WhetStone:Tensor<> Tensor00(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K(2, 1);
+    Amanzi::WhetStone:Tensor<> K(2, 1);
     K(0, 0) = 1.0;
     return K;
   }
-  virtual Amanzi::WhetStone::Tensor Tensor01(const Amanzi::AmanziGeometry::Point& p, double t)
+  virtual Amanzi::WhetStone:Tensor<> Tensor01(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K(2, 1);
+    Amanzi::WhetStone:Tensor<> K(2, 1);
     K(0, 0) = 1.0;
     return K;
   }
-  virtual Amanzi::WhetStone::Tensor Tensor10(const Amanzi::AmanziGeometry::Point& p, double t)
+  virtual Amanzi::WhetStone:Tensor<> Tensor10(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K(2, 1);
+    Amanzi::WhetStone:Tensor<> K(2, 1);
     K(0, 0) = 1.0;
     return K;
   }
-  virtual Amanzi::WhetStone::Tensor Tensor11(const Amanzi::AmanziGeometry::Point& p, double t)
+  virtual Amanzi::WhetStone:Tensor<> Tensor11(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K(2, 1);
+    Amanzi::WhetStone:Tensor<> K(2, 1);
     K(0, 0) = 1.0;
     return K;
   }
@@ -89,7 +89,7 @@ class AnalyticNonlinearCoupledBase {
   virtual Amanzi::AmanziGeometry::Point
   velocity_exact0(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K = Tensor00(p, t);
+    Amanzi::WhetStone:Tensor<> K = Tensor00(p, t);
     Amanzi::AmanziGeometry::Point g = gradient_exact0(p, t);
     double u = exact0(p, t);
     double v = exact1(p, t);
@@ -99,7 +99,7 @@ class AnalyticNonlinearCoupledBase {
   virtual Amanzi::AmanziGeometry::Point
   velocity_exact1(const Amanzi::AmanziGeometry::Point& p, double t)
   {
-    Amanzi::WhetStone::Tensor K = Tensor11(p, t);
+    Amanzi::WhetStone:Tensor<> K = Tensor11(p, t);
     Amanzi::AmanziGeometry::Point g = gradient_exact1(p, t);
     double u = exact0(p, t);
     double v = exact1(p, t);
@@ -123,10 +123,10 @@ class AnalyticNonlinearCoupledBase {
     int ncells =
       mesh_->getNumEntities(Amanzi::AmanziMesh::Entity_kind::CELL, Amanzi::AmanziMesh::Parallel_kind::OWNED);
     for (int c = 0; c < ncells; c++) {
-      const Amanzi::AmanziGeometry::Point& xc = mesh_->getCellCentroid(c);
+      const Amanzi::AmanziGeometry::Point& xc = mesh_->getCellCentroid(c)
       double u_tmp = exact0(xc, t);
       double v_tmp = exact1(xc, t);
-      double volume = mesh_->getCellVolume(c);
+      double volume = mesh_->getCellVolume(c)
 
       // std::cout << c << " " << tmp << " " << p[0][c] << std::endl;
       l2_err += std::pow(u_tmp - u[0][c], 2.0) * volume;
@@ -138,11 +138,11 @@ class AnalyticNonlinearCoupledBase {
     }
 #ifdef HAVE_MPI
     double tmp = pnorm;
-    mesh_->getComm()->SumAll(&tmp, &pnorm, 1);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &pnorm);
     tmp = l2_err;
-    mesh_->getComm()->SumAll(&tmp, &l2_err, 1);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &l2_err);
     tmp = inf_err;
-    mesh_->getComm()->MaxAll(&tmp, &inf_err, 1);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_MAX, 1,&tmp, &inf_err);
 #endif
     pnorm = sqrt(pnorm);
     l2_err = sqrt(l2_err);
@@ -162,9 +162,9 @@ class AnalyticNonlinearCoupledBase {
     int nfaces =
       mesh_->getNumEntities(Amanzi::AmanziMesh::Entity_kind::FACE, Amanzi::AmanziMesh::Parallel_kind::OWNED);
     for (int f = 0; f < nfaces; f++) {
-      double area = mesh_->getFaceArea(f);
-      const Amanzi::AmanziGeometry::Point& normal = mesh_->getFaceNormal(f);
-      const Amanzi::AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f);
+      double area = mesh_->getFaceArea(f)
+      const Amanzi::AmanziGeometry::Point& normal = mesh_->getFaceNormal(f)
+      const Amanzi::AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f)
       const Amanzi::AmanziGeometry::Point& u_velocity = velocity_exact0(xf, t);
       const Amanzi::AmanziGeometry::Point& v_velocity = velocity_exact1(xf, t);
       double u_tmp = u_velocity * normal;
@@ -180,11 +180,11 @@ class AnalyticNonlinearCoupledBase {
     }
 #ifdef HAVE_MPI
     double tmp = qnorm;
-    mesh_->getComm()->SumAll(&tmp, &qnorm, 1);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &qnorm);
     tmp = l2_err;
-    mesh_->getComm()->SumAll(&tmp, &l2_err, 1);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &l2_err);
     tmp = inf_err;
-    mesh_->getComm()->MaxAll(&tmp, &inf_err, 1);
+    Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_MAX, 1,&tmp, &inf_err);
 #endif
     qnorm = sqrt(qnorm);
     l2_err = sqrt(l2_err);

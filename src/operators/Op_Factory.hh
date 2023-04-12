@@ -8,11 +8,6 @@
 */
 
 //! Helper factory for storing Ops in State
-/*
-  Operators
-
-*/
-
 #ifndef AMANZI_OP_FACTORY_HH_
 #define AMANZI_OP_FACTORY_HH_
 
@@ -26,7 +21,7 @@ namespace Operators {
 
 class Op_Factory {
  public:
-  Op_Factory(){};
+  Op_Factory() {}
 
   void set_mesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) { mesh_ = mesh; }
   Teuchos::RCP<const AmanziMesh::Mesh> mesh() const { return mesh_; }
@@ -61,11 +56,14 @@ class Op_Factory {
     } else if (schema_row_.OldSchema() == (OPERATOR_SCHEMA_BASE_FACE | OPERATOR_SCHEMA_DOFS_CELL)) {
       return Teuchos::rcp(new Op_Face_Cell(name_, mesh_));
     } else {
-      Errors::Message message("Unimeplemented Op Schema requested in Op_Factory");
-      throw(message);
+      std::stringstream message;
+      message << "Unimeplemented Op Schema: \"" << schema_row_ << "\" requested in Op_Factory";
+      Errors::Message msg(message.str());
+      throw(msg);
     }
     return Teuchos::null;
   }
+
 
  protected:
   Teuchos::RCP<const AmanziMesh::Mesh> mesh_;
@@ -75,5 +73,6 @@ class Op_Factory {
 
 } // namespace Operators
 } // namespace Amanzi
+
 
 #endif

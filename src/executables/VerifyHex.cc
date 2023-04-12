@@ -90,10 +90,10 @@ dump_output(const int& me, Amanzi::AmanziMesh::Mesh& mesh, const std::string& fi
   viz_output->createMeshFile(Teuchos::rcp(&mesh), filenameout);
   viz_output->createDataFile(filenameout);
 
-  const Epetra_Map& cmap(mesh.getMap(Amanzi::AmanziMesh::Entity_kind::CELL,false));
-  Epetra_Vector part(cmap);
-  int nmycell(cmap.NumMyElements());
+  auto cmap = mesh.getMap(Amanzi::AmanziMesh::Entity_kind::CELL,false);
+  int nmycell(cmap->getLocalNumElements();
   std::vector<int> myidx(nmycell, 0);
+  Vector_type part(cmap);
 
   viz_output->createTimestep(0.0, 0, "");
 
@@ -111,7 +111,7 @@ dump_output(const int& me, Amanzi::AmanziMesh::Mesh& mesh, const std::string& fi
   //      i != setids.end(); ++i) {
   //   Amanzi::AmanziMesh::Entity_ID_List gids;
   //   mesh.getSetEntities(*i, Amanzi::AmanziMesh::Entity_kind::CELL,
-  //                          Amanzi::AmanziMesh::Parallel_type::OWNED, &gids);
+  //                          Amanzi::AmanziMesh::Parallel_kind::OWNED, &gids);
   //   for (Amanzi::AmanziMesh::Entity_ID_List::const_iterator g = gids.begin();
   //        g != gids.end(); ++g) {
   //     int lidx(*g);

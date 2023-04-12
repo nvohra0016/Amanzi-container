@@ -14,32 +14,20 @@
 */
 
 #include "errors.hh"
-
-#include "Mesh_Algorithms.hh"
-#include "WhetStoneDefs.hh"
-
-#include "SchemaUtils.hh"
-#include "ParallelCommunication.hh"
+#include "AmanziComm.hh"
 #include "PDE_HelperDiscretization.hh"
 
 namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Simple constructors.
-****************************************************************** */
+ * Simple constructors.
+ ****************************************************************** */
 PDE_HelperDiscretization::PDE_HelperDiscretization(const Teuchos::RCP<Operator>& global_op)
-  : global_op_(global_op)
+  : PDE_HelperDiscretization(global_op->getMesh())
 {
-  if (global_op == Teuchos::null) {
-    Errors::Message msg("PDE_HelperDiscretization: Constructor received null global operator");
-    Exceptions::amanzi_throw(msg);
-  }
-
-  mesh_ = global_op_->Mesh();
-  PopulateDimensions_();
+  global_op_ = global_op;
 }
-
 
 PDE_HelperDiscretization::PDE_HelperDiscretization(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
   : mesh_(mesh)
@@ -48,16 +36,9 @@ PDE_HelperDiscretization::PDE_HelperDiscretization(const Teuchos::RCP<const Aman
 }
 
 
-PDE_HelperDiscretization::PDE_HelperDiscretization(const Teuchos::RCP<AmanziMesh::Mesh>& mesh)
-  : mesh_(mesh)
-{
-  PopulateDimensions_();
-}
-
-
 /* ******************************************************************
-* Supporting private routines.
-****************************************************************** */
+ * Supporting private routines.
+ ****************************************************************** */
 void
 PDE_HelperDiscretization::PopulateDimensions_()
 {
@@ -69,7 +50,7 @@ PDE_HelperDiscretization::PopulateDimensions_()
   nfaces_wghost = mesh_->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
   nnodes_wghost = mesh_->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
 
-  if (mesh_->hasEdges()) {
+  if (mesh_->valid_edges()) {
     nedges_owned = mesh_->getNumEntities(AmanziMesh::Entity_kind::EDGE, AmanziMesh::Parallel_kind::OWNED);
     nedges_wghost = mesh_->getNumEntities(AmanziMesh::Entity_kind::EDGE, AmanziMesh::Parallel_kind::ALL);
   }
@@ -77,8 +58,8 @@ PDE_HelperDiscretization::PopulateDimensions_()
 
 
 /* ******************************************************************
-* Replace container of local matrices with another container.
-****************************************************************** */
+ * Replace container of local matrices with another container.
+ ****************************************************************** */
 void
 PDE_HelperDiscretization::set_local_op(const Teuchos::RCP<Op>& op)
 {
@@ -98,57 +79,22 @@ PDE_HelperDiscretization::set_local_op(const Teuchos::RCP<Op>& op)
   local_op_ = op;
 }
 
-
-/* ******************************************************************
-* Apply boundary conditions to the local matrices.
-* NOTE: We always zero-out matrix rows for essential test BCs.
-****************************************************************** */
+// boundary conditions (BC) require information on test and
+// trial spaces. For a single PDE, these BCs could be the same.
 void
-PDE_HelperDiscretization::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
+PDE_HelperDiscretization::SetBCs(const Teuchos::RCP<const BCs>& bc_trial,
+                                 const Teuchos::RCP<const BCs>& bc_test)
 {
-  auto base = global_op_->schema_row().get_base();
+  bcs_trial_.clear();
+  bcs_test_.clear();
 
-  for (auto bc : bcs_trial_) {
-    bool missing(true);
-
-    if (bc->type() == WhetStone::DOF_Type::SCALAR ||
-        bc->type() == WhetStone::DOF_Type::NORMAL_COMPONENT ||
-        bc->type() == WhetStone::DOF_Type::MOMENT) {
-      if (base == AmanziMesh::Entity_kind::CELL) {
-        ApplyBCs_Cell_Scalar_(*bc, local_op_, primary, eliminate, essential_eqn);
-        missing = false;
-      }
-    } else if (bc->type() == WhetStone::DOF_Type::POINT) {
-      if (base == AmanziMesh::Entity_kind::CELL) {
-        ApplyBCs_Cell_Point_(*bc, local_op_, primary, eliminate, essential_eqn);
-        missing = false;
-      } else if (base == AmanziMesh::Entity_kind::NODE) {
-        missing = false; // for testing
-      }
-    } else if (bc->type() == WhetStone::DOF_Type::VECTOR) {
-      if (base == AmanziMesh::Entity_kind::CELL) {
-        ApplyBCs_Cell_Vector_(*bc, local_op_, primary, eliminate, essential_eqn);
-        missing = false;
-      }
-    }
-
-    if (missing) {
-      Errors::Message msg("PDE_HelperDiscretization: Unsupported boundary condition.\n");
-      Exceptions::amanzi_throw(msg);
-    }
-  }
+  bcs_trial_.emplace_back(bc_trial);
+  bcs_test_.emplace_back(bc_test);
 }
 
-
-/* ******************************************************************
-* Apply BCs of scalar type.
-****************************************************************** */
 void
-PDE_HelperDiscretization::ApplyBCs_Cell_Scalar_(const BCs& bc,
-                                                Teuchos::RCP<Op> op,
-                                                bool primary,
-                                                bool eliminate,
-                                                bool essential_eqn)
+PDE_HelperDiscretization::AddBCs(const Teuchos::RCP<const BCs>& bc_trial,
+                                 const Teuchos::RCP<const BCs>& bc_test)
 {
   const std::vector<int>& bc_model = bc.bc_model();
   const std::vector<double>& bc_value = bc.bc_value();

@@ -27,6 +27,7 @@
 // Amanzi
 #include "GMVMesh.hh"
 #include "CompositeVector.hh"
+#include "LinearOperatorFactory.hh"
 #include "MeshFactory.hh"
 #include "NumericalIntegration.hh"
 #include "Tensor.hh"
@@ -41,8 +42,8 @@
 
 
 /* *****************************************************************
-* This test diffusion solver with full tensor and source term.
-* **************************************************************** */
+ * This test diffusion solver with full tensor and source term.
+ * **************************************************************** */
 class MyFunction : public Amanzi::WhetStone::WhetStoneFunction {
  public:
   MyFunction(AnalyticDG02* ana) : ana_(ana){};
@@ -68,7 +69,7 @@ OperatorDiffusionDG(std::string solver_name,
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0)
     std::cout << "\nTest: " << dim << "D elliptic problem, dG method, solver: " << solver_name
@@ -81,27 +82,24 @@ OperatorDiffusionDG(std::string solver_name,
 
   // create a mesh framework
   MeshFactory meshfactory(comm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
   RCP<const Mesh> mesh;
   if (dim == 2) {
     // mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 1, 2);
     mesh = meshfactory.create("test/median7x8_filtered.exo");
     // mesh = meshfactory.create("test/triangular8_clockwise.exo");
   } else {
-    auto fac_list = Teuchos::rcp(new Teuchos::ParameterList());
-    fac_list->set<bool>("request edges", true);  
-    fac_list->set<bool>("request faces", true);
-    MeshFactory meshfactory(comm, Teuchos::null,  fac_list);
-    mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2, 3, 3);
+    mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2, 3, 3, true, true);
   }
 
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+  int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int ncells_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
   // modify diffusion coefficient
-  int d = mesh->getSpaceDimension();
-  auto Kc = std::make_shared<std::vector<WhetStone::Tensor>>();
+  int d = mesh->get_space_dimension();
+  auto Kc = std::make_shared<std::vector<WhetStone:Tensor<>>>();
   auto Kc_poly = std::make_shared<std::vector<WhetStone::MatrixPolynomial>>();
   auto Kc_func = std::make_shared<std::vector<WhetStone::WhetStoneFunction*>>();
   auto Kf = std::make_shared<std::vector<double>>();
@@ -110,8 +108,8 @@ OperatorDiffusionDG(std::string solver_name,
   MyFunction func(&ana);
 
   for (int c = 0; c < ncells_wghost; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Ktmp = ana.Tensor(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Ktmp = ana.Tensor(xc, 0.0);
     Kc->push_back(Ktmp);
 
     WhetStone::MatrixPolynomial Kpoly(d, d, d, 0);
@@ -124,7 +122,7 @@ OperatorDiffusionDG(std::string solver_name,
   }
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    double area = mesh->getFaceArea(f);
+    double area = mesh->getFaceArea(f)
     Kf->push_back(40.0 / area);
   }
 
@@ -138,14 +136,14 @@ OperatorDiffusionDG(std::string solver_name,
   std::vector<int>& bc_model = bc->bc_model();
   std::vector<std::vector<double>>& bc_value = bc->bc_value_vector(nk);
 
-  WhetStone::Polynomial coefs;
-  WhetStone::DenseVector data;
+  WhetStone::Polynomial<> coefs;
+  WhetStone::DenseVector<> data;
 
   const auto& fmap = mesh->getMap(AmanziMesh::Entity_kind::FACE,true);
-  const auto& bmap = mesh->getMap(AmanziMesh::Entity_kind::BOUNDARY_FACE,true);
+  const auto& bmap = mesh->exterior_face_map(true);
   for (int bf = 0; bf < bmap.NumMyElements(); ++bf) {
-    int f = fmap.LID(bmap.GID(bf));
-    const Point& xf = mesh->getFaceCentroid(f);
+    int f = fmap.getLocalElement(bmap.getGlobalElement(bf));
+    const Point& xf = mesh->getFaceCentroid(f)
 
     if (fabs(xf[0]) < 1e-6 || fabs(xf[0] - 1.0) < 1e-6 || fabs(xf[1]) < 1e-6) {
       bc_model[f] = OPERATOR_BC_DIRICHLET;
@@ -177,23 +175,24 @@ OperatorDiffusionDG(std::string solver_name,
   CompositeVector src(cvs);
   Epetra_MultiVector& src_c = *src.ViewComponent("cell");
 
-  WhetStone::Polynomial pc(dim, order);
-  WhetStone::NumericalIntegration numi(mesh);
+  WhetStone::Polynomial<> pc(dim, order);
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh);
 
   for (int c = 0; c < ncells; ++c) {
-    const Point& xc = mesh->getCellCentroid(c);
+    const Point& xc = mesh->getCellCentroid(c)
+    double volume = mesh->getCellVolume(c)
 
     ana.SourceTaylor(xc, 0.0, coefs);
     coefs.set_origin(xc);
 
     // -- calculate moments in natural basis
-    data.Reshape(pc.size());
+    data.reshape(pc.size());
     for (auto it = pc.begin(); it < pc.end(); ++it) {
       int n = it.PolynomialPosition();
 
-      WhetStone::Polynomial cmono(dim, it.multi_index(), 1.0);
+      WhetStone::Polynomial<> cmono(dim, it.multi_index(), 1.0);
       cmono.set_origin(xc);
-      WhetStone::Polynomial tmp = coefs * cmono;
+      WhetStone::Polynomial<> tmp = coefs * cmono;
 
       data(n) = numi.IntegratePolynomialCell(c, tmp);
     }
@@ -216,33 +215,35 @@ OperatorDiffusionDG(std::string solver_name,
 
   // apply BCs (primary=true, eliminate=true) and assemble
   op->ApplyBCs(true, true, true);
-
-  // create preconditoner using the base operator class
-  global_op->set_inverse_parameters("Hypre AMG", plist.sublist("preconditioners"));
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
 
   // Test SPD properties of the matrix.
   VerificationCV ver(global_op);
   ver.CheckMatrixSPD(false, true, 1);
 
-  // create preconditoner with iterative method
-  global_op->set_inverse_parameters(
-    "Hypre AMG", plist.sublist("preconditioners"), solver_name, plist.sublist("solvers"));
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  // create preconditoner using the base operator class
+  ParameterList slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
+
+  // solve the problem
+  ParameterList lop_list = plist.sublist("solvers");
+  AmanziSolvers::LinearOperatorFactory<Operator, CompositeVector, CompositeVectorSpace>
+    solverfactory;
+  auto solver = solverfactory.Create(solver_name, lop_list, global_op, global_op);
 
   CompositeVector& rhs = *global_op->rhs();
   CompositeVector solution(rhs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
-  global_op->ApplyInverse(rhs, solution);
+  int ierr = solver->ApplyInverse(rhs, solution);
 
   ver.CheckResidual(solution, 1.0e-11);
 
   if (MyPID == 0) {
-    std::cout << "pressure solver (pcg): ||r||=" << global_op->residual()
-              << " itr=" << global_op->num_itrs() << " code=" << global_op->returned_code()
+    std::cout << "pressure solver (pcg): ||r||=" << solver->residual()
+              << " itr=" << solver->num_itrs() << " code=" << solver->returned_code()
               << " dofs=" << global_op->A()->NumGlobalRows() << std::endl;
 
     // visualization
@@ -255,7 +256,7 @@ OperatorDiffusionDG(std::string solver_name,
     GMV::close_data_file();
   }
 
-  CHECK(global_op->num_itrs() < 200);
+  CHECK(solver->num_itrs() < 200);
 
   // compute pressure error
   solution.ScatterMasterToGhosted();
@@ -266,7 +267,7 @@ OperatorDiffusionDG(std::string solver_name,
 
   if (MyPID == 0) {
     printf(
-      "Mean:     L2(p)=%9.6f  Inf(p)=%9.6f  itr=%3d\n", pl2_mean, pinf_mean, global_op->num_itrs());
+      "Mean:     L2(p)=%9.6f  Inf(p)=%9.6f  itr=%3d\n", pl2_mean, pinf_mean, solver->num_itrs());
     printf("Total:    L2(p)=%9.6f  Inf(p)=%9.6f\n", pl2_err, pinf_err);
     printf("Integral: L2(p)=%9.6f\n", pl2_int);
 

@@ -19,7 +19,7 @@
 #include <iterator>
 #include <vector>
 
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 #include "Point.hh"
 #include "errors.hh"
 
@@ -30,53 +30,56 @@
 namespace Amanzi {
 namespace WhetStone {
 
-RegisteredFactory<MFD3D_Diffusion_Edge> MFD3D_Diffusion_Edge::reg_("diffusion edge");
+RegisteredFactory<MFD3D_Diffusion_Edge> MFD3D_Diffusion_Edge::factory_("diffusion edge");
 
 /* ******************************************************************
-* Consistency condition for stiffness matrix in heat conduction.
-* Only the upper triangular part of Ac is calculated.
-* The degrees of freedom are at nodes.
-****************************************************************** */
+ * Consistency condition for stiffness matrix in heat conduction.
+ * Only the upper triangular part of Ac is calculated.
+ * The degrees of freedom are at nodes.
+ ****************************************************************** */
 int
-MFD3D_Diffusion_Edge::H1consistency(int c, const Tensor& K, DenseMatrix& N, DenseMatrix& Ac)
+MFD3D_Diffusion_Edge::H1consistency(int c, constTensor<>& K, DenseMatrix<>& N, DenseMatrix<>& Ac)
 {
-  const auto& [faces, dirs] = mesh_->getCellFacesAndDirections(c);
+  Entity_ID_List faces, edges, fedges;
+  std::vector<int> dirs, edirs, map;
+
+  mesh_->getCellFacesAndDirs(c, faces, &dirs);
   int nfaces = faces.size();
 
-  const auto& edges = mesh_->getCellEdges(c);
+  mesh_->getCellEdges(c, edges);
   int nedges = edges.size();
 
-  N.Reshape(nedges, d_ + 1);
-  Ac.Reshape(nedges, nedges);
+  N.reshape(nedges, d_ + 1);
+  Ac.reshape(nedges, nedges);
 
-  const AmanziGeometry::Point& xc = mesh_->getCellCentroid(c);
-  double volume = mesh_->getCellVolume(c);
+  const AmanziGeometry::Point& xc = mesh_->getCellCentroid(c)
+  double volume = mesh_->getCellVolume(c)
 
   // calculate matrix R (we re-use matrix N)
-  if (d_ == 3) N.PutScalar(0.0);
+  if (d_ == 3) N.putScalar(0.0);
 
   for (int n = 0; n < nfaces; ++n) {
     int f = faces[n];
-    const AmanziGeometry::Point& normal = mesh_->getFaceNormal(f);
+    const AmanziGeometry::Point& normal = mesh_->getFaceNormal(f)
 
     if (d_ == 2) {
       for (int k = 0; k < d_; k++) N(n, k) = normal[k] * dirs[n];
     } else {
-      const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f);
-      double area = mesh_->getFaceArea(f);
+      const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f)
+      double area = mesh_->getFaceArea(f)
 
-      auto [fedges, edirs] = mesh_->getFaceEdgesAndDirections(f);
-      auto map = mesh_->getFaceCellEdgeMap(f, c);
+      mesh_->getFaceEdgesAndDirs(f, fedges, &edirs);
+      mesh_->face_to_cell_edge_map(f, c, &map);
       int nfedges = fedges.size();
 
       int e0 = fedges[0];
-      const AmanziGeometry::Point& xe0 = mesh_->getEdgeCentroid(e0);
+      const AmanziGeometry::Point& xe0 = mesh_.getEdgeCentroid(e0);
 
       for (int k = 0; k < d_; ++k) N(map[0], k) += normal[k] * dirs[n];
 
       for (int m = 0; m < nfedges; ++m) {
         int e = fedges[m];
-        const AmanziGeometry::Point& tau = mesh_->getEdgeVector(e);
+        const AmanziGeometry::Point& tau = mesh_->getEdgeVector(e)
 
         double tmp = ((tau ^ normal) * (xf - xe0)) * dirs[n] * edirs[m] / area;
 
@@ -101,33 +104,33 @@ MFD3D_Diffusion_Edge::H1consistency(int c, const Tensor& K, DenseMatrix& N, Dens
   // calculate N
   for (int n = 0; n < nedges; n++) {
     int e = edges[n];
-    const AmanziGeometry::Point& xe = mesh_->getEdgeCentroid(e);
+    const AmanziGeometry::Point& xe = mesh_.getEdgeCentroid(e);
     for (int k = 0; k < d_; k++) N(n, k) = xe[k] - xc[k];
     N(n, d_) = 1.0;
   }
 
   // Internal verification
-  // DenseMatrix NtR(d_ + 1, d_ + 1);
+  // DenseMatrix<> NtR(d_ + 1, d_ + 1);
   // NtR.Multiply(N, R, true);
   // std::cout << NtR << std::endl;
 
-  return 0;
+  return WHETSTONE_ELEMENTAL_MATRIX_OK;
 }
 
 
 /* ******************************************************************
-* Stiffness matrix: the standard algorithm.
-****************************************************************** */
+ * Stiffness matrix: the standard algorithm.
+ ****************************************************************** */
 int
-MFD3D_Diffusion_Edge::StiffnessMatrix(int c, const Tensor& K, DenseMatrix& A)
+MFD3D_Diffusion_Edge::StiffnessMatrix(int c, constTensor<>& K, DenseMatrix<>& A)
 {
-  DenseMatrix N;
+  DenseMatrix<> N;
 
   int ok = H1consistency(c, K, N, A);
   if (ok) return ok;
 
   StabilityScalar_(N, A);
-  return 0;
+  return WHETSTONE_ELEMENTAL_MATRIX_OK;
 }
 
 } // namespace WhetStone

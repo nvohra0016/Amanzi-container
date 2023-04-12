@@ -29,12 +29,12 @@
 #include "PDE_Diffusion.hh"
 
 /*!
-
 Additional options available only for the MFD family of discretizations include:
 
-* `"nonlinear coefficient`" ``[string]`` specifies a method for treating nonlinear
-  diffusion coefficient, if any. Available options are `"none`", `"upwind:
-  face`", `"divk: cell-face`" (default), `"divk: face`", `"standard: cell`",
+* `"nonlinear coefficient`" ``[string]`` specifies a method for treating
+nonlinear diffusion coefficient, if any. Available options are `"none`",
+`"upwind: face`", `"divk: cell-face`" (default), `"divk: face`", `"standard:
+cell`",
   `"divk: cell-face-twin`" and `"divk: cell-grad-face-twin`".  Symmetry
   preserving methods are the divk-family of methods and the classical
   cell-centered method (`"standard: cell`"). The first part of the name
@@ -47,8 +47,9 @@ Additional options available only for the MFD family of discretizations include:
   satisfy all a priori conditions.  This is typically `"mfd: default`", and is
   used only when an MFD `"discretization primary`" is used.
 
-* `"schema`" ``[Array(string)]`` defines the operator stencil. It is a collection of
-  geometric objects.  Typically this is set by the implementation and is not provided.
+* `"schema`" ``[Array(string)]`` defines the operator stencil. It is a
+collection of geometric objects.  Typically this is set by the implementation
+and is not provided.
 
 * `"preconditioner schema`" ``[Array(string)]`` **{face,cell}** Defines the
   preconditioner stencil.  It is needed only when the default assembling
@@ -65,52 +66,46 @@ Additional options available only for the MFD family of discretizations include:
   equation in MFD by assembling and inverting the face-only system.  This is
   not currently used by any Amanzi PKs.
 
-* `"diffusion tensor`" ``[string]`` allows us to solve problems with symmetric and
-  non-symmetric (but positive definite) tensors. Available options are *symmetric*
-  (default) and *nonsymmetric*.
-
-* `"use manifold flux`"  ``[bool]`` **false** Computes the flux using algorithms
-  and data structures for manifolds or fracture networks. 
-
+* `"diffusion tensor`" ``[string]`` allows us to solve problems with symmetric
+and non-symmetric (but positive definite) tensors. Available options are
+*symmetric* (default) and *nonsymmetric*.
 */
 
 namespace Amanzi {
 namespace Operators {
 
-class PDE_DiffusionMFD : public virtual PDE_Diffusion {
+class PDE_DiffusionMFD : public PDE_Diffusion {
  public:
   PDE_DiffusionMFD(Teuchos::ParameterList& plist, const Teuchos::RCP<Operator>& global_op)
-    : PDE_Diffusion(global_op), plist_(plist), factor_(1.0), use_manifold_flux_(false)
+    : PDE_Diffusion(plist, global_op),
+      factor_(1.0),
+      transmissibility_initialized_(false),
+      bcs_applied_(false),
+      mass_matrices_initialized_(false)
   {
-    pde_type_ = PDE_DIFFUSION_MFD;
-    ParsePList_(plist);
+    ParsePList_();
   }
 
   PDE_DiffusionMFD(Teuchos::ParameterList& plist, const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : PDE_Diffusion(mesh), plist_(plist), factor_(1.0), use_manifold_flux_(false)
+    : PDE_Diffusion(plist, mesh),
+      factor_(1.0),
+      transmissibility_initialized_(false),
+      bcs_applied_(false),
+      mass_matrices_initialized_(false)
   {
-    pde_type_ = PDE_DIFFUSION_MFD;
-    ParsePList_(plist);
+    ParsePList_();
   }
 
-  PDE_DiffusionMFD(Teuchos::ParameterList& plist, const Teuchos::RCP<AmanziMesh::Mesh>& mesh)
-    : PDE_Diffusion(mesh), plist_(plist), factor_(1.0), use_manifold_flux_(false)
-  {
-    pde_type_ = PDE_DIFFUSION_MFD;
-    ParsePList_(plist);
-  }
+  virtual void Init() override;
 
-  // main virtual members for populating an operator
-  virtual void Init(Teuchos::ParameterList& plist);
-
-  virtual void
-  SetTensorCoefficient(const Teuchos::RCP<const std::vector<WhetStone::Tensor>>& K) override;
+  virtual void SetTensorCoefficient(const Teuchos::RCP<const TensorVector>& K) override;
   virtual void SetScalarCoefficient(const Teuchos::RCP<const CompositeVector>& k,
                                     const Teuchos::RCP<const CompositeVector>& dkdp) override;
 
   // -- To calculate elemetal matrices, we can use input parameters flux
-  //    and u from the previous nonlinear iteration. Otherwise, use null-pointers.
-  using PDE_HelperDiscretization::UpdateMatrices;
+  //    and u from the previous nonlinear iteration. Otherwise, use
+  //    null-pointers.
+  using PDE_Diffusion::UpdateMatrices;
   virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& flux,
                               const Teuchos::Ptr<const CompositeVector>& u) override;
 
@@ -126,29 +121,67 @@ class PDE_DiffusionMFD : public virtual PDE_Diffusion {
                                  const Teuchos::Ptr<const CompositeVector>& u,
                                  const Teuchos::Ptr<const CompositeVector>& factor) override;
 
+  virtual CompositeVectorSpace scalar_coefficient_derivative_space() const override
+  {
+    CompositeVectorSpace out;
+    out.SetMesh(mesh_);
+    out.SetGhosted();
+    if (little_k_type_ != OPERATOR_LITTLE_K_NONE) { out.AddComponent("face", AmanziMesh::Entity_kind::FACE, 1); }
+    return out;
+  }
+
+
+  // Need to be public for kokkos::parallel_for
+  void UpdateMatricesTPFA_();
+  void UpdateMatricesMixed_();
+  void UpdateMatricesNodal_();
+  void UpdateMatricesMixed_little_k_();
+  void UpdateMatricesMixedWithGrad_(const Teuchos::Ptr<const CompositeVector>& flux);
+
+
+  void AddNewtonCorrectionCell_(const Teuchos::Ptr<const CompositeVector>& flux,
+                                const Teuchos::Ptr<const CompositeVector>& u,
+                                double scalar_factor);
+
+  void AddNewtonCorrectionCell_(const Teuchos::Ptr<const CompositeVector>& flux,
+                                const Teuchos::Ptr<const CompositeVector>& u,
+                                const Teuchos::Ptr<const CompositeVector>& factor);
+
+  void Preallocate_little_k_(bool init = false);
+
   // modify matrix due to boundary conditions
-  //    primary=true indicates that the operator updates both matrix and right-hand
+  //    primary=true indicates that the operator updates both matrix and
+  //    right-hand
   //      side using BC data. If primary=false, only matrix is changed.
   //    eliminate=true indicates that we eliminate essential BCs for a trial
   //      function, i.e. zeros go in the corresponding matrix columns and
   //      right-hand side is modified using BC values. This is the optional
   //      parameter that enforces symmetry for a symmetric tree operators.
-  //    essential_eqn=true indicates that the operator places a positive number on
+  //    essential_eqn=true indicates that the operator places a positive number
+  //    on
   //      the main matrix diagonal for the case of essential BCs. This is the
   //      implementation trick.
   virtual void ApplyBCs(bool primary, bool eliminate, bool essential_eqn) override;
+  virtual void ApplyBCsJacobian() override;
+
+  void ApplyBCs_Mixed_(const Teuchos::Ptr<const BCs>& bc_trial,
+                       const Teuchos::Ptr<const BCs>& bc_test,
+                       bool primary,
+                       bool eliminate,
+                       bool essential_eqn);
 
   // -- by breaking p-lambda coupling.
   virtual void ModifyMatrices(const CompositeVector& u) override;
 
-  // -- by rescaling mass and stiffness matrices.
+  // -- by rescaling mass matrices.
   virtual void ScaleMassMatrices(double s) override;
-  virtual void ScaleMatricesColumns(const CompositeVector& s) override{};
 
   // main virtual members after solving the problem
   // -- calculate the flux variable.
   virtual void UpdateFlux(const Teuchos::Ptr<const CompositeVector>& u,
                           const Teuchos::Ptr<CompositeVector>& flux) override;
+  virtual void UpdateFluxNonManifold(const Teuchos::Ptr<const CompositeVector>& u,
+                                     const Teuchos::Ptr<CompositeVector>& flux) override;
 
   // Developments
   // -- working with consistent faces
@@ -165,30 +198,10 @@ class PDE_DiffusionMFD : public virtual PDE_Diffusion {
   void set_factor(double factor) { factor_ = factor; }
 
  protected:
-  virtual void UpdateFluxManifold_(const Teuchos::Ptr<const CompositeVector>& u,
-                                   const Teuchos::Ptr<CompositeVector>& flux) override;
-
-  void ParsePList_(Teuchos::ParameterList& plist);
+  void ParsePList_();
   void CreateMassMatrices_();
 
-  void UpdateMatricesNodal_();
-  void UpdateMatricesTPFA_();
-  void UpdateMatricesMixed_();
-  void UpdateMatricesMixed_little_k_();
 
-  void AddNewtonCorrectionCell_(const Teuchos::Ptr<const CompositeVector>& flux,
-                                const Teuchos::Ptr<const CompositeVector>& u,
-                                double scalar_factor);
-
-  void AddNewtonCorrectionCell_(const Teuchos::Ptr<const CompositeVector>& flux,
-                                const Teuchos::Ptr<const CompositeVector>& u,
-                                const Teuchos::Ptr<const CompositeVector>& factor);
-
-  void ApplyBCs_Mixed_(const Teuchos::Ptr<const BCs>& bc_trial,
-                       const Teuchos::Ptr<const BCs>& bc_test,
-                       bool primary,
-                       bool eliminate,
-                       bool essential_eqn);
   void ApplyBCs_Cell_(const Teuchos::Ptr<const BCs>& bc_trial,
                       const Teuchos::Ptr<const BCs>& bc_test,
                       bool primary,
@@ -200,14 +213,17 @@ class PDE_DiffusionMFD : public virtual PDE_Diffusion {
                        bool eliminate,
                        bool essential_eqn);
 
+ public:
+  DenseMatrix_Vector Wff_cells_;
+  DenseVector_Vector kr_cells_;
+
  protected:
-  Teuchos::ParameterList plist_;
-  std::vector<WhetStone::DenseMatrix> Wff_cells_;
+  // std::vector<WhetStone::DenseMatrix<>> Wff_cells_;
   bool mass_matrices_initialized_;
 
   int newton_correction_;
   double factor_;
-  bool exclude_primary_terms_, use_manifold_flux_;
+  bool exclude_primary_terms_;
 
   // modifiers for flux continuity equations
   bool scaled_constraint_;
@@ -217,7 +233,10 @@ class PDE_DiffusionMFD : public virtual PDE_Diffusion {
   int nfailed_primary_;
 
   Teuchos::RCP<Operator> consistent_face_op_;
+  bool transmissibility_initialized_;
+  bool bcs_applied_;
 
+ private:
   int schema_prec_dofs_;
 };
 

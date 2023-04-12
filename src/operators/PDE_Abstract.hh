@@ -99,9 +99,10 @@ class PDE_Abstract : public PDE_HelperDiscretization {
 
   // main members
   // -- required by the interface
-  using PDE_HelperDiscretization::UpdateMatrices;
   virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
-                              const Teuchos::Ptr<const CompositeVector>& p) override;
+                              const Teuchos::Ptr<const CompositeVector>& p = Teuchos::null);
+  void UpdateMatrices() { UpdateMatrices(Teuchos::null, Teuchos::null); }
+
   // -- new interface for pre-computed data
   void UpdateMatrices(double t);
 
@@ -111,15 +112,14 @@ class PDE_Abstract : public PDE_HelperDiscretization {
   template <typename T>
   void Setup(const Teuchos::RCP<std::vector<T>>& K, bool reset);
 
-  // optional calculation of flux from potential p
-  virtual void UpdateFlux(const Teuchos::Ptr<const CompositeVector>& p,
-                          const Teuchos::Ptr<CompositeVector>& u) override{};
-
  protected:
   // available models for operator coefficient
-  Teuchos::RCP<std::vector<WhetStone::Polynomial>> Kpoly_;
+  Teuchos::RCP<std::vector<WhetStone::Polynomial<>>> Kpoly_;
   Teuchos::RCP<std::vector<WhetStone::VectorPolynomial>> Kvec_poly_;
   Teuchos::RCP<std::vector<WhetStone::VectorSpaceTimePolynomial>> Kvec_stpoly_;
+
+  Schema global_schema_row_, global_schema_col_;
+  Schema local_schema_col_, local_schema_row_;
 
  private:
   void Init_(Teuchos::ParameterList& plist);
@@ -134,40 +134,40 @@ class PDE_Abstract : public PDE_HelperDiscretization {
 
   CoefType coef_type_;
   bool static_matrices_initialized_;
-  std::vector<std::vector<WhetStone::DenseMatrix>> static_matrices_;
+  std::vector<std::vector<WhetStone::DenseMatrix<>>> static_matrices_;
 };
 
 
 /* ******************************************************************
-* Specialization of Setup
-****************************************************************** */
+ * Specialization of Setup
+ ****************************************************************** */
 template <>
 inline void
-PDE_Abstract::Setup<WhetStone::Tensor>(const Teuchos::RCP<std::vector<WhetStone::Tensor>>& K,
+PDE_Abstract::Setup<WhetStone:Tensor<>>(const Teuchos::RCP<std::vector<WhetStone:Tensor<>>>& K,
                                        bool reset)
 {
   coef_type_ = CoefType::CONSTANT;
 
   auto Kc = Teuchos::get_shared_ptr(K);
-  const auto coef = std::make_shared<CoefficientModel<WhetStone::Tensor>>(Kc);
+  const auto coef = std::make_shared<CoefficientModel<WhetStone:Tensor<>>>(Kc);
   interface_ = Teuchos::rcp(
-    new InterfaceWhetStoneMFD<WhetStone::BilinearForm, CoefficientModel<WhetStone::Tensor>>(mfd_,
+    new InterfaceWhetStoneMFD<WhetStone::BilinearForm, CoefficientModel<WhetStone:Tensor<>>>(mfd_,
                                                                                             coef));
 }
 
 template <>
 inline void
-PDE_Abstract::Setup<WhetStone::Polynomial>(
-  const Teuchos::RCP<std::vector<WhetStone::Polynomial>>& K,
+PDE_Abstract::Setup<WhetStone::Polynomial<>>(
+  const Teuchos::RCP<std::vector<WhetStone::Polynomial<>>>& K,
   bool reset)
 {
   Kpoly_ = K;
   coef_type_ = CoefType::POLYNOMIAL;
 
   auto Kc = Teuchos::get_shared_ptr(K);
-  const auto coef = std::make_shared<CoefficientModel<WhetStone::Polynomial>>(Kc);
+  const auto coef = std::make_shared<CoefficientModel<WhetStone::Polynomial<>>>(Kc);
   interface_ = Teuchos::rcp(
-    new InterfaceWhetStoneMFD<WhetStone::BilinearForm, CoefficientModel<WhetStone::Polynomial>>(
+    new InterfaceWhetStoneMFD<WhetStone::BilinearForm, CoefficientModel<WhetStone::Polynomial<>>>(
       mfd_, coef));
 }
 

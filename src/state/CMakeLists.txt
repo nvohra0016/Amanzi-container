@@ -57,8 +57,8 @@ endif(ENABLE_Silo)
 # Library: state
 #
 set(state_inc_files 
-  Checkpoint.hh
-  chemistry_data.hh 
+  StateDefs.hh
+  Debugger.hh
   data/Data.hh
   data/Data_Helpers.hh
   data/Data_Impl.hh
@@ -69,8 +69,6 @@ set(state_inc_files
   data/RecordSet.hh
   evaluators/Evaluator.hh
   evaluators/Evaluator_Factory.hh
-  evaluators/EvaluatorCellVolume.hh
-  evaluators/EvaluatorDeformingCellVolume.hh
   evaluators/EvaluatorIndependent.hh
   evaluators/EvaluatorIndependentFromFile.hh
   evaluators/EvaluatorIndependentFunction.hh
@@ -79,50 +77,53 @@ set(state_inc_files
   evaluators/EvaluatorPrimary.hh
   evaluators/EvaluatorSecondary.hh
   evaluators/EvaluatorSecondaryMonotype.hh
+  evaluators/EvaluatorSecondaryMonotypeAdditive.hh
+  evaluators/EvaluatorSecondaryMonotypeMultiplicative.hh
   evaluators/EvaluatorSecondaryMonotypeFromFunction.hh
+  evaluators/EvaluatorSecondaryMeshedQuantity.hh
+  State.hh
   IO.hh
   Observable.hh
-  StateDefs.hh
-  State.hh
-  state_evaluators_registration.hh
-  Visualization.hh
-  VisualizationDomainSet.hh
   UnstructuredObservations.hh
-  MeshInfo.hh
-  Debugger.hh)
+  Visualization.hh
+  Checkpoint.hh
+  # chemistry_data.hh 
+  # state_evaluators_registration.hh
+  )
+
+set(state_src_files
+  Debugger.cc
+  data/Record.cc
+  data/RecordSet.cc
+  data/Data_Helpers.cc
+  evaluators/Evaluator.cc
+  evaluators/Evaluator_Factory.cc
+  evaluators/EvaluatorIndependent.cc
+  evaluators/EvaluatorIndependentFromFile.cc
+  evaluators/EvaluatorIndependentFunction.cc
+  evaluators/EvaluatorIndependentConstant.cc
+  evaluators/EvaluatorPrimary.cc
+  evaluators/EvaluatorSecondary.cc
+  evaluators/EvaluatorSecondaryMonotype.cc
+  evaluators/EvaluatorSecondaryMonotypeFromFunction.cc
+  State.cc
+  IO.cc
+  Observable.cc
+  UnstructuredObservations.cc
+  Visualization.cc
+  Checkpoint.cc
+  # chemistry_data.cc
+  )  
+
+set(state_link_libs  data_structures functions mesh_functions output mesh atk ${Boost_LIBRARIES})
 
 add_amanzi_library(state 
-                   SOURCE State.cc
-                          Checkpoint.cc
-                          chemistry_data.cc
-                          evaluators/Evaluator.cc
-                          evaluators/Evaluator_Factory.cc
-                          evaluators/EvaluatorCellVolume.cc
-                          evaluators/EvaluatorDeformingCellVolume.cc
-                          evaluators/EvaluatorIndependent.cc
-                          evaluators/EvaluatorIndependentFromFile.cc
-                          evaluators/EvaluatorIndependentFunction.cc
-                          evaluators/EvaluatorIndependentConstant.cc
-                          evaluators/EvaluatorMultiplicativeReciprocal.cc
-                          evaluators/EvaluatorPrimary.cc
-                          evaluators/EvaluatorSecondary.cc
-                          evaluators/EvaluatorSecondaryMonotype.cc
-                          evaluators/EvaluatorSecondaryMonotypeFromFunction.cc
-                          IO.cc
-                          Observable.cc
-                          UnstructuredObservations.cc
-                          Visualization.cc
-                          VisualizationDomainSet.cc
-                          data/Record.cc
-                          data/RecordSet.cc
-                          data/Data_Helpers.cc
-                          MeshInfo.cc
-                          Debugger.cc
-                   HEADERS ${state_inc_files}
-		   LINK_LIBS data_structures functions mesh_functions output mesh atk
-		   ${Boost_LIBRARIES} ${SEACAS_LIBRARIES})
-set_property(GLOBAL PROPERTY STATE_SOURCE_DIR ${MPC_SOURCE_DIR})
-set_property(GLOBAL PROPERTY STATE_BINARY_DIR ${MPC_BINARY_DIR})
+  SOURCE ${state_src_files}
+  HEADERS ${state_inc_files}
+  LINK_LIBS ${state_link_libs})
+
+# set_property(GLOBAL PROPERTY STATE_SOURCE_DIR ${MPC_SOURCE_DIR})
+# set_property(GLOBAL PROPERTY STATE_BINARY_DIR ${MPC_BINARY_DIR})
 if (APPLE AND BUILD_SHARED_LIBS)
   set_target_properties(state PROPERTIES LINK_FLAGS "-Wl,-undefined,dynamic_lookup")
 endif()			  
@@ -143,6 +144,8 @@ if (BUILD_TESTS)
 
     # Add UnitTest includes
     include_directories(${UnitTest_INCLUDE_DIRS})
+    set(state_test_link_libs state mesh_factory mesh data_structures mesh_functions functions
+                              ${UnitTest_LIBRARIES} ${HDF5_LIBRARIES})
 
 
     # Copy test subdirectory for out of source builds
@@ -152,116 +155,108 @@ if (BUILD_TESTS)
                           "${STATE_SOURCE_DIR}/test/*.gold")
       file(COPY ${DataFiles} DESTINATION ${STATE_BINARY_DIR}/test/)
     endif()
-    
-    add_amanzi_test(state_restart state_restart
-                    KIND int
-                    SOURCE
-	  	          test/Main.cc
-	 		  test/state_restart.cc
-	 		  test/state_vis.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES} ${NOX_LIBRARIES} ${HDF5_LIBRARIES})
 
-    if(ENABLE_MESH_MSTK)
-      add_amanzi_test(state_restart2 state_restart2
-                    KIND int
-                    SOURCE
-	  	          test/Main.cc
-	 		  test/state_restart2.cc
-                    NPROCS 2
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES} ${NOX_LIBRARIES} ${HDF5_LIBRARIES})
-    endif() 
-                              
-    add_amanzi_test(state_copy state_copy
-                    KIND int
-                    SOURCE test/Main.cc test/state_copy.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES} ${NOX_LIBRARIES} ${HDF5_LIBRARIES})
-
-    add_amanzi_test(state_dag state_dag
-                    KIND int
-                    SOURCE test/Main.cc test/state_dag.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES} ${NOX_LIBRARIES} ${HDF5_LIBRARIES})
-
-    add_amanzi_test(state_functional_evaluators state_functional_evaluators
-                    KIND int
-                    SOURCE test/Main.cc
-	 		   test/state_functional_evaluators.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES} ${HDF5_LIBRARIES})
-
-    add_amanzi_test(state_init state_init
-                    KIND int
-                    SOURCE test/Main.cc
-	 		   test/state_init.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES} ${NOX_LIBRARIES} ${HDF5_LIBRARIES})
-
-    add_amanzi_test(state_observations state_observations
-                    KIND int
-                    SOURCE test/Main.cc
-	 		   test/state_observations.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES} ${NOX_LIBRARIES} ${HDF5_LIBRARIES})
-    #add_amanzi_test(state_observations_np2 state_observations NPROCS 2 KIND unit)
-
+    # tests the "any" inside data objects
     add_amanzi_test(state_data_factory state_data_factory
                     KIND unit
                     SOURCE test/Main.cc 
                            test/state_data_factory.cc
-                    LINK_LIBS error_handling atk mesh data_structures mesh_functions state
-                              ${state_tpl_list} ${UnitTest_LIBRARIES})
+                    LINK_LIBS ${state_test_link_libs})
 
+    # tests record, recordset, and the underlying data objects
     add_amanzi_test(state_record state_record
                     KIND unit
                     SOURCE test/Main.cc
                            test/state_record.cc
-                    LINK_LIBS atk mesh data_structures mesh_functions state
-                              ${state_tpl_list} ${UnitTest_LIBRARIES})
+                    LINK_LIBS ${state_test_link_libs})
 
+    # tests state as a container of data                 
+    add_amanzi_test(state_container state_container
+                    KIND unit
+                    SOURCE test/Main.cc
+                           test/state_container.cc
+                    LINK_LIBS ${state_test_link_libs})
+
+    # tests state as a container of meshes
     add_amanzi_test(state_mesh state_mesh
                     KIND unit
                     SOURCE test/Main.cc
                            test/state_mesh.cc
-                    LINK_LIBS atk mesh_factory mesh data_structures mesh_functions state
-                              ${state_tpl_list} ${UnitTest_LIBRARIES})
+                    LINK_LIBS ${state_test_link_libs})
+
+    # tests the ability of state to initialize data                  
+    add_amanzi_test(state_init state_init
+                    KIND int
+                    SOURCE test/Main.cc
+         		   test/state_init.cc
+                    LINK_LIBS ${state_test_link_libs})
+
+    # tests the correctness of operator-assigning data by tag
+    add_amanzi_test(state_copy state_copy
+                    KIND int
+                    SOURCE test/Main.cc test/state_copy.cc
+                    LINK_LIBS ${state_test_link_libs})
+
+    add_amanzi_test(state_observations state_observations
+                    KIND int
+                    SOURCE test/Main.cc
+         		   test/state_observations.cc
+                    LINK_LIBS ${state_test_link_libs})
+    add_amanzi_test(state_observations_np2 state_observations NPROCS 2 KIND unit)
+
 
     add_amanzi_test(state_vis state_vis
                     KIND int
                     SOURCE test/Main.cc
                            test/state_vis.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions
-                              ${state_tpl_list} ${UnitTest_LIBRARIES})
-
-    add_amanzi_test(state_container state_container
-                    KIND unit
-                    SOURCE test/Main.cc
-                           test/state_container.cc
-                    LINK_LIBS atk mesh_factory mesh data_structures mesh_functions state
-                              ${state_tpl_list} ${UnitTest_LIBRARIES})
-
-    add_amanzi_test(state_extensibility state_extensibility
+                    LINK_LIBS ${state_test_link_libs})
+                         
+    add_amanzi_test(state_restart state_restart
                     KIND int
-                    SOURCE test/Main.cc
-                           test/state_extensibility.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${state_tpl_list} ${UnitTest_LIBRARIES})
+                    SOURCE
+          	          test/Main.cc
+         		  test/state_restart.cc
+                    LINK_LIBS ${state_test_link_libs})
+
+    if(ENABLE_MESH_MSTK)
+      add_amanzi_test(state_restart2 state_restart2
+                    KIND int
+                    SOURCE
+          	          test/Main.cc
+         		  test/state_restart2.cc
+                    NPROCS 2
+                    LINK_LIBS ${state_test_link_libs})
+    endif() 
+
+    # # full test of state extensibility, showing how to insert a new datatype with vis and checkpoint
+    # add_amanzi_test(state_extensibility state_extensibility
+    #                 KIND int
+    #                 SOURCE test/Main.cc
+    #                        test/state_extensibility.cc
+    #                 LINK_LIBS ${state_test_link_libs})
     
-    add_amanzi_test(state_evaluators state_evaluators
-                    KIND int
-                    SOURCE test/Main.cc
-                           test/state_evaluators.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES})
+    # add_amanzi_test(state_dag state_dag
+    #                 KIND int
+    #                 SOURCE test/Main.cc test/state_dag.cc
+    #                 LINK_LIBS ${state_test_link_libs})
 
-    add_amanzi_test(state_evaluators_cv state_evaluators_cv
-                    KIND int
-                    SOURCE test/Main.cc
-                           test/state_evaluators_cv.cc
-                    LINK_LIBS state mesh_factory mesh data_structures mesh_functions functions 
-                              ${UnitTest_LIBRARIES})
+    # add_amanzi_test(state_evaluators state_evaluators
+    #                 KIND int
+    #                 SOURCE test/Main.cc
+    #                        test/state_evaluators.cc
+    #                 LINK_LIBS ${state_test_link_libs})
+
+    # add_amanzi_test(state_evaluators_cv state_evaluators_cv
+    #                 KIND int
+    #                 SOURCE test/Main.cc
+    #                        test/state_evaluators_cv.cc
+    #                 LINK_LIBS ${state_test_link_libs})
+
+    # add_amanzi_test(state_functional_evaluators state_functional_evaluators
+    #                 KIND int
+    #                 SOURCE test/Main.cc
+    #      		   test/state_functional_evaluators.cc
+    #                 LINK_LIBS ${state_test_link_libs})
 
 endif()
 

@@ -26,16 +26,14 @@ namespace Operators {
 
 class Operator_Node : public Operator {
  public:
+  // main constructor
   //   The CVS is the domain and range of the operator
   Operator_Node(const Teuchos::RCP<const CompositeVectorSpace>& cvs, Teuchos::ParameterList& plist)
     : Operator(cvs, plist, OPERATOR_SCHEMA_DOFS_NODE)
   {
     set_schema_string("NODE");
-    cell_max_nodes = mesh_->getCellMaxNodes();
+    cell_max_nodes = mesh_->cell_get_max_nodes();
   }
-
-  // copy constructor
-  virtual Teuchos::RCP<Operator> Clone() const override;
 
   // rhs update which multiplies by cell
   virtual void UpdateRHS(const CompositeVector& source, bool volume_included) override;

@@ -22,14 +22,13 @@
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
-#include "Epetra_MultiVector.h"
-#include "EpetraExt_RowMatrixOut.h"
 #include "UnitTest++.h"
 
 // Amanzi
 #include "MeshFactory.hh"
 #include "Mesh_MSTK.hh"
 #include "Tensor.hh"
+#include "LinearOperatorGMRES.hh"
 
 // Operators
 #include "Analytic06.hh"
@@ -39,8 +38,8 @@
 
 
 /* *****************************************************************
-* Exactness test for mixed diffusion solver.
-***************************************************************** */
+ * Exactness test for mixed diffusion solver.
+ ***************************************************************** */
 std::pair<double, double>
 RunForwardProblem(const std::string& discretization, int nx, int ny)
 {
@@ -53,12 +52,11 @@ RunForwardProblem(const std::string& discretization, int nx, int ny)
   auto comm = Amanzi::getDefaultComm();
 
   // create a mesh
-  auto mesh_mstk = Teuchos::rcp(new Mesh_MSTK(0., 0., 1., 1., nx, ny, comm));
-  auto mesh = Teuchos::rcp(new Mesh(mesh_mstk, Teuchos::rcp(new Amanzi::AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null)); 
+  Teuchos::RCP<Mesh> mesh = Teuchos::rcp(new Mesh_MSTK(0., 0., 1., 1., nx, ny, comm));
 
   // modify diffusion coefficient
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
@@ -66,8 +64,8 @@ RunForwardProblem(const std::string& discretization, int nx, int ny)
   Analytic06 ana(mesh);
 
   for (int c = 0; c < ncells; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.TensorDiffusivity(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.TensorDiffusivity(xc, 0.0);
     K->push_back(Kc);
   }
 
@@ -78,8 +76,8 @@ RunForwardProblem(const std::string& discretization, int nx, int ny)
 
   bool flag;
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
-    double area = mesh->getFaceArea(f);
+    const Point& xf = mesh->getFaceCentroid(f)
+    double area = mesh->getFaceArea(f)
     Point normal = ana.face_normal_exterior(f, &flag);
 
     if (fabs(xf[0]) < 1e-6) {
@@ -111,7 +109,7 @@ RunForwardProblem(const std::string& discretization, int nx, int ny)
   CompositeVector source(*op->global_operator()->rhs());
   Epetra_MultiVector& source_c = *source.ViewComponent("cell", false);
   for (int c = 0; c != ncells; ++c) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     source_c[0][c] = ana.source_exact(xc, 0);
   }
   op->global_operator()->UpdateRHS(source, false);
@@ -124,30 +122,31 @@ RunForwardProblem(const std::string& discretization, int nx, int ny)
   CompositeVector u(rhs), error(rhs), flux(rhs);
 
   // fill the solution
-  u.PutScalar(0.0);
+  u.putScalar(0.0);
   Epetra_MultiVector& u_c = *u.ViewComponent("cell", false);
   for (int c = 0; c != ncells; ++c) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     u_c[0][c] = ana.pressure_exact(xc, 0.0);
   }
 
-  if (u.HasComponent("face")) {
+  if (u.hasComponent("face")) {
+    int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
     Epetra_MultiVector& u_f = *u.ViewComponent("face", false);
 
     for (int f = 0; f != nfaces; ++f) {
-      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
       u_f[0][f] = ana.pressure_exact(xf, 0.0);
     }
   }
 
-  if (u.HasComponent("boundary_face")) {
+  if (u.hasComponent("boundary_face")) {
     int nboundary_faces =
       mesh->getNumEntities(AmanziMesh::Entity_kind::BOUNDARY_FACE, AmanziMesh::Parallel_kind::OWNED);
     Epetra_MultiVector& u_f = *u.ViewComponent("boundary_face", false);
 
     for (int bf = 0; bf != nboundary_faces; ++bf) {
-      int f = mesh->getMap(AmanziMesh::Entity_kind::FACE,false).LID(mesh->getMap(AmanziMesh::Entity_kind::BOUNDARY_FACE,false).GID(bf));
-      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+      int f = mesh->getMap(AmanziMesh::Entity_kind::FACE,false).getLocalElement(mesh->exterior_face_map(false).getGlobalElement(bf));
+      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
       u_f[0][f] = ana.pressure_exact(xf, 0.0);
     }
   }
@@ -161,9 +160,9 @@ RunForwardProblem(const std::string& discretization, int nx, int ny)
   error.ViewComponent("cell", false)->Norm2(&l2);
   l2 /= pnorm;
   double linf(0.0);
-  error.NormInf(&linf);
+  error.normInf(&linf);
 
-  if (comm->MyPID() == 0) {
+  if (comm->getRank() == 0) {
     printf("[%4d, %6.12e, %6.12e],\n", (int)round(log2(nx)), log2(l2), log2(linf));
   }
   return std::make_pair(log2(l2), log2(linf));
@@ -182,12 +181,11 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
   auto comm = Amanzi::getDefaultComm();
 
   // create a mesh
-  auto mesh_mstk = Teuchos::rcp(new Mesh_MSTK(0.0, 0.0, 1.0, 1.0, nx, ny, comm));
-  auto mesh = Teuchos::rcp(new Mesh(mesh_mstk, Teuchos::rcp(new Amanzi::AmanziMesh::MeshFrameworkAlgorithms()), Teuchos::null)); 
+  Teuchos::RCP<Mesh> mesh = Teuchos::rcp(new Mesh_MSTK(0.0, 0.0, 1.0, 1.0, nx, ny, comm));
 
   // modify diffusion coefficient
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
@@ -195,8 +193,8 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
   Analytic06 ana(mesh);
 
   for (int c = 0; c < ncells; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.TensorDiffusivity(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.TensorDiffusivity(xc, 0.0);
     K->push_back(Kc);
   }
 
@@ -207,8 +205,8 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
 
   bool flag;
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
-    double area = mesh->getFaceArea(f);
+    const Point& xf = mesh->getFaceCentroid(f)
+    double area = mesh->getFaceArea(f)
     Point normal = ana.face_normal_exterior(f, &flag);
 
     if (fabs(xf[0]) < 1e-6) {
@@ -240,7 +238,7 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
   CompositeVector source(*op->global_operator()->rhs());
   Epetra_MultiVector& source_c = *source.ViewComponent("cell", false);
   for (int c = 0; c != ncells; ++c) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     source_c[0][c] = ana.source_exact(xc, 0.0);
   }
   op->global_operator()->UpdateRHS(source, false);
@@ -253,42 +251,52 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
   CompositeVector u(rhs), error(rhs), flux(rhs);
 
   // fill the solution
-  u.PutScalar(0.0);
+  u.putScalar(0.0);
   Epetra_MultiVector& u_c = *u.ViewComponent("cell", false);
   for (int c = 0; c != ncells; ++c) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     u_c[0][c] = ana.pressure_exact(xc, 0.0);
   }
 
-  if (u.HasComponent("face")) {
+  if (u.hasComponent("face")) {
+    int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
     Epetra_MultiVector& u_f = *u.ViewComponent("face", false);
 
     for (int f = 0; f != nfaces; ++f) {
-      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
       u_f[0][f] = ana.pressure_exact(xf, 0.0);
     }
   }
 
-  if (u.HasComponent("boundary_face")) {
+  if (u.hasComponent("boundary_face")) {
     int nboundary_faces =
       mesh->getNumEntities(AmanziMesh::Entity_kind::BOUNDARY_FACE, AmanziMesh::Parallel_kind::OWNED);
     Epetra_MultiVector& u_f = *u.ViewComponent("boundary_face", false);
 
     for (int bf = 0; bf != nboundary_faces; ++bf) {
-      int f = mesh->getMap(AmanziMesh::Entity_kind::FACE,false).LID(mesh->getMap(AmanziMesh::Entity_kind::BOUNDARY_FACE,false).GID(bf));
+      int f = mesh->getMap(AmanziMesh::Entity_kind::FACE,false).getLocalElement(mesh->exterior_face_map(false).getGlobalElement(bf));
 
-      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
       u_f[0][f] = ana.pressure_exact(xf, 0.0);
     }
   }
 
+  // assemble, invert
+  op->global_operator()->SymbolicAssembleMatrix();
+  op->global_operator()->AssembleMatrix();
+
   Teuchos::ParameterList pc_list;
-  pc_list.set("preconditioning method", "boomer amg");
+  pc_list.set("preconditioner type", "boomer amg");
   pc_list.sublist("boomer amg parameters").set("tolerance", 0.0);
-  pc_list.set("iterative method", "gmres");
-  op->global_operator()->set_inverse_parameters(pc_list);
-  op->global_operator()->InitializeInverse();
-  op->global_operator()->ComputeInverse();
+  op->global_operator()->InitializePreconditioner(pc_list);
+  op->global_operator()->UpdatePreconditioner();
+
+  Teuchos::ParameterList lin_list;
+  lin_list.sublist("verbose object").set("verbosity level", "low");
+  auto lin_op = Teuchos::rcp(
+    new AmanziSolvers::LinearOperatorGMRES<Operator, CompositeVector, CompositeVectorSpace>(
+      op->global_operator(), op->global_operator()));
+  lin_op->Init(lin_list);
 
   if (write_matrix) {
     std::stringstream fname;
@@ -301,10 +309,10 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
     EpetraExt::RowMatrixToMatlabFile(fname.str().c_str(), *op->global_operator()->A());
   }
 
-  error.PutScalar(0.0);
-  int ierr = op->global_operator()->ApplyInverse(*op->global_operator()->rhs(), error);
+  error.putScalar(0.0);
+  int ierr = lin_op->ApplyInverse(*op->global_operator()->rhs(), error);
   CHECK(ierr >= 0);
-  CHECK(op->global_operator()->num_itrs() < 10);
+  CHECK(lin_op->num_itrs() < 10);
 
   error.Update(-1.0, u, 1.0);
 
@@ -315,9 +323,9 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
   error.ViewComponent("cell", false)->Norm2(&l2);
   l2 /= pnorm;
   double linf(0.0);
-  error.NormInf(&linf);
+  error.normInf(&linf);
 
-  if (comm->MyPID() == 0) {
+  if (comm->getRank() == 0) {
     printf("[%4d, %6.12e, %6.12e],\n", (int)round(log2(nx)), log2(l2), log2(linf));
   }
   return std::make_pair(log2(l2), log2(linf));
@@ -325,8 +333,17 @@ RunInverseProblem(const std::string& discretization, int nx, int ny, bool write_
 
 
 void
-MeanConvergenceRate(const std::vector<std::pair<double, double>>& l2s)
+RunForwardTest(const std::string& discretization)
 {
+  std::cout << "Convergence for discretization: " << discretization << std::endl;
+  std::cout << "x = np.array([";
+  std::vector<std::pair<double, double>> l2s;
+  for (int i = 2; i <= 65; i *= 2) {
+    std::pair<double, double> l2 = RunForwardProblem(discretization, i, i);
+    l2s.push_back(l2);
+  }
+  std::cout << "])" << std::endl;
+
   double mean_dl2 = 0.0;
   double mean_dlinf = 0.0;
   int size = 0;
@@ -345,22 +362,6 @@ MeanConvergenceRate(const std::vector<std::pair<double, double>>& l2s)
 
 
 void
-RunForwardTest(const std::string& discretization)
-{
-  std::cout << "Convergence for discretization: " << discretization << std::endl;
-  std::cout << "x = np.array([";
-  std::vector<std::pair<double, double>> l2s;
-  for (int i = 2; i <= 65; i *= 2) {
-    std::pair<double, double> l2 = RunForwardProblem(discretization, i, i);
-    l2s.push_back(l2);
-  }
-  std::cout << "])" << std::endl;
-
-  MeanConvergenceRate(l2s);
-}
-
-
-void
 RunInverseTest(const std::string& discretization)
 {
   std::cout << "Convergence for discretization: " << discretization << std::endl;
@@ -372,7 +373,20 @@ RunInverseTest(const std::string& discretization)
   }
   std::cout << "])" << std::endl;
 
-  MeanConvergenceRate(l2s);
+  double mean_dl2 = 0.0;
+  double mean_dlinf = 0.0;
+  int size = 0;
+  for (int i = 1; i != l2s.size(); ++i) {
+    mean_dl2 += (l2s[i].first - l2s[i - 1].first);
+    mean_dlinf += (l2s[i].second - l2s[i - 1].second);
+    size++;
+  }
+
+  double rate2 = -mean_dl2 / size;
+  double rateinf = -mean_dlinf / size;
+  std::cout << " Mean convergence rate (l2, linf) = " << rate2 << ", " << rateinf << std::endl;
+  CHECK(rate2 > 1.9);
+  CHECK(rateinf > 1.8);
 }
 
 

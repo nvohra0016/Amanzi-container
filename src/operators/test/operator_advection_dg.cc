@@ -30,6 +30,7 @@
 #include "GMVMesh.hh"
 #include "CompositeVector.hh"
 #include "DG_Modal.hh"
+#include "LinearOperatorGMRES.hh"
 #include "MeshFactory.hh"
 #include "MeshMapsFactory.hh"
 #include "NumericalIntegration.hh"
@@ -48,11 +49,11 @@
 
 
 /* *****************************************************************
-* This tests exactness of the advection scheme for steady-state
-* equations c p + div(v p) = f  (conservative formulation)
-* and       c p + v . grad(p) = f.
-* Two ways to impose Dirichlet BCs are used: primal and dual.
-* **************************************************************** */
+ * This tests exactness of the advection scheme for steady-state
+ * equations c p + div(v p) = f  (conservative formulation)
+ * and       c p + v . grad(p) = f.
+ * Two ways to impose Dirichlet BCs are used: primal and dual.
+ * **************************************************************** */
 template <class AnalyticDG>
 void
 AdvectionSteady(int dim,
@@ -69,7 +70,7 @@ AdvectionSteady(int dim,
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   std::string problem = (conservative_form) ? ", conservative formulation" : "";
   if (MyPID == 0)
@@ -84,11 +85,8 @@ AdvectionSteady(int dim,
 
   // create a mesh framework
   Teuchos::RCP<GeometricModel> gm;
-  auto fac_list = Teuchos::rcp(new Teuchos::ParameterList());
-  fac_list->set<bool>("request edges", true);  
-  fac_list->set<bool>("request faces", true);  
-  MeshFactory meshfactory(comm, gm, fac_list);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  MeshFactory meshfactory(comm, gm);
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
 
   double weak_sign = 1.0;
   std::string pk_name;
@@ -96,7 +94,7 @@ AdvectionSteady(int dim,
 
   if (dim == 2) {
     // mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, nx, nx);
-    mesh = meshfactory.create(filename);
+    mesh = meshfactory.create(filename, true, true);
     pk_name = "PK operator 2D";
 
     if (weak_form == "primal") {
@@ -114,6 +112,7 @@ AdvectionSteady(int dim,
   }
 
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+  int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int ncells_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
@@ -151,11 +150,14 @@ AdvectionSteady(int dim,
   auto K = Teuchos::rcp(new CompositeVector(*cvs));
   auto Kc = K->ViewComponent("cell", true);
 
-  for (int c = 0; c < ncells_wghost; c++) { (*Kc)[0][c] = Kreac; }
+  for (int c = 0; c < ncells_wghost; c++) {
+    const Point& xc = mesh->getCellCentroid(c)
+    (*Kc)[0][c] = Kreac;
+  }
 
   // -- velocity function
   auto velc = Teuchos::rcp(new std::vector<WhetStone::VectorPolynomial>(ncells_wghost));
-  auto velf = Teuchos::rcp(new std::vector<WhetStone::Polynomial>(nfaces_wghost));
+  auto velf = Teuchos::rcp(new std::vector<WhetStone::Polynomial<>>(nfaces_wghost));
 
   WhetStone::VectorPolynomial v;
   ana.VelocityTaylor(AmanziGeometry::Point(dim), 0.0, v);
@@ -165,12 +167,12 @@ AdvectionSteady(int dim,
     (*velc)[c] *= -weak_sign;
   }
 
-  for (int f = 0; f < nfaces_wghost; ++f) { (*velf)[f] = v * (mesh->getFaceNormal(f) * weak_sign); }
+  for (int f = 0; f < nfaces_wghost; ++f) { (*velf)[f] = v * (mesh->getFaceNormal(f) * weak_sign) }
 
   // -- divergence of velocity
   //    non-conservative formulation leads to Kn = Kreac - div(v)
-  auto Kn = Teuchos::rcp(new std::vector<WhetStone::Polynomial>());
-  WhetStone::Polynomial divv = Divergence(v);
+  auto Kn = Teuchos::rcp(new std::vector<WhetStone::Polynomial<>>());
+  WhetStone::Polynomial<> divv = Divergence(v);
 
   if (!conservative_form && weak_form == "dual") {
     auto tmp = divv;
@@ -182,14 +184,15 @@ AdvectionSteady(int dim,
 
   // -- source term is calculated using method of manufactured solutions
   //    f = K p + div (v p) = K p + v . grad p + p div(v)
-  WhetStone::Polynomial sol, src;
-  WhetStone::Polynomial pc(dim, order);
-  WhetStone::DenseVector data(pc.size());
-  WhetStone::NumericalIntegration numi(mesh);
+  WhetStone::Polynomial<> sol, src;
+  WhetStone::Polynomial<> pc(dim, order);
+  WhetStone::DenseVector<> data(pc.size());
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh);
 
   Epetra_MultiVector& rhs_c = *global_op->rhs()->ViewComponent("cell");
   for (int c = 0; c < ncells; ++c) {
-    const Point& xc = mesh->getCellCentroid(c);
+    const Point& xc = mesh->getCellCentroid(c)
+    double volume = mesh->getCellVolume(c)
 
     v.ChangeOrigin(xc);
     divv.ChangeOrigin(xc);
@@ -201,11 +204,12 @@ AdvectionSteady(int dim,
 
     for (auto it = pc.begin(); it < pc.end(); ++it) {
       int n = it.PolynomialPosition();
+      int k = it.MonomialSetOrder();
 
-      WhetStone::Polynomial cmono(dim, it.multi_index(), 1.0);
+      WhetStone::Polynomial<> cmono(dim, it.multi_index(), 1.0);
       cmono.set_origin(xc);
 
-      WhetStone::Polynomial tmp = src * cmono;
+      WhetStone::Polynomial<> tmp = src * cmono;
 
       data(n) = numi.IntegratePolynomialCell(c, tmp);
     }
@@ -220,11 +224,11 @@ AdvectionSteady(int dim,
   std::vector<int>& bc_model = bc->bc_model();
   std::vector<std::vector<double>>& bc_value = bc->bc_value_vector(nk);
 
-  WhetStone::Polynomial coefs;
+  WhetStone::Polynomial<> coefs;
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
-    const Point& normal = mesh->getFaceNormal(f);
+    const Point& xf = mesh->getFaceCentroid(f)
+    const Point& normal = mesh->getFaceNormal(f)
     if (fabs(xf[0]) < 1e-6 || fabs(xf[0] - 1.0) < 1e-6 || fabs(xf[1]) < 1e-6 ||
         fabs(xf[1] - 1.0) < 1e-6 || fabs(xf[dim - 1]) < 1e-6 || fabs(xf[dim - 1] - 1.0) < 1e-6) {
       Point vp(v[0].Value(xf), v[1].Value(xf));
@@ -246,7 +250,8 @@ AdvectionSteady(int dim,
   // populate the global operator
   op_flux->SetBCs(bc, bc);
   op_flux->Setup(velc, velf);
-  op_flux->UpdateMatrices(*velf);
+  Teuchos::RCP<const std::vector<WhetStone::Polynomial<>>> velf_c = velf;
+  op_flux->UpdateMatrices(velf_c.ptr());
   op_flux->ApplyBCs(true, true, true);
 
   op_adv->Setup(velc, false);
@@ -256,24 +261,31 @@ AdvectionSteady(int dim,
     op_reac->Setup(Kc);
   else
     op_reac->Setup(Kn, false);
-  op_reac->UpdateMatrices(Teuchos::null, Teuchos::null);
+  op_reac->UpdateMatrices();
 
   // create preconditoner
-  global_op->set_inverse_parameters(
-    "Hypre AMG", plist.sublist("preconditioners"), "GMRES", plist.sublist("solvers"));
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  ParameterList slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
+
+  // solve the problem
+  ParameterList lop_list = plist.sublist("solvers").sublist("GMRES").sublist("gmres parameters");
+  AmanziSolvers::LinearOperatorGMRES<Operator, CompositeVector, CompositeVectorSpace> solver(
+    global_op, global_op);
+  solver.Init(lop_list);
 
   CompositeVector& rhs = *global_op->rhs();
   CompositeVector solution(rhs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
-  global_op->ApplyInverse(rhs, solution);
+  int ierr = solver.ApplyInverse(rhs, solution);
 
   if (MyPID == 0) {
-    std::cout << "dG solver (gmres): ||r||=" << global_op->residual()
-              << " itr=" << global_op->num_itrs() << " code=" << global_op->returned_code()
-              << " order=" << order << std::endl;
+    std::cout << "dG solver (gmres): ||r||=" << solver.residual() << " itr=" << solver.num_itrs()
+              << " code=" << solver.returned_code() << " order=" << order << std::endl;
 
     // visualization
     const Epetra_MultiVector& p = *solution.ViewComponent("cell");
@@ -287,7 +299,7 @@ AdvectionSteady(int dim,
     GMV::close_data_file();
   }
 
-  CHECK(global_op->num_itrs() < 200);
+  CHECK(solver.num_itrs() < 200);
 
   // compute solution error
   solution.ScatterMasterToGhosted();
@@ -299,10 +311,8 @@ AdvectionSteady(int dim,
   if (MyPID == 0) {
     sol.ChangeOrigin(AmanziGeometry::Point(dim));
     std::cout << "\nEXACT solution: " << sol << std::endl;
-    printf("Mean:     L2(p)=%12.9f  Inf(p)=%12.9f  itr=%3d\n",
-           pl2_mean,
-           pinf_mean,
-           global_op->num_itrs());
+    printf(
+      "Mean:     L2(p)=%12.9f  Inf(p)=%12.9f  itr=%3d\n", pl2_mean, pinf_mean, solver.num_itrs());
     printf("Total:    L2(p)=%12.9f  Inf(p)=%12.9f\n", pl2_err, pinf_err);
     printf("Integral: L2(p)=%12.9f\n", pl2_int);
     CHECK(pl2_err < 1e-10 && pinf_err < 1e-10);

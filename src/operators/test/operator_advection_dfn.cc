@@ -27,7 +27,7 @@
 #include "UnitTest++.h"
 
 // Amanzi
-#include "IterativeMethodGMRES.hh"
+#include "LinearOperatorGMRES.hh"
 #include "MeshFactory.hh"
 #include "Mesh_MSTK.hh"
 #include "OutputXDMF.hh"
@@ -43,8 +43,8 @@
 
 
 /* *****************************************************************
-* TBW.
-* **************************************************************** */
+ * TBW.
+ * **************************************************************** */
 void
 RunTest(double gravity)
 {
@@ -55,7 +55,7 @@ RunTest(double gravity)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0)
     std::cout << "\nTest: Transport in fracture network, gravity=" << gravity << std::endl;
@@ -78,23 +78,24 @@ RunTest(double gravity)
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
   // create Darcy flux
-  auto cvsf = Operators::CreateManifoldCVS(mesh);
+  auto cvsf = Operators::CreateNonManifoldCVS(mesh);
   auto flux = Teuchos::rcp(new CompositeVector(*cvsf));
   Epetra_MultiVector& flux_f = *flux->ViewComponent("face", true);
-  const auto& map = flux->Map().Map("face", true);
+  const auto& map = flux->getMap().getMap("face", true);
 
   int dir;
+  AmanziMesh::Entity_ID_List cells;
   AmanziGeometry::Point v(1.0, 0.0, 1.0);
   for (int f = 0; f < nfaces_owned; ++f) {
     int g = map->FirstPointInElement(f);
     int ndofs = map->ElementSize(f);
 
-    auto cells = mesh->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+    mesh->getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
     if (ndofs > 1) CHECK(ndofs == cells.size());
 
     for (int i = 0; i < ndofs; ++i) {
       int c = cells[i];
-      auto normal = mesh->getFaceNormal(f, c, &dir);
+      auto normal = mesh->face_normal(f, false, c, &dir);
       normal *= dir; // natural normal
 
       int g2 = g + Operators::UniqueIndexFaceToCells(*mesh, f, c);
@@ -108,7 +109,7 @@ RunTest(double gravity)
   std::vector<double>& bc_value = bc->bc_value();
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
+    const Point& xf = mesh->getFaceCentroid(f)
     if (fabs(xf[0]) < 1e-6) {
       bc_model[f] = OPERATOR_BC_DIRICHLET;
       bc_value[f] = 1.0;
@@ -120,7 +121,7 @@ RunTest(double gravity)
   cvs->SetMesh(mesh)->SetGhosted(true)->SetComponent("cell", AmanziMesh::Entity_kind::CELL, 1);
 
   CompositeVector solution(*cvs), solution_new(*cvs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
   // create advection operator
   Teuchos::ParameterList olist = plist->sublist("PK operator").sublist("advection operator");
@@ -141,12 +142,13 @@ RunTest(double gravity)
 
   // apply BCs and assemble
   op_adv->ApplyBCs(true, true, true);
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
 
-  // create inverse
-  global_op->set_inverse_parameters(
-    "Hypre AMG", plist->sublist("preconditioners"), "GMRES", plist->sublist("solvers"));
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  // create preconditoner
+  ParameterList slist = plist->sublist("preconditioners").sublist("Hypre AMG");
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
 
   // initialize I/O
   Teuchos::ParameterList iolist;
@@ -154,33 +156,45 @@ RunTest(double gravity)
   OutputXDMF io(iolist, mesh, true, false);
 
   // time stepping
+  int nstep(1);
   double t(0.0);
   for (int nstep = 0; nstep < 5; ++nstep) {
+    // -- solve the problem
+    ParameterList lop_list = plist->sublist("solvers").sublist("GMRES").sublist("gmres parameters");
+    AmanziSolvers::LinearOperatorGMRES<Operator, CompositeVector, CompositeVectorSpace> solver(
+      global_op, global_op);
+    solver.Init(lop_list);
+
     CompositeVector& rhs = *global_op->rhs();
-    global_op->ApplyInverse(rhs, solution_new);
+    int ierr = solver.ApplyInverse(rhs, solution_new);
 
     // -- modify right-hand side and solution
     const auto& old_c = *solution.ViewComponent("cell");
     const auto& new_c = *solution_new.ViewComponent("cell");
-    auto& rhs_c = *rhs.ViewComponent("cell");
+    const auto& rhs_c = *rhs.ViewComponent("cell");
     for (int c = 0; c < ncells_owned; ++c)
-      rhs_c[0][c] += (new_c[0][c] - old_c[0][c]) * mesh->getCellVolume(c) / dt;
+      rhs_c[0][c] += (new_c[0][c] - old_c[0][c]) * mesh->cell_volume(c) / dt;
 
     solution = solution_new;
 
     double a;
     rhs.Norm2(&a);
+    if (MyPID == 0) {
+      std::cout << "pressure solver (" << solver.name() << "): ||r||=" << solver.residual()
+                << " itr=" << solver.num_itrs() << "  ||f||=" << a
+                << " code=" << solver.returned_code() << std::endl;
+    }
 
-    io.InitializeCycle(t, nstep, "");
+    io.InitializeCycle(t, nstep);
     io.WriteVector(*new_c(0), "solution", AmanziMesh::Entity_kind::CELL);
     io.FinalizeCycle();
 
     // verify solution bounds and monotone decrease away from sources at x=0
     for (int c = 0; c < ncells_owned; ++c) {
-      const auto& xc = mesh->getCellCentroid(c);
+      const auto& xc = mesh->getCellCentroid(c)
       CHECK(new_c[0][c] <= 1.0);
       for (int c2 = 0; c2 < ncells_owned; ++c2) {
-        const auto& xc2 = mesh->getCellCentroid(c2);
+        const auto& xc2 = mesh->getCellCentroid(c2)
         if (xc2[0] - xc[0] > 1e-6 && fabs(xc2[1] - xc[1]) < 1e-6 && fabs(xc2[2] - xc[2]) < 1e-6)
           CHECK(new_c[0][c2] <= new_c[0][c]);
       }

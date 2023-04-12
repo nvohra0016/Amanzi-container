@@ -11,7 +11,7 @@
 
 #include "MeshUtils.hh"
 #include "MeshColumns.hh"
-#include "MeshCache.hh"
+#include "Mesh.hh"
 
 namespace Amanzi {
 namespace AmanziMesh {
@@ -27,14 +27,14 @@ MeshColumns::initialize(const MeshCache<MemSpace_kind::HOST>& mesh)
 
   // loop over all boundary faces and look for those whose normal z component
   // is not zero and whose opposing face is below them.
-  Entity_ID_View surface_faces("surface_faces",mesh.getBoundaryFaces().size());
-  int sf = 0; 
+  MeshCache<MemSpace_kind::HOST>::Entity_ID_View surface_faces("surface_faces",mesh.getBoundaryFaces().size());
+  int sf = 0;
   for (const Entity_ID f : mesh.getBoundaryFaces()) {
     auto f_normal = mesh.getFaceNormal(f);
     Entity_ID c = mesh.getFaceCells(f, Parallel_kind::ALL)[0];
     if (Impl::orientFace(mesh, f, c) == 1) surface_faces[sf++] = f;
   }
-  Kokkos::resize(surface_faces, sf); 
+  Kokkos::resize(surface_faces, sf);
   initialize(mesh, surface_faces);
 }
 
@@ -54,15 +54,16 @@ MeshColumns::initialize(const MeshCache<MemSpace_kind::HOST>& mesh, const std::v
   }
 
   // collect faces in all regions, keeping the collection sorted
-  Entity_ID_List vsurface_faces; 
+  Entity_ID_List vsurface_faces;
   for (const auto& r : regions) {
     auto r_faces = mesh.getSetEntities(r, Entity_kind::FACE, Parallel_kind::ALL);
     for (Entity_ID f : r_faces)
       vsurface_faces.insert(std::upper_bound(vsurface_faces.begin(),
               vsurface_faces.end(),f),f);
   }
-  Entity_ID_View surface_faces;
-  vectorToView(surface_faces,vsurface_faces); 
+
+  MeshCache<MemSpace_kind::HOST>::Entity_ID_View surface_faces;
+  vectorToView(surface_faces,vsurface_faces);
 
   // build columns for each face
   initialize(mesh, surface_faces);
@@ -70,7 +71,8 @@ MeshColumns::initialize(const MeshCache<MemSpace_kind::HOST>& mesh, const std::v
 
 
 void
-MeshColumns::initialize(const MeshCache<MemSpace_kind::HOST>& mesh, const Entity_ID_View& surface_faces)
+MeshColumns::initialize(const MeshCache<MemSpace_kind::HOST>& mesh,
+                        const View_type<const Entity_ID, MemSpace_kind::HOST>& surface_faces)
 {
   // figure out the correct size
   // Note, this is done to make life easier for Kokkos
@@ -91,8 +93,8 @@ MeshColumns::initialize(const MeshCache<MemSpace_kind::HOST>& mesh, const Entity
   view<MemSpace_kind::HOST>(cells_.rows)[i] = ncells;
   view<MemSpace_kind::HOST>(faces_.rows)[i] = nfaces;
 
-  cells_.entries.resize(ncells); 
-  faces_.entries.resize(nfaces); 
+  cells_.entries.resize(ncells);
+  faces_.entries.resize(nfaces);
 
   // fill
   i = 0;
@@ -102,8 +104,8 @@ MeshColumns::initialize(const MeshCache<MemSpace_kind::HOST>& mesh, const Entity
   }
   num_columns_all = i;
 
-  cells_.update<MemSpace_kind::DEVICE>(); 
-  faces_.update<MemSpace_kind::DEVICE>(); 
+  cells_.update<MemSpace_kind::DEVICE>();
+  faces_.update<MemSpace_kind::DEVICE>();
 }
 
 

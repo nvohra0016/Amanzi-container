@@ -178,7 +178,7 @@ RunTest(int n, int d)
   flux_numer->Norm2(&err[0]);
   out.second = err[0] * n;
 
-  if (comm->MyPID() == 0) {
+  if (comm->getRank() == 0) {
     std::cout << "error lower order: " << out.first << std::endl;
     std::cout << "error high order: " << out.second << std::endl;
     std::cout << "mean limiter: " << fct.get_alpha_mean() << std::endl;

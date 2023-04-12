@@ -18,7 +18,6 @@
 #include <vector>
 
 // TPLs
-#include "Epetra_MultiVector.h"
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
@@ -27,7 +26,7 @@
 // Amanzi
 #include "DG_Modal.hh"
 #include "Explicit_TI_RK.hh"
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 #include "MeshCurved.hh"
 #include "MeshFactory.hh"
 #include "NumericalIntegration.hh"
@@ -49,11 +48,11 @@ class MyRemapDGr : public Operators::RemapDG<TreeVector> {
              Teuchos::ParameterList& plist,
              double T1)
     : RemapDG<TreeVector>(mesh0, mesh1, plist),
-      tprint_(0.0),
-      dt_output_(0.1),
-      l2norm_(-1.0),
       T1_(T1),
-      tini_(0.0){};
+      l2norm_(-1.0),
+      tini_(0.0),
+      tprint_(0.0),
+      dt_output_(0.1){};
   ~MyRemapDGr(){};
 
   // create basic structures at each cycle
@@ -75,7 +74,7 @@ class MyRemapDGr : public Operators::RemapDG<TreeVector> {
   void CollectStatistics(double t, const TreeVector& u);
 
   // access
-  const std::vector<WhetStone::Polynomial> jac() const { return *jac_; }
+  const std::vector<WhetStone::Polynomial<>> jac() const { return *jac_; }
 
  public:
   double tprint_, dt_output_, l2norm_;
@@ -88,12 +87,12 @@ class MyRemapDGr : public Operators::RemapDG<TreeVector> {
 
 
 /* *****************************************************************
-* Initialization of remap.
-***************************************************************** */
+ * Initialization of remap.
+ ***************************************************************** */
 void
 MyRemapDGr::Init(const Teuchos::RCP<WhetStone::DG_Modal> dg)
 {
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data on mesh scheleton...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data on mesh scheleton...\n";
   InitializeOperators(dg);
   StaticEdgeFaceVelocities();
 
@@ -101,41 +100,41 @@ MyRemapDGr::Init(const Teuchos::RCP<WhetStone::DG_Modal> dg)
 
   velf_vec0_.resize(nfaces_wghost_);
   for (int f = 0; f < nfaces_wghost_; ++f) {
-    velf_vec0_[f].Reshape(dim_, dim_, 1, true);
-    velf_vec0_[f].set_origin(mesh0_->getFaceCentroid(f));
+    velf_vec0_[f].reshape(dim_, dim_, 1, true);
+    velf_vec0_[f].set_origin(mesh0_->getFaceCentroid(f))
   }
 
-  if (mesh0_->hasEdges()) {
+  if (mesh0_->valid_edges()) {
     vele_vec0_.resize(nedges_wghost_);
     for (int e = 0; e < nedges_wghost_; ++e) {
-      vele_vec0_[e].Reshape(dim_, dim_, 1, true);
-      vele_vec0_[e].set_origin(mesh0_->getEdgeCentroid(e));
+      vele_vec0_[e].reshape(dim_, dim_, 1, true);
+      vele_vec0_[e].set_origin(mesh0_.getEdgeCentroid(e));
     }
   }
 
   J0_.resize(ncells_owned_);
   for (int c = 0; c < ncells_owned_; ++c) {
-    J0_[c].Reshape(dim_, dim_, dim_, 0, true);
-    J0_[c].set_origin(mesh0_->getCellCentroid(c));
+    J0_[c].reshape(dim_, dim_, dim_, 0, true);
+    J0_[c].set_origin(mesh0_->getCellCentroid(c))
   }
 
   StaticFaceCoVelocity();
 
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data in mesh cells...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data in mesh cells...\n";
   StaticCellCoVelocity();
 }
 
 
 /* *****************************************************************
-* Update internal data at restart time.
-***************************************************************** */
+ * Update internal data at restart time.
+ ***************************************************************** */
 void
 MyRemapDGr::ReInit(double tini)
 {
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data on mesh scheleton...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data on mesh scheleton...\n";
   for (int f = 0; f < nfaces_wghost_; ++f) velf_vec0_[f] += velf_vec_[f];
 
-  if (mesh0_->hasEdges()) {
+  if (mesh0_->valid_edges()) {
     for (int e = 0; e < nedges_wghost_; ++e) vele_vec0_[e] += vele_vec_[e];
   }
 
@@ -147,7 +146,7 @@ MyRemapDGr::ReInit(double tini)
   // adjust new velocities for interval [tini, tend]
   for (int f = 0; f < nfaces_wghost_; ++f) velf_vec_[f] -= velf_vec0_[f];
 
-  if (mesh0_->hasEdges()) {
+  if (mesh0_->valid_edges()) {
     for (int e = 0; e < nedges_wghost_; ++e) vele_vec_[e] -= vele_vec0_[e];
   }
 
@@ -155,7 +154,7 @@ MyRemapDGr::ReInit(double tini)
   StaticCellVelocity();
 
   StaticFaceCoVelocity();
-  if (mesh0_->getComm()->MyPID() == 0) std::cout << "Computing static data in mesh cells...\n";
+  if (mesh0_->get_comm()->getRank() == 0) std::cout << "Computing static data in mesh cells...\n";
   StaticCellCoVelocity();
 
   /*
@@ -169,8 +168,8 @@ MyRemapDGr::ReInit(double tini)
 
 
 /* *****************************************************************
-* Initialization of space-tim co-velocity v = u * (j J^{-t} N)
-***************************************************************** */
+ * Initialization of space-tim co-velocity v = u * (j J^{-t} N)
+ ***************************************************************** */
 void
 MyRemapDGr::StaticFaceCoVelocity()
 {
@@ -193,8 +192,8 @@ MyRemapDGr::StaticFaceCoVelocity()
 
 
 /* *****************************************************************
-* Initialization of the constant cell velocity
-***************************************************************** */
+ * Initialization of the constant cell velocity
+ ***************************************************************** */
 void
 MyRemapDGr::StaticCellCoVelocity()
 {
@@ -205,6 +204,7 @@ MyRemapDGr::StaticCellCoVelocity()
     // space-time cell velocity: v = -j J^{-1} u = -C^t u
     WhetStone::MatrixSpaceTimePolynomial Jt(dim_, dim_, dim_, 1), Ct;
     WhetStone::VectorSpaceTimePolynomial tmp(dim_, dim_, 0);
+    const auto& origin = uc_[c][0].origin();
 
     for (int i = 0; i < dim_; ++i) {
       for (int j = 0; j < dim_; ++j) {
@@ -226,18 +226,18 @@ MyRemapDGr::StaticCellCoVelocity()
 
 
 /* *****************************************************************
-* Compute initial mass: partial specialization
-***************************************************************** */
+ * Compute initial mass: partial specialization
+ ***************************************************************** */
 double
 MyRemapDGr::InitialMass(const TreeVector& p1, int order)
 {
   const Epetra_MultiVector& p1c = *p1.SubVector(0)->Data()->ViewComponent("cell", false);
-  int nk = p1c.NumVectors();
-  int ncells = p1c.MyLength();
+  int nk = p1c.getNumVectors();
+  int ncells = p1c.getLocalLength();
 
   double mass(0.0), mass0;
-  WhetStone::DenseVector data(nk);
-  WhetStone::NumericalIntegration numi(mesh0_);
+  WhetStone::DenseVector<> data(nk);
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh0_);
 
   for (int c = 0; c < ncells; c++) {
     for (int i = 0; i < nk; ++i) data(i) = p1c[i][c];
@@ -245,14 +245,14 @@ MyRemapDGr::InitialMass(const TreeVector& p1, int order)
     mass += numi.IntegratePolynomialCell(c, poly);
   }
 
-  mesh0_->getComm()->SumAll(&mass, &mass0, 1);
+  Teuchos::reduceAll<int>(*mesh0_->get_comm(),Teuchos::REDUCE_SUM, 1,&mass, &mass0);
   return mass0;
 }
 
 
 /* *****************************************************************
-* Print statistics using conservative field u
-***************************************************************** */
+ * Print statistics using conservative field u
+ ***************************************************************** */
 void
 MyRemapDGr::CollectStatistics(double t, const TreeVector& u)
 {
@@ -265,10 +265,10 @@ MyRemapDGr::CollectStatistics(double t, const TreeVector& u)
 
     auto& rhs = *op_reac_->global_operator()->rhs();
     op_reac_->global_operator()->Apply(*u.SubVector(0)->Data(), rhs);
-    rhs.Dot(*u.SubVector(0)->Data(), &l2norm_);
+    rhs.dot(*u.SubVector(0)->Data(), &l2norm_);
 
     Epetra_MultiVector& xc = *rhs.ViewComponent("cell");
-    int nk = xc.NumVectors();
+    int nk = xc.getNumVectors();
     double xmax[nk], xmin[nk], lmax(-1.0), lmin(-1.0), lavg(-1.0);
     xc.MaxValue(xmax);
     xc.MinValue(xmin);
@@ -280,9 +280,9 @@ MyRemapDGr::CollectStatistics(double t, const TreeVector& u)
       lim.MeanValue(&lavg);
     }
 
-    if (mesh0_->getComm()->MyPID() == 0) {
-      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  limiter: %6.3f %6.3f %6.3f  umax/umin: "
-             "%9.5g %9.5g\n",
+    if (mesh0_->get_comm()->getRank() == 0) {
+      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  limiter: %6.3f %6.3f "
+             "%6.3f  umax/umin: %9.5g %9.5g\n",
              tglob,
              l2norm_,
              nfun_,
@@ -303,9 +303,9 @@ MyRemapDGr::CollectStatistics(double t, const TreeVector& u)
 
 
 /* *****************************************************************
-* Remap of polynomilas in two dimensions. Explicit time scheme.
-* Dual formulation places gradient and jumps on a test function.
-***************************************************************** */
+ * Remap of polynomilas in two dimensions. Explicit time scheme.
+ * Dual formulation places gradient and jumps on a test function.
+ ***************************************************************** */
 void
 RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
           std::string file_name,
@@ -325,7 +325,7 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
   int dim = (nz == 0) ? 2 : 3;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   // read parameter list
   std::string xmlFileName = "test/operator_remap.xml";
@@ -420,8 +420,8 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
 
   AnalyticDG04 ana(mesh0, order, true);
   ana.InitialGuess(*dg, p1c, 1.0);
-  j1c.PutScalar(0.0);
-  j1c(0)->PutScalar(1.0);
+  j1c.putScalar(0.0);
+  j1c(0)->putScalar(1.0);
 
   // initialize I/O
   {
@@ -431,7 +431,8 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
     OutputXDMF io(iolist, mesh0, true, false);
 
     io.InitializeCycle(0.0, 1);
-    Epetra_MultiVector& p1c_tmp = *p1->SubVector(0)->Data()->ViewComponent("cell");
+    Epetra_MultiVector& p1c_tmp =
+    *p1->SubVector(0)->Data()->ViewComponent("cell");
     io.WriteVector(*p1c_tmp(0), "solution", AmanziMesh::Entity_kind::CELL);
     io.FinalizeCycle();
     */
@@ -444,6 +445,8 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
   remap.set_dt_output(0.1);
 
   // initial mass
+  auto& sv1 = *p1->SubVector(0)->Data();
+  auto& sv2 = *p2->SubVector(0)->Data();
   double mass0 = remap.InitialMass(*p1, order);
 
   // explicit time integration
@@ -481,16 +484,15 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
   // calculate error in the new basis
   AmanziGeometry::Point v0(dim), v1(dim), tau(dim);
 
-  double pnorm, l2_err, inf_err, l20_err, l10_err, inf0_err;
+  double pnorm, l2_err, inf_err, l20_err, inf0_err;
   ana.ComputeCellErrorRemap(
-    *dg, p2c, tend, 0, mesh1, pnorm, l2_err, inf_err, l20_err, l10_err, inf0_err, &p3c);
+    *dg, p2c, tend, 0, mesh1, pnorm, l2_err, inf_err, l20_err, inf0_err, &p3c);
 
   CHECK(((dim == 2) ? l2_err : l20_err) < 0.12 / (order + 1));
 
   if (MyPID == 0) {
-    printf("nx=%3d (orig) L1=%12.8g(mean) L2=%12.8g(mean) %12.8g  Inf=%12.8g %12.8g\n",
+    printf("nx=%3d (orig) L2=%12.8g(mean) %12.8g  Inf=%12.8g %12.8g\n",
            nx,
-           l10_err,
            l20_err,
            l2_err,
            inf0_err,
@@ -500,11 +502,11 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
   // concervation errors: mass and volume (CGL)
   auto& jac = remap.jac();
   double area(0.0), area1(0.0), mass1(0.0), gcl_err(0.0), gcl_inf(0.0);
-  WhetStone::NumericalIntegration numi(mesh0);
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh0);
 
   for (int c = 0; c < ncells_owned; ++c) {
     double vol1 = numi.IntegratePolynomialCell(c, jac[c]);
-    double vol2 = mesh1->getCellVolume(c);
+    double vol2 = mesh1->getCellVolume(c)
 
     area += vol1;
     area1 += vol2;
@@ -513,12 +515,12 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
     gcl_inf = std::max(gcl_inf, err / vol1);
     gcl_err += err;
 
-    WhetStone::DenseVector data(nk);
+    WhetStone::DenseVector<> data(nk);
     for (int i = 0; i < nk; ++i) data(i) = p2c[i][c];
     auto poly = dg->cell_basis(c).CalculatePolynomial(mesh0, c, order, data);
 
-    WhetStone::Polynomial tmp(jac[c]);
-    tmp.ChangeOrigin(mesh0->getCellCentroid(c));
+    WhetStone::Polynomial<> tmp(jac[c]);
+    tmp.ChangeOrigin(mesh0->getCellCentroid(c))
     poly *= tmp;
     mass1 += numi.IntegratePolynomialCell(c, poly);
   }
@@ -544,7 +546,7 @@ RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
   iolist.get<std::string>("file name base", "plot");
   OutputXDMF io(iolist, mesh1, true, false);
 
-  io.InitializeCycle(t, 1, "");
+  io.InitializeCycle(t, 1);
   io.WriteVector(*p2c(0), "solution", AmanziMesh::Entity_kind::CELL);
   io.FinalizeCycle();
 }
@@ -554,6 +556,5 @@ TEST(REMAP_GEOMETRIC_CONSERVATION_LAW_REINIT)
   int deform = 5, nloop = 2;
   auto rk_method = Amanzi::Explicit_TI::tvd_3rd_order;
   double dT(0.025 * nloop), T1(1.0 / nloop);
-
   RemapGCLr(rk_method, "", 8, 8, 8, dT, deform, nloop, T1);
 }

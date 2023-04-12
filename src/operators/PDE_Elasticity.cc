@@ -15,13 +15,13 @@
 #include <vector>
 
 // TPLs
-#include "Epetra_Vector.h"
 
 // Amanzi
 #include "BilinearFormFactory.hh"
 #include "errors.hh"
 #include "MatrixFE.hh"
 #include "MFD3D_Elasticity.hh"
+#include "PreconditionerFactory.hh"
 #include "WhetStoneDefs.hh"
 #include "WhetStoneMeshUtils.hh"
 
@@ -38,10 +38,10 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Initialization of the operator, scalar coefficient.
-****************************************************************** */
+ * Initialization of the operator, scalar coefficient.
+ ****************************************************************** */
 void
-PDE_Elasticity::SetTensorCoefficient(const Teuchos::RCP<std::vector<WhetStone::Tensor>>& K)
+PDE_Elasticity::SetTensorCoefficient(const Teuchos::RCP<std::vector<WhetStone:Tensor<>>>& K)
 {
   K_ = K;
   K_default_ = 1.0;
@@ -56,16 +56,14 @@ PDE_Elasticity::SetTensorCoefficient(double K)
 
 
 /* ******************************************************************
-* Calculate elemental matrices.
-* NOTE: The input parameters are not yet used.
-****************************************************************** */
+ * Calculate elemental matrices.
+ ****************************************************************** */
 void
-PDE_Elasticity::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
-                               const Teuchos::Ptr<const CompositeVector>& p)
+PDE_Elasticity::UpdateMatrices()
 {
-  WhetStone::DenseMatrix Acell;
+  WhetStone::DenseMatrix<> Acell;
 
-  WhetStone::Tensor Kc(mesh_->getSpaceDimension(), 1);
+  WhetStone:Tensor<> Kc(mesh_->getSpaceDimension(), 1);
   Kc(0, 0) = K_default_;
 
   for (int c = 0; c < ncells_owned; c++) {
@@ -77,8 +75,8 @@ PDE_Elasticity::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
 
 
 /* ******************************************************************
-* Put here stuff that has to be done in constructor.
-****************************************************************** */
+ * Put here stuff that has to be done in constructor.
+ ****************************************************************** */
 void
 PDE_Elasticity::Init_(Teuchos::ParameterList& plist)
 {
@@ -116,7 +114,7 @@ PDE_Elasticity::Init_(Teuchos::ParameterList& plist)
     // constructor was given an Operator
     global_schema_col_ = global_op_->schema_col();
     global_schema_row_ = global_op_->schema_row();
-    mesh_ = global_op_->DomainMap().Mesh();
+    mesh_ = global_op_->DomainMap().getMesh();
   }
 
   // create the local Op and register it with the global Operator

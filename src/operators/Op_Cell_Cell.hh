@@ -27,9 +27,14 @@ class Op_Cell_Cell : public Op {
   Op_Cell_Cell(const std::string& name, const Teuchos::RCP<const AmanziMesh::Mesh> mesh)
     : Op(OPERATOR_SCHEMA_BASE_CELL | OPERATOR_SCHEMA_DOFS_CELL, name, mesh)
   {
-    diag = Teuchos::rcp(new Epetra_MultiVector(mesh->getMap(AmanziMesh::Entity_kind::CELL,false), 1));
-    diag_shadow = Teuchos::rcp(new Epetra_MultiVector(mesh->getMap(AmanziMesh::Entity_kind::CELL,false), 1));
+    diag = Teuchos::rcp(new MultiVector_type(mesh->getMap(AmanziMesh::Entity_kind::CELL,false), 1));
   }
+
+  virtual void SumLocalDiag(CompositeVector& X) const
+  {
+    X.getComponent("cell", false)->update(1., *diag, 1.);
+  }
+
 
   virtual void
   ApplyMatrixFreeOp(const Operator* assembler, const CompositeVector& X, CompositeVector& Y) const
@@ -57,13 +62,18 @@ class Op_Cell_Cell : public Op {
 
   virtual void Rescale(const CompositeVector& scaling)
   {
-    if (scaling.HasComponent("cell")) {
-      const Epetra_MultiVector& s_c = *scaling.ViewComponent("cell", false);
-      AMANZI_ASSERT(s_c.MyLength() == diag->MyLength());
-      for (int k = 0; k != s_c.NumVectors(); ++k) {
-        for (int i = 0; i != s_c.MyLength(); ++i) { (*diag)[k][i] *= s_c[0][i]; }
+    assert(false);
+#if 0
+    if (scaling.hasComponent("cell")) {
+      const Epetra_MultiVector& s_c = *scaling.viewComponent("cell", false);
+      AMANZI_ASSERT(s_c.getLocalLength() == diag->getLocalLength());
+      for (int k = 0; k != s_c.getNumVectors(); ++k) {
+        for (int i = 0; i != s_c.getLocalLength(); ++i) {
+          (*diag)[k][i] *= s_c[0][i];
+        }
       }
     }
+#endif
   }
 };
 

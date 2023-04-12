@@ -72,15 +72,10 @@ and their extensions for various PKs.
 
 #include <vector>
 
-#include "Epetra_MultiVector.h"
 #include "Teuchos_RCP.hpp"
 
-#include "BCs.hh"
-#include "CompositeVector.hh"
-#include "Mesh.hh"
-#include "OperatorDefs.hh"
+#include "MeshFramework.hh"
 #include "Point.hh"
-#include "Polynomial.hh"
 
 namespace Amanzi {
 namespace Operators {
@@ -89,32 +84,26 @@ class Reconstruction {
  public:
   Reconstruction(){};
   Reconstruction(Teuchos::RCP<const Amanzi::AmanziMesh::Mesh> mesh)
-    : mesh_(mesh), field_(Teuchos::null), component_(0), weight_(WeightType::WT_CONSTANT){};
+    : mesh_(mesh), field_(Teuchos::null), component_(0){};
   virtual ~Reconstruction() = default;
 
   // main members
-  virtual void Init(Teuchos::ParameterList& plist) = 0;
-
-  virtual void Compute(const Teuchos::RCP<const Epetra_MultiVector>& field,
-                       int component = 0,
-                       const Teuchos::RCP<const BCs>& bc = Teuchos::null)
+  virtual void Init(Teuchos::RCP<const Epetra_MultiVector> field, Teuchos::ParameterList& plist)
+  {
+    field_ = field;
+  }
+  virtual void
+  Init(Teuchos::RCP<const Epetra_MultiVector> field, Teuchos::ParameterList& plist, int component)
   {
     field_ = field;
     component_ = component;
   }
-
-  virtual double getValue(int c, const AmanziGeometry::Point& p) = 0;
-  virtual double getValueSlope(int c, const AmanziGeometry::Point& p) = 0;
-  virtual WhetStone::Polynomial getPolynomial(int c) const = 0;
-
-  // access function returns slope (gradient and higher-order derivatives)
-  virtual Teuchos::RCP<CompositeVector> data() = 0;
+  virtual void ComputeGradient() = 0;
 
  protected:
   Teuchos::RCP<const AmanziMesh::Mesh> mesh_;
   Teuchos::RCP<const Epetra_MultiVector> field_;
   int component_;
-  WeightType weight_;
 };
 
 } // namespace Operators

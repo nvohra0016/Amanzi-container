@@ -121,7 +121,7 @@ DiffusionFixture::Discretize(const std::string& name, AmanziMesh::Entity_kind sc
   Operators::PDE_DiffusionFactory opfactory(plist->sublist("PK operator").sublist(name), mesh);
 
   // populate diffusion coefficient(s)
-  auto K = Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  auto K = Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
 
   for (int c = 0; c < ncells; c++) {
@@ -148,9 +148,7 @@ DiffusionFixture::DiscretizeWithGravity(const std::string& name,
                                         double gravity,
                                         AmanziMesh::Entity_kind scalar_coef)
 {
-  Teuchos::ParameterList oplist = plist->sublist("PK operator").sublist(name);
-  oplist.set<bool>("gravity", true);
-  Operators::PDE_DiffusionFactory opfactory(oplist, mesh);
+  Operators::PDE_DiffusionFactory opfactory(plist->sublist("PK operator").sublist(name), mesh);
 
   // set gravity
   AmanziGeometry::Point g(mesh->getSpaceDimension());
@@ -158,7 +156,7 @@ DiffusionFixture::DiscretizeWithGravity(const std::string& name,
   opfactory.SetConstantGravitationalTerm(g, 1.0);
 
   // populate diffusion coefficient
-  auto K = Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  auto K = Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
 
   for (int c = 0; c < ncells; c++) {
@@ -186,7 +184,7 @@ DiffusionFixture::Setup(const std::string& prec_solver_, bool symmetric_)
   prec_solver = prec_solver_;
   global_op = op->global_operator();
   solution = Teuchos::rcp(new CompositeVector(global_op->DomainMap()));
-  solution->PutScalar(0.0);
+  solution->putScalar(0.0);
 
   // create preconditoner using the base operator class
   if (prec_solver.substr(0, 6) == "Amesos") {
@@ -258,7 +256,7 @@ DiffusionFixture::SetBCsDirichlet()
     const auto& f_map = mesh->getMap(AmanziMesh::Entity_kind::FACE, false);
 
     for (int bf = 0; bf != bf_map.NumMyElements(); ++bf) {
-      auto f = f_map.LID(bf_map.GID(bf));
+      auto f = f_map.getLocalElement(bf_map.getGlobalElement(bf));
       bc_model[f] = Operators::OPERATOR_BC_DIRICHLET;
       bc_value[f] = ana->pressure_exact(mesh->getFaceCentroid(f), 0.0);
     }
@@ -279,7 +277,7 @@ DiffusionFixture::SetBCsDirichletNeumann()
     const auto& f_map = mesh->getMap(AmanziMesh::Entity_kind::FACE, true);
 
     for (int bf = 0; bf != bf_map.NumMyElements(); ++bf) {
-      auto f = f_map.LID(bf_map.GID(bf));
+      auto f = f_map.getLocalElement(bf_map.getGlobalElement(bf));
       const auto& xf = mesh->getFaceCentroid(f);
       if (xf[0] < 0.0) {
         bool flag;
@@ -309,7 +307,7 @@ DiffusionFixture::SetBCsDirichletNeumannRobin()
     const auto& f_map = mesh->getMap(AmanziMesh::Entity_kind::FACE, true);
 
     for (int bf = 0; bf != bf_map.NumMyElements(); ++bf) {
-      auto f = f_map.LID(bf_map.GID(bf));
+      auto f = f_map.getLocalElement(bf_map.getGlobalElement(bf));
       const auto& xf = mesh->getFaceCentroid(f);
 
       bool flag;
@@ -377,7 +375,7 @@ DiffusionFixture::Go(double tol)
     Epetra_MultiVector& flx = *flux->ViewComponent("face", true);
     ana->ComputeFaceError(flx, 0.0, unorm, ul2_err, uinf_err);
 
-    auto MyPID = comm->MyPID();
+    auto MyPID = comm->getRank();
     if (MyPID == 0) {
       auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
       printf("solution time only = %g sec\n", double(duration.count() * 1e-6));

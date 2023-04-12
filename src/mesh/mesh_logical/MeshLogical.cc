@@ -22,28 +22,29 @@
 #include <set>
 #include "RegionEnumerated.hh"
 #include "MeshLogical.hh"
+#include "Iterators.hh"
 
 namespace Amanzi {
 namespace AmanziMesh {
 
 // lumped things for more efficient calculation
 std::pair<double, AmanziGeometry::Point>
-MeshLogicalAlgorithms::computeCellGeometry(const Mesh& mesh, const Entity_ID c) const
+MeshLogicalAlgorithms::computeCellGeometry(const MeshHost& mesh, const Entity_ID c) const
 {
   double volume = mesh.getCellVolume(c);
   AmanziGeometry::Point centroid = mesh.getCellCentroid(c);
   return std::make_pair(volume, centroid);
 }
 
-std::tuple<double, AmanziGeometry::Point, cPoint_View>
-MeshLogicalAlgorithms::computeFaceGeometry(const Mesh& mesh, const Entity_ID f) const
+std::tuple<double, AmanziGeometry::Point, Mesh::cPoint_View>
+MeshLogicalAlgorithms::computeFaceGeometry(const MeshHost& mesh, const Entity_ID f) const
 {
   double area = mesh.getFaceArea(f);
   AmanziGeometry::Point centroid = mesh.getFaceCentroid(f);
 
-  cEntity_ID_View fcells;
+  Mesh::cEntity_ID_View fcells;
   mesh.getFaceCells(f, Parallel_kind::ALL, fcells);
-  Point_View normals("normals", fcells.size());
+  Mesh::Point_View normals("normals", fcells.size());
   for (int i=0; i!=fcells.size(); ++i) {
     normals[i] = mesh.getFaceNormal(f, fcells[i], nullptr);
   }
@@ -51,43 +52,43 @@ MeshLogicalAlgorithms::computeFaceGeometry(const Mesh& mesh, const Entity_ID f) 
 }
 
 std::pair<AmanziGeometry::Point, AmanziGeometry::Point>
-MeshLogicalAlgorithms::computeEdgeGeometry(const Mesh& mesh, const Entity_ID e) const
+MeshLogicalAlgorithms::computeEdgeGeometry(const MeshHost& mesh, const Entity_ID e) const
 {
   Errors::Message msg("There are no edges in a MeshLogical.");
   Exceptions::amanzi_throw(msg);
   return std::make_pair(AmanziGeometry::Point(), AmanziGeometry::Point());
 }
 
-void MeshLogicalAlgorithms::getCellFacesAndBisectors(
-          const Mesh& mesh, 
+void MeshLogicalAlgorithms::computeCellFacesAndBisectors(
+          const MeshHost& mesh, 
           const Entity_ID cellid,
-          cEntity_ID_View& faceids,
-          cPoint_View * const bisectors) const 
+          Mesh::cEntity_ID_View& faceids,
+          Mesh::cPoint_View * const bisectors) const 
 {
   static_cast<const MeshLogical*>(mesh.getMeshFramework().get())->getCellFacesAndBisectors(cellid, faceids, bisectors);
 }
 
-double MeshLogicalAlgorithms::getCellVolume(const Mesh& mesh, const Entity_ID c) const 
+double MeshLogicalAlgorithms::computeCellVolume(const MeshHost& mesh, const Entity_ID c) const 
 {
   return static_cast<const MeshLogical*>(mesh.getMeshFramework().get())->getCellVolume(c); 
 }
 
-AmanziGeometry::Point MeshLogicalAlgorithms::getCellCentroid(const Mesh& mesh, const Entity_ID c) const
+AmanziGeometry::Point MeshLogicalAlgorithms::computeCellCentroid(const MeshHost& mesh, const Entity_ID c) const
 {
   return static_cast<const MeshLogical*>(mesh.getMeshFramework().get())->getCellCentroid(c); 
 }
 
-double MeshLogicalAlgorithms::getFaceArea(const Mesh& mesh, const Entity_ID f) const
+double MeshLogicalAlgorithms::computeFaceArea(const MeshHost& mesh, const Entity_ID f) const
 {
   return static_cast<const MeshLogical*>(mesh.getMeshFramework().get())->getFaceArea(f); 
 }
 
-AmanziGeometry::Point MeshLogicalAlgorithms::getFaceCentroid(const Mesh& mesh, const Entity_ID f) const
+AmanziGeometry::Point MeshLogicalAlgorithms::computeFaceCentroid(const MeshHost& mesh, const Entity_ID f) const
 {
   return static_cast<const MeshLogical*>(mesh.getMeshFramework().get())->getFaceCentroid(f); 
 }
 
-AmanziGeometry::Point MeshLogicalAlgorithms::getFaceNormal(const Mesh& mesh, const Entity_ID f,
+AmanziGeometry::Point MeshLogicalAlgorithms::computeFaceNormal(const MeshHost& mesh, const Entity_ID f,
           const Entity_ID c, int * const orientation) const
 {
   return static_cast<const MeshLogical*>(mesh.getMeshFramework().get())->getFaceNormal(f,c,orientation); 
@@ -333,7 +334,7 @@ MeshLogical::getCellFacesAndBisectors(const Entity_ID cellid,
 void
 MeshLogical::getCellFacesAndDirs(const Entity_ID c,
         cEntity_ID_View& faces,
-        cEntity_Direction_View * const dirs) const
+        cDirection_View * const dirs) const
 {
   faces = cell_face_ids_.getRowUnmanaged<MemSpace_kind::HOST>(c);
   if (dirs) (*dirs) = cell_face_dirs_.getRowUnmanaged<MemSpace_kind::HOST>(c);
@@ -429,42 +430,6 @@ MeshLogical::getFaceNormal(const Entity_ID f,
   if (orientation) *orientation = (cc == 0) ? 1 : -1;
   return normal;
 }
-
-
-
-//
-// Note this works on Mesh, but is less useful for a general mesh
-// --------------------------------------------------------------------------------
-bool viewMeshLogical(const Mesh& m, std::ostream& os) {
-  // if (m.getComm()->NumProc() != 1) {
-  //   return true;
-  // }
-
-  // os << "cell_centroids, volumes =" << std::endl;
-  // for (int c=0; c!=m.getNumEntities(Entity_kind::CELL, Parallel_kind::OWNED); ++c) {
-  //   os << m.cell_centroid(c) << " " << m.cell_volume(c) << std::endl;
-  // }
-  // os << "face_connections, areas =" << std::endl;
-  // for (int f=0; f!=m.getNumEntities(Entity_kind::FACE, Parallel_kind::OWNED); ++f) {
-  //   AmanziMesh::Entity_ID_View fcells;
-  //   m.face_get_cells(f, Parallel_kind::ALL, &fcells);
-  //   for (auto c : fcells) os << c << " ";
-  //   os << m.face_area(f) << std::endl;
-  // }
-
-  // os << "cell_sets =" << std::endl;
-  // for (auto& r : *m.getGeometricModel()) {
-  //   if (r->type() == AmanziGeometry::ENUMERATED) {
-  //     AmanziMesh::Entity_ID_View set;
-  //     m.get_set_entities(r->name(), AmanziMesh::CELL, AmanziMesh::Parallel_kind::OWNED, &set);
-  //     os << r->name() << " ";
-  //     for (auto e : set) os << e << " ";
-  //     os << std::endl;
-  //   }
-  // }
-  return false;
-}
-
 
 
 }  // namespace AmanziMesh

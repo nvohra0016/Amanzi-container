@@ -23,30 +23,20 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Create a tri-diagonal matrix. Structure of underlying equation is
-*   down_(i) x_{i-1} + diag_(i) x_i + up_(i) x_{i + 1} = b_i
-* We use end values of sub-diagonals to impose boundary conditions.
-****************************************************************** */
+ * Create a tri-diagonal matrix. Structure of underlying equation is
+ *   down_(i) x_{i-1} + diag_(i) x_i + up_(i) x_{i + 1} = b_i
+ * We use end values of sub-diagonals to impose boundary conditions.
+ ****************************************************************** */
 void
-Mini_Diffusion1D::UpdateMatrices(const PDEType method)
-{
-  if (method == PDEType::PDE_DIFFUSION_MFD)
-    UpdateMatricesMFD_();
-  else if (method == PDEType::PDE_DIFFUSION_FD)
-    UpdateMatricesFD_();
-}
-
-
-/* ******************************************************************
-* MFD scheme with harmonic mean for K, arithmetic mean for k
-****************************************************************** */
-void
-Mini_Diffusion1D::UpdateMatricesMFD_()
+Mini_Diffusion1D::UpdateMatrices()
 {
   int ncells = mesh_->NumRows() - 1;
-  double al, ar, hl, hr, Kc;
+  double al, ar, hl, hr, x0, x1, Kc;
 
   const auto& mesh = *mesh_;
+
+  x0 = mesh(0);
+  x1 = mesh(ncells);
 
   Kc = (K_ != NULL) ? (*K_)(0) : Kconst_;
 
@@ -82,47 +72,25 @@ Mini_Diffusion1D::UpdateMatricesMFD_()
 
 
 /* ******************************************************************
-* FV scheme with K=1 and arithmetic for k
-****************************************************************** */
+ * Jacobian matrix for operator A(k(p)) p - f(k(p)).
+ * NOTE: we assume that k_ != NULL and dkdp_ != NULL, i.e. J != A.
+ ****************************************************************** */
 void
-Mini_Diffusion1D::UpdateMatricesFD_()
-{
-  int ncells = mesh_->NumRows() - 1;
-  double al, ar;
-
-  const auto& mesh = *mesh_;
-
-  al = (*k_)(0) / (mesh(1) - mesh(0));
-
-  for (int i = 0; i < ncells; ++i) {
-    ar = (*k_)(i) / (mesh(i + 1) - mesh(i));
-
-    diag_(i) = al + ar;
-    down_(i) = -al;
-    up_(i) = -ar;
-
-    al = ar;
-  }
-}
-
-
-/* ******************************************************************
-* Jacobian matrix for operator A(k(p)) p - f(k(p)).
-* NOTE: we assume that k_ != NULL and dkdp_ != NULL, i.e. J != A.
-****************************************************************** */
-void
-Mini_Diffusion1D::UpdateJacobian(const WhetStone::DenseVector& p,
+Mini_Diffusion1D::UpdateJacobian(const WhetStone::DenseVector<>& p,
                                  double bcl,
                                  int type_l,
                                  double bcr,
                                  int type_r)
 {
   int ncells = mesh_->NumRows() - 1;
-  double al, ar, bl, br, hl, hr, Kc, tmp0, tmp1;
+  double al, ar, bl, br, hl, hr, x0, x1, Kc, tmp0, tmp1;
 
   const auto& mesh = *mesh_;
   const auto& k = *k_;
   const auto& dkdp = *dkdp_;
+
+  x0 = mesh(0);
+  x1 = mesh(ncells);
 
   // derivatives of A(k(p))
   Kc = (K_ != NULL) ? (*K_)(0) : Kconst_;
@@ -173,8 +141,8 @@ Mini_Diffusion1D::UpdateJacobian(const WhetStone::DenseVector& p,
 
 
 /* ******************************************************************
-* Apply boundary conditions.
-****************************************************************** */
+ * Apply boundary conditions.
+ ****************************************************************** */
 void
 Mini_Diffusion1D::ApplyBCs(double bcl, int type_l, double bcr, int type_r)
 {

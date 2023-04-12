@@ -4,21 +4,8 @@
   The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
-  Authors:
+  Authors: William A. Perkins
 */
-
-/**
- * @file   GenerationSpec.cc
- * @author William A. Perkins
- * @date Wed Sep 28 10:20:33 2011
- *
- * @brief
- *
- *
- */
-
-
-#include <Teuchos_ParameterList.hpp>
 
 #include "GenerationSpec.hh"
 

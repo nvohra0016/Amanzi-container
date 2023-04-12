@@ -44,7 +44,7 @@ class Op_Diagonal : public Op {
       row_inds_(row_inds),
       col_inds_(col_inds)
   {
-    WhetStone::DenseMatrix null_matrix;
+    WhetStone::DenseMatrix<> null_matrix;
     matrices.resize(row_inds->size(), null_matrix);
     matrices_shadow = matrices;
   }

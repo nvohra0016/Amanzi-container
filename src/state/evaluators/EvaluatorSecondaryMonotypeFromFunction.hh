@@ -89,7 +89,7 @@ class EvaluatorSecondaryMonotypeFromFunction
                                           const Tag& wrt_tag,
                                           const std::vector<CompositeVector*>& results) override
   {
-    for (auto& r : results) { r->PutScalar(0.0); }
+    for (auto& r : results) { r->putScalar(0.0); }
   }
 
  protected:

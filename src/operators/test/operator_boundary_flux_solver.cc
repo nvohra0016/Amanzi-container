@@ -51,9 +51,9 @@ typedef double (Model::*NonLinFn)(double pc) const;
 
 
 /* *****************************************************************
-* This test replaces diffusion tensor and boundary conditions by
-* continuous functions.
-* **************************************************************** */
+ * This test replaces diffusion tensor and boundary conditions by
+ * continuous functions.
+ * **************************************************************** */
 TEST(BOUNDARYFLUX)
 {
   using namespace Teuchos;
@@ -63,7 +63,7 @@ TEST(BOUNDARYFLUX)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0) std::cout << "\nTest: BoundaryFluxSolver" << std::endl;
 

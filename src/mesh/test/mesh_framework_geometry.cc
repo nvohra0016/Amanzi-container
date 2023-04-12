@@ -44,14 +44,14 @@ TEST(MESH_GEOMETRY_1CUBE_GENERATED)
 {
   // a 3D, generated, structured hex on the unit cube, NX=NY=NZ=1
   // only makes sense in serial
-  if (getDefaultComm()->NumProc() != 1) return;
+  if (getDefaultComm()->getSize() != 1) return;
 
   std::vector<Framework> frameworks;
   // works in MSTK & SIMPLE (in serial)
   if (framework_enabled(Framework::MSTK)) {
     frameworks.push_back(Framework::MSTK);
   }
-  if (getDefaultComm()->NumProc() == 1)
+  if (getDefaultComm()->getSize() == 1)
     frameworks.push_back(Framework::SIMPLE);
 
   for (const auto& frm : frameworks) {
@@ -69,7 +69,7 @@ TEST(MESH_GEOMETRY_1CUBE_EXO)
 {
   // a 3D exodus file, structured hex on the unit cube, NX=NY=NZ=1
   // only makes sense in serial
-  if (getDefaultComm()->NumProc() != 1) return;
+  if (getDefaultComm()->getSize() != 1) return;
 
   // works in MSTK or MOAB
   std::vector<Framework> frameworks;
@@ -99,7 +99,7 @@ TEST(MESH_GEOMETRY_3CUBE)
   if (framework_enabled(Framework::MSTK)) {
     frameworks.push_back(Framework::MSTK);
   }
-  if (getDefaultComm()->NumProc() == 1)
+  if (getDefaultComm()->getSize() == 1)
     frameworks.push_back(Framework::SIMPLE);
 
   for (const auto& frm : frameworks) {
@@ -122,7 +122,7 @@ TEST(MESH_GEOMETRY_3CUBE_EXO)
     frameworks.push_back(Framework::MSTK);
   }
   if (framework_enabled(Framework::MOAB) &&
-      getDefaultComm()->NumProc() == 1) {
+      getDefaultComm()->getSize() == 1) {
     // moab only reads exo in serial, otherwise must read par
     frameworks.push_back(Framework::MOAB);
   }
@@ -145,7 +145,7 @@ TEST(MESH_GEOMETRY_3CUBE_EXO)
 // {
 //   // a 3D exodus file, structured hex on the unit cube, NX=NY=NZ=3, prepartitioned
 //   // works in MSTK or MOAB
-//   int nprocs = getDefaultComm()->NumProc();
+//   int nprocs = getDefaultComm()->getSize();
 //   if (nprocs != 2) return;
 
 //   std::vector<Framework> frameworks;
@@ -176,7 +176,7 @@ TEST(MESH_GEOMETRY_2x3CUBE)
   if (framework_enabled(Framework::MSTK)) {
     frameworks.push_back(Framework::MSTK);
   }
-  if (getDefaultComm()->NumProc() == 1)
+  if (getDefaultComm()->getSize() == 1)
     frameworks.push_back(Framework::SIMPLE);
 
   for (const auto& frm : frameworks) {

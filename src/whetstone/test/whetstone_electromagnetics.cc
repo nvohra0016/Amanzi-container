@@ -62,14 +62,14 @@ TEST(MASS_MATRIX_2D)
   int nedges = edges.size();
   int nrows = nedges;
 
-  Tensor T(2, 2);
+ Tensor<> T(2, 2);
   T(0, 0) = 2.0;
   T(1, 1) = 1.0;
   T(0, 1) = 1.0;
   T(1, 0) = 1.0;
 
   for (int method = 0; method < 4; method++) {
-    DenseMatrix M(nrows, nrows);
+    DenseMatrix<> M(nrows, nrows);
 
     if (method == 0) {
       mfd.MassMatrix(cell, T, M);
@@ -158,7 +158,7 @@ MassMatrix3D(std::string mesh_file, int max_row)
   int nedges = edges.size();
   int nrows = nedges;
 
-  Tensor T(3, 2);
+ Tensor<> T(3, 2);
   T(0, 0) = 2.0;
   T(1, 1) = 1.0;
   T(0, 1) = 1.0;
@@ -166,7 +166,7 @@ MassMatrix3D(std::string mesh_file, int max_row)
   T(2, 2) = 1.0;
 
   for (int method = 0; method < 4; method++) {
-    DenseMatrix M(nrows, nrows);
+    DenseMatrix<> M(nrows, nrows);
 
     if (method == 0) {
       mfd.MassMatrix(cell, T, M);
@@ -273,11 +273,11 @@ TEST(STIFFNESS_MATRIX_2D)
   int nfaces = faces.size();
   int nrows = nfaces;
 
-  Tensor T(2, 1);
+ Tensor<> T(2, 1);
   T(0, 0) = 1.0;
 
   for (int method = 1; method < 2; method++) {
-    DenseMatrix A(nrows, nrows);
+    DenseMatrix<> A(nrows, nrows);
 
     if (method == 0) {
       mfd.StiffnessMatrix(cell, T, A);
@@ -364,7 +364,7 @@ StiffnessMatrix3D(std::string mesh_file, int max_row)
   int nedges = edges.size();
   int nrows = nedges;
 
-  Tensor T(3, 2);
+ Tensor<> T(3, 2);
   T(0, 0) = 2.0;
   T(1, 1) = 1.0;
   T(2, 2) = 3.0;
@@ -372,7 +372,7 @@ StiffnessMatrix3D(std::string mesh_file, int max_row)
   T(1, 0) = 1.0;
 
   for (int method = 0; method < 2; method++) {
-    DenseMatrix A(nrows, nrows);
+    DenseMatrix<> A(nrows, nrows);
 
     if (method == 0) {
       mfd.StiffnessMatrix(cell, T, A);

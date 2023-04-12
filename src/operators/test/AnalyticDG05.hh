@@ -36,7 +36,7 @@ class AnalyticDG05 : public AnalyticDGBase {
   virtual Amanzi::WhetStone::Tensor
   Tensor(const Amanzi::AmanziGeometry::Point& p, double t) override
   {
-    Amanzi::WhetStone::Tensor K(2, 1);
+    Amanzi::WhetStone:Tensor<> K(2, 1);
     K(0, 0) = 0.0;
     return K;
   }
@@ -44,18 +44,18 @@ class AnalyticDG05 : public AnalyticDGBase {
   // -- solution
   virtual void SolutionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& sol) override
+                              Amanzi::WhetStone::Polynomial<>& sol) override
   {
-    sol.Reshape(d_, order_, true);
+    sol.reshape(d_, order_, true);
     sol(0) = (p[0] < X0 + t * VEL) ? 1.0 : 0.0;
   }
 
   // -- accumulation
   virtual void AccumulationTaylor(const Amanzi::AmanziGeometry::Point& p,
                                   double t,
-                                  Amanzi::WhetStone::Polynomial& a) override
+                                  Amanzi::WhetStone::Polynomial<>& a) override
   {
-    a.Reshape(d_, 0, true);
+    a.reshape(d_, 0, true);
   }
 
   // -- velocity
@@ -63,24 +63,24 @@ class AnalyticDG05 : public AnalyticDGBase {
                               double t,
                               Amanzi::WhetStone::VectorPolynomial& v) override
   {
-    v.Reshape(d_, d_, 0, true);
+    v.reshape(d_, d_, 0, true);
     v[0](0) = VEL;
   }
 
   // -- reaction
   virtual void ReactionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& r) override
+                              Amanzi::WhetStone::Polynomial<>& r) override
   {
-    r.Reshape(d_, 0, true);
+    r.reshape(d_, 0, true);
   }
 
   // -- source term
   virtual void SourceTaylor(const Amanzi::AmanziGeometry::Point& p,
                             double t,
-                            Amanzi::WhetStone::Polynomial& src) override
+                            Amanzi::WhetStone::Polynomial<>& src) override
   {
-    src.Reshape(d_, 0, true);
+    src.reshape(d_, 0, true);
   }
 };
 

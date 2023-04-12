@@ -18,8 +18,6 @@
 #include <vector>
 
 #include "Teuchos_RCP.hpp"
-#include "Epetra_Map.h"
-#include "Epetra_Import.h"
 
 #include "errors.hh"
 #include "AmanziTypes.hh"
@@ -55,22 +53,11 @@ struct MemorySpace<MemSpace_kind::HOST> {
 //
 // Views are on host or device
 //
-template<typename T, MemSpace_kind MEM=MemSpace_kind::HOST>
+template<typename T, MemSpace_kind MEM=MemSpace_kind::DEVICE>
 using View_type = Kokkos::MeshView<T*, typename Impl::MemorySpace<MEM>::space>;
 
-using Entity_ID_View = View_type<Entity_ID>;
-using cEntity_ID_View = View_type<const Entity_ID>;
-using Entity_GID_View = View_type<Entity_GID>;
-using cEntity_GID_View = View_type<const Entity_GID>;
-using Entity_Direction_View = View_type<int>;
-using cEntity_Direction_View = View_type<const int>;
-using Point_View = View_type<AmanziGeometry::Point>;
-using cPoint_View = View_type<const AmanziGeometry::Point>;
-using Double_View = View_type<double>;
-using cDouble_View = View_type<const double>;
-
 //
-// View for host only
+// Lists for host only
 //
 using Entity_ID_List = std::vector<Entity_ID>;
 using Entity_GID_List = std::vector<Entity_ID>;
@@ -80,20 +67,27 @@ using Double_List = std::vector<double>;
 template<typename T> using RaggedArray_List = std::vector<std::vector<T>>;
 
 
-template<typename T> using DualView_type = Kokkos::MeshDualView<T*, Kokkos::DefaultHostExecutionSpace>;
+template<typename T> using DualView_type = Kokkos::MeshDualView<T*, Amanzi::DefaultMemorySpace>;
 using Entity_ID_DualView = DualView_type<Entity_ID>;
 using Entity_GID_DualView = DualView_type<Entity_GID>;
 using Entity_Direction_DualView = DualView_type<int>;
 using Point_DualView = DualView_type<AmanziGeometry::Point>;
 using Double_DualView = DualView_type<double>;
 
-//
-// This may not be necessary?
-//
-struct RaggedArray_View {
-  Entity_ID_View rows;
-  Entity_ID_View entries;
-};
+// //
+// // This may not be necessary?
+// //
+// struct RaggedArray_View {
+//   Entity_ID_View rows;
+//   Entity_ID_View entries;
+// };
+
+
+inline
+std::string to_string(const MemSpace_kind mem) {
+  if (mem == MemSpace_kind::HOST) return "host";
+  else return "device";
+}
 
 
 // Cells (aka zones/elements) are the highest dimension entities in a mesh

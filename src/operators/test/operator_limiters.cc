@@ -19,7 +19,6 @@
 #include <vector>
 
 // TPLs
-#include "Epetra_MultiVector.h"
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
@@ -33,14 +32,14 @@
 #include "ErrorAnalysis.hh"
 #include "LimiterCell.hh"
 #include "OperatorDefs.hh"
-#include "ReconstructionCellLinear.hh"
+#include "ReconstructionCell.hh"
 
-const std::string LIMITERS[9] = { "B-J",     "Tensorial", "Tens. c2c", "Kuzmin", "B-J c2c",
-                                  "B-J all", "M-G all",   "B-J node",  "B-J ext" };
+const std::string LIMITERS[7] = { "B-J",     "Tensorial", "Tens. c2c", "Kuzmin",
+                                  "B-J c2c", "B-J all",   "M-G all" };
 
 /* *****************************************************************
-* Limiters must be 1 on linear functions in two dimensions
-***************************************************************** */
+ * Limiters must be 1 on linear functions in two dimensions
+ ***************************************************************** */
 TEST(LIMITER_LINEAR_FUNCTION_2D)
 {
   using namespace Amanzi;
@@ -49,12 +48,12 @@ TEST(LIMITER_LINEAR_FUNCTION_2D)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: Limiters for linear functions in 2D." << std::endl;
 
   // create rectangular mesh
   MeshFactory meshfactory(comm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
 
   Teuchos::RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 7, 7);
 
@@ -69,7 +68,7 @@ TEST(LIMITER_LINEAR_FUNCTION_2D)
   int nnodes_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
 
   for (int c = 0; c < ncells_wghost; c++) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     (*field)[0][c] = xc[0] + 2 * xc[1];
     if (c < ncells_owned) {
       grad_exact[0][c] = 1.0;
@@ -77,7 +76,7 @@ TEST(LIMITER_LINEAR_FUNCTION_2D)
     }
   }
 
-  for (int i = 0; i < 9; i++) {
+  for (int i = 0; i < 7; i++) {
     std::vector<int> bc_model;
     std::vector<double> bc_value;
     Teuchos::ParameterList plist;
@@ -103,14 +102,6 @@ TEST(LIMITER_LINEAR_FUNCTION_2D)
     } else if (i == 6) {
       plist.set<std::string>("limiter", "Michalak-Gooch")
         .set<std::string>("limiter stencil", "cell to all cells");
-    } else if (i == 7) {
-      plist.set<std::string>("limiter", "Barth-Jespersen")
-        .set<std::string>("limiter stencil", "cell to all cells")
-        .set<std::string>("limiter location", "node");
-    } else if (i == 8) {
-      plist.set<std::string>("limiter", "Barth-Jespersen")
-        .set<std::string>("limiter stencil", "cell to all cells")
-        .set<bool>("use external controls", true);
     }
 
     if (i != 3) {
@@ -118,7 +109,7 @@ TEST(LIMITER_LINEAR_FUNCTION_2D)
       bc_value.assign(nfaces_wghost, 0.0);
 
       for (int f = 0; f < nfaces_wghost; f++) {
-        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
         if (fabs(xf[0]) < 1e-6 || fabs(1.0 - xf[0]) < 1e-6 || fabs(xf[1]) < 1e-6 ||
             fabs(1.0 - xf[1]) < 1e-6) {
           bc_model[f] = OPERATOR_BC_DIRICHLET;
@@ -140,34 +131,24 @@ TEST(LIMITER_LINEAR_FUNCTION_2D)
       }
     }
 
-    // Set control
-    auto controls = Teuchos::rcp(new std::vector<std::vector<AmanziGeometry::Point>>(ncells_owned));
-    if (i == 8) {
-      for (int c = 0; c < ncells_owned; ++c) {
-        const auto& xc = mesh->getCellCentroid(c);
-        (*controls)[c].push_back(xc);
-      }
-    }
-
     // Compute reconstruction
-    auto lifting = Teuchos::rcp(new ReconstructionCellLinear(mesh));
-    lifting->Init(plist);
-    lifting->Compute(field);
+    ReconstructionCell lifting(mesh);
+    lifting.Init(field, plist);
+    lifting.ComputeGradient();
 
     // Apply limiter
     LimiterCell limiter(mesh);
     limiter.Init(plist);
-    if (i == 8) limiter.set_controls(controls);
-    limiter.ApplyLimiter(field, 0, lifting, bc_model, bc_value);
+    limiter.ApplyLimiter(field, 0, lifting.gradient(), bc_model, bc_value);
 
     // calculate gradient error.
     double err_int, err_glb, gnorm;
-    auto& grad_computed = *lifting->data()->ViewComponent("cell");
+    Epetra_MultiVector& grad_computed = *lifting.gradient()->ViewComponent("cell");
 
-    ComputePolyError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
+    ComputeGradError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
     // Michalak-Gooch limiter is not linearity preserving near boundary
-    CHECK_CLOSE(0.0, err_int, 2.0e-9);
-    if (i < 6) CHECK_CLOSE(0.0, err_glb, 1.0e-10);
+    CHECK_CLOSE(0.0, err_int, 1.0e-12);
+    if (i < 6) CHECK_CLOSE(0.0, err_glb, 1.0e-12);
 
     if (MyPID == 0) printf("%9s: errors: %8.4f %8.4f\n", LIMITERS[i].c_str(), err_int, err_glb);
   }
@@ -175,8 +156,8 @@ TEST(LIMITER_LINEAR_FUNCTION_2D)
 
 
 /* *****************************************************************
-* Limiters must be 1 on linear functions in three dimensions.
-***************************************************************** */
+ * Limiters must be 1 on linear functions in three dimensions.
+ ***************************************************************** */
 TEST(LIMITER_LINEAR_FUNCTION_3D)
 {
   using namespace Amanzi;
@@ -185,12 +166,12 @@ TEST(LIMITER_LINEAR_FUNCTION_3D)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: Limiters for linear functions in 3D." << std::endl;
 
   // create rectangular mesh
   MeshFactory meshfactory(comm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
 
   Teuchos::RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 7, 6, 5);
 
@@ -203,7 +184,7 @@ TEST(LIMITER_LINEAR_FUNCTION_3D)
   int ncells_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
 
   for (int c = 0; c < ncells_wghost; c++) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     (*field)[0][c] = xc[0] + 2 * xc[1] + 3 * xc[2];
     if (c < ncells_owned) {
       grad_exact[0][c] = 1.0;
@@ -223,10 +204,10 @@ TEST(LIMITER_LINEAR_FUNCTION_3D)
   AmanziGeometry::Point velocity(3), center(0.5, 0.5, 0.5);
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+    const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
     velocity = center - xf;
-    const AmanziGeometry::Point& normal = mesh->getFaceNormal(f);
-    (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f);
+    const AmanziGeometry::Point& normal = mesh->getFaceNormal(f)
+    (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f)
   }
 
   for (int i = 0; i < 4; i++) {
@@ -253,7 +234,7 @@ TEST(LIMITER_LINEAR_FUNCTION_3D)
       bc_value.assign(nfaces_wghost, 0.0);
 
       for (int f = 0; f < nfaces_wghost; f++) {
-        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
         if (fabs(xf[0]) < 1e-6 || fabs(1.0 - xf[0]) < 1e-6 || fabs(xf[1]) < 1e-6 ||
             fabs(1.0 - xf[1]) < 1e-6 || fabs(xf[2]) < 1e-6 || fabs(1.0 - xf[2]) < 1e-6) {
           bc_model[f] = OPERATOR_BC_DIRICHLET;
@@ -276,21 +257,21 @@ TEST(LIMITER_LINEAR_FUNCTION_3D)
     }
 
     // Compute reconstruction
-    auto lifting = Teuchos::rcp(new ReconstructionCellLinear(mesh));
-    lifting->Init(plist);
-    lifting->Compute(field);
+    ReconstructionCell lifting(mesh);
+    lifting.Init(field, plist);
+    lifting.ComputeGradient();
 
     // Apply limiter
     LimiterCell limiter(mesh);
     limiter.Init(plist, flux);
-    limiter.ApplyLimiter(field, 0, lifting, bc_model, bc_value);
+    limiter.ApplyLimiter(field, 0, lifting.gradient(), bc_model, bc_value);
 
     // calculate gradient error
     double err_int, err_glb, gnorm;
-    auto& grad_computed = *lifting->data()->ViewComponent("cell");
+    Epetra_MultiVector& grad_computed = *lifting.gradient()->ViewComponent("cell");
 
-    ComputePolyError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
-    CHECK_CLOSE(0.0, err_int + err_glb, 1.0e-10);
+    ComputeGradError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
+    CHECK_CLOSE(0.0, err_int + err_glb, 1.0e-12);
 
     if (MyPID == 0) printf("%9s: errors: %8.4f %8.4f\n", LIMITERS[i].c_str(), err_int, err_glb);
   }
@@ -298,8 +279,8 @@ TEST(LIMITER_LINEAR_FUNCTION_3D)
 
 
 /* *****************************************************************
-* Convergence of limited functions in two dimensions.
-***************************************************************** */
+ * Convergence of limited functions in two dimensions.
+ ***************************************************************** */
 TEST(LIMITER_SMOOTH_FIELD_2D)
 {
   using namespace Amanzi;
@@ -308,12 +289,12 @@ TEST(LIMITER_SMOOTH_FIELD_2D)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: Accuracy on a smooth field in 2D." << std::endl;
 
   // create rectangular mesh
   MeshFactory meshfactory(comm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
 
   for (int n = 14; n < 100; n *= 2) {
     Teuchos::RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, n, n - 1);
@@ -327,7 +308,7 @@ TEST(LIMITER_SMOOTH_FIELD_2D)
     int ncells_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
 
     for (int c = 0; c < ncells_wghost; c++) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
       double x = xc[0], y = xc[1];
       (*field)[0][c] = x * x * y + 2 * x * y * y * y;
       if (c < ncells_owned) {
@@ -347,19 +328,18 @@ TEST(LIMITER_SMOOTH_FIELD_2D)
     AmanziGeometry::Point velocity(1.0, 2.0), center(0.5, 0.5);
 
     for (int f = 0; f < nfaces_wghost; f++) {
-      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
       velocity = center - xf;
-      const AmanziGeometry::Point& normal = mesh->getFaceNormal(f);
-      (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f);
+      const AmanziGeometry::Point& normal = mesh->getFaceNormal(f)
+      (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f)
     }
 
     for (int i = 0; i < 7; i++) {
       std::vector<int> bc_model;
       std::vector<double> bc_value;
       Teuchos::ParameterList plist;
-      plist.set<int>("polynomial_order", 1)
-        .set<std::string>("weight", "inverse distance")
-        .set<bool>("limiter extension for transport", false);
+      plist.set<int>("polynomial_order", 1);
+      plist.set<bool>("limiter extension for transport", false);
 
       if (i == 0) {
         plist.set<std::string>("limiter", "Barth-Jespersen")
@@ -387,7 +367,7 @@ TEST(LIMITER_SMOOTH_FIELD_2D)
         bc_value.assign(nfaces_wghost, 0.0);
 
         for (int f = 0; f < nfaces_wghost; f++) {
-          const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+          const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
           double x = xf[0], y = xf[1];
           if (fabs(xf[0]) < 1e-6 || fabs(1.0 - xf[0]) < 1e-6 || fabs(xf[1]) < 1e-6 ||
               fabs(1.0 - xf[1]) < 1e-6) {
@@ -412,20 +392,20 @@ TEST(LIMITER_SMOOTH_FIELD_2D)
       }
 
       // Compute reconstruction
-      auto lifting = Teuchos::rcp(new ReconstructionCellLinear(mesh));
-      lifting->Init(plist);
-      lifting->Compute(field);
+      ReconstructionCell lifting(mesh);
+      lifting.Init(field, plist);
+      lifting.ComputeGradient();
 
       // Apply limiter
       LimiterCell limiter(mesh);
       limiter.Init(plist, flux);
-      limiter.ApplyLimiter(field, 0, lifting, bc_model, bc_value);
+      limiter.ApplyLimiter(field, 0, lifting.gradient(), bc_model, bc_value);
 
       // calculate gradient error
       double err_int, err_glb, gnorm;
-      auto& grad_computed = *lifting->data()->ViewComponent("cell");
+      Epetra_MultiVector& grad_computed = *lifting.gradient()->ViewComponent("cell");
 
-      ComputePolyError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
+      ComputeGradError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
 
       if (MyPID == 0)
         printf("%9s: rel errors: %9.5f %9.5f\n", LIMITERS[i].c_str(), err_int, err_glb);
@@ -437,8 +417,8 @@ TEST(LIMITER_SMOOTH_FIELD_2D)
 
 
 /* *****************************************************************
-* Convergence of limited functions in three dimensions.
-***************************************************************** */
+ * Convergence of limited functions in three dimensions.
+ ***************************************************************** */
 TEST(LIMITER_SMOOTH_FIELD_3D)
 {
   using namespace Amanzi;
@@ -447,12 +427,12 @@ TEST(LIMITER_SMOOTH_FIELD_3D)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: Accuracy on a smooth field in 3D" << std::endl;
 
   // create rectangular mesh
   MeshFactory meshfactory(comm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
 
   for (int n = 14; n < 50; n *= 2) {
     Teuchos::RCP<const Mesh> mesh =
@@ -467,7 +447,7 @@ TEST(LIMITER_SMOOTH_FIELD_3D)
     int ncells_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
 
     for (int c = 0; c < ncells_wghost; c++) {
-      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+      const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
       double x = xc[0], y = xc[1], z = xc[2];
       (*field)[0][c] = x * x * y * z * z + 2 * x * y * y * y * z;
       if (c < ncells_owned) {
@@ -488,17 +468,18 @@ TEST(LIMITER_SMOOTH_FIELD_3D)
     AmanziGeometry::Point velocity(3), center(0.5, 0.5, 0.5);
 
     for (int f = 0; f < nfaces_wghost; f++) {
-      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+      const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
       velocity = center - xf;
-      const AmanziGeometry::Point& normal = mesh->getFaceNormal(f);
-      (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f);
+      const AmanziGeometry::Point& normal = mesh->getFaceNormal(f)
+      (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f)
     }
 
     for (int i = 0; i < 3; i++) {
       std::vector<int> bc_model;
       std::vector<double> bc_value;
       Teuchos::ParameterList plist;
-      plist.set<int>("polynomial_order", 1).set<bool>("limiter extension for transport", false);
+      plist.set<int>("polynomial_order", 1);
+      plist.set<bool>("limiter extension for transport", false);
 
       if (i == 0) {
         plist.set<std::string>("limiter", "Barth-Jespersen");
@@ -513,7 +494,7 @@ TEST(LIMITER_SMOOTH_FIELD_3D)
         bc_value.assign(nfaces_wghost, 0.0);
 
         for (int f = 0; f < nfaces_wghost; f++) {
-          const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+          const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
           double x = xf[0], y = xf[1], z = xf[2];
           if (fabs(xf[0]) < 1e-6 || fabs(1.0 - xf[0]) < 1e-6 || fabs(xf[1]) < 1e-6 ||
               fabs(1.0 - xf[1]) < 1e-6 || fabs(xf[2]) < 1e-6 || fabs(1.0 - xf[2]) < 1e-6) {
@@ -538,35 +519,23 @@ TEST(LIMITER_SMOOTH_FIELD_3D)
       }
 
       // Compute reconstruction
-      auto lifting = Teuchos::rcp(new ReconstructionCellLinear(mesh));
-      lifting->Init(plist);
-      lifting->Compute(field);
+      ReconstructionCell lifting(mesh);
+      lifting.Init(field, plist);
+      lifting.ComputeGradient();
 
       // Apply limiter
       LimiterCell limiter(mesh);
       limiter.Init(plist, flux);
-      limiter.ApplyLimiter(field, 0, lifting, bc_model, bc_value);
+      limiter.ApplyLimiter(field, 0, lifting.gradient(), bc_model, bc_value);
 
       // calculate gradient error
-      double err_int, err_glb, err_int_nobc, err_glb_nobc, gnorm;
-      auto& grad_computed = *lifting->data()->ViewComponent("cell");
+      double err_int, err_glb, gnorm;
+      Epetra_MultiVector& grad_computed = *lifting.gradient()->ViewComponent("cell");
 
-      ComputePolyError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
-
-      // skip boundary data
-      limiter.ApplyLimiter(field, 0, lifting);
-
-      auto& grad_test = *lifting->data()->ViewComponent("cell");
-      ComputePolyError(mesh, grad_test, grad_exact, err_int_nobc, err_glb_nobc, gnorm);
+      ComputeGradError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
 
       if (MyPID == 0)
-        printf("n=%d  %9s: rel errors: %9.5f %9.5f  no_bc: %9.5f %9.5f\n",
-               n,
-               LIMITERS[i].c_str(),
-               err_int,
-               err_glb,
-               err_int_nobc,
-               err_glb_nobc);
+        printf("n=%d  %9s: rel errors: %9.5f %9.5f\n", n, LIMITERS[i].c_str(), err_int, err_glb);
 
       CHECK(err_int + err_glb < 1.0 / n);
     }
@@ -575,8 +544,8 @@ TEST(LIMITER_SMOOTH_FIELD_3D)
 
 
 /* *****************************************************************
-* Convergece of limited functions in two dimensions.
-***************************************************************** */
+ * Convergece of limited functions in two dimensions.
+ ***************************************************************** */
 void
 SmoothField2DPoly(double extension)
 {
@@ -586,7 +555,7 @@ SmoothField2DPoly(double extension)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0)
     std::cout << "\nTest: smooth field on a polygonal mesh, extension=" << extension << std::endl;
 
@@ -595,7 +564,7 @@ SmoothField2DPoly(double extension)
   Teuchos::RCP<GeometricModel> gm = Teuchos::rcp(new GeometricModel(2, region_list, *comm));
 
   MeshFactory meshfactory(comm, gm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
 
   Teuchos::RCP<const Mesh> mesh = meshfactory.create("test/median32x33.exo");
 
@@ -608,7 +577,7 @@ SmoothField2DPoly(double extension)
   int ncells_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
 
   for (int c = 0; c < ncells_wghost; c++) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     double x = xc[0], y = xc[1];
     (*field)[0][c] = x * x * y + 2 * x * y * y * y;
     if (c < ncells_owned) {
@@ -628,19 +597,18 @@ SmoothField2DPoly(double extension)
   AmanziGeometry::Point velocity(1.0, 2.0), center(0.5, 0.5);
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+    const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
     velocity = center - xf;
-    const AmanziGeometry::Point& normal = mesh->getFaceNormal(f);
-    (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f);
+    const AmanziGeometry::Point& normal = mesh->getFaceNormal(f)
+    (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f)
   }
 
   for (int i = 0; i < 7; i++) {
     std::vector<int> bc_model;
     std::vector<double> bc_value;
     Teuchos::ParameterList plist;
-    plist.set<int>("polynomial_order", 1)
-      .set<std::string>("weight", "inverse distance")
-      .set<bool>("limiter extension for transport", extension);
+    plist.set<int>("polynomial_order", 1);
+    plist.set<bool>("limiter extension for transport", extension);
 
     if (i == 0) {
       plist.set<std::string>("limiter", "Barth-Jespersen")
@@ -668,7 +636,7 @@ SmoothField2DPoly(double extension)
       bc_value.assign(nfaces_wghost, 0.0);
 
       for (int f = 0; f < nfaces_wghost; f++) {
-        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
         double x = xf[0], y = xf[1];
         if (fabs(xf[0]) < 1e-6 || fabs(1.0 - xf[0]) < 1e-6 || fabs(xf[1]) < 1e-6 ||
             fabs(1.0 - xf[1]) < 1e-6) {
@@ -693,20 +661,20 @@ SmoothField2DPoly(double extension)
     }
 
     // Compute reconstruction
-    auto lifting = Teuchos::rcp(new ReconstructionCellLinear(mesh));
-    lifting->Init(plist);
-    lifting->Compute(field);
+    ReconstructionCell lifting(mesh);
+    lifting.Init(field, plist);
+    lifting.ComputeGradient();
 
     // Apply limiter
     LimiterCell limiter(mesh);
     limiter.Init(plist, flux);
-    limiter.ApplyLimiter(field, 0, lifting, bc_model, bc_value);
+    limiter.ApplyLimiter(field, 0, lifting.gradient(), bc_model, bc_value);
 
     // calculate gradient error
     double err_int, err_glb, gnorm;
-    auto& grad_computed = *lifting->data()->ViewComponent("cell");
+    Epetra_MultiVector& grad_computed = *lifting.gradient()->ViewComponent("cell");
 
-    ComputePolyError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
+    ComputeGradError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
 
     if (MyPID == 0) printf("%9s: rel errors: %9.5f %9.5f\n", LIMITERS[i].c_str(), err_int, err_glb);
   }
@@ -720,8 +688,8 @@ TEST(LIMITER_SMOOTH_FIELD_POLYMESH)
 
 
 /* *****************************************************************
-* Limiters must be 1 on linear functions in three dimensions.
-***************************************************************** */
+ * Limiters must be 1 on linear functions in three dimensions.
+ ***************************************************************** */
 TEST(LIMITER_LINEAR_FUNCTION_FRACTURES)
 {
   using namespace Amanzi;
@@ -730,12 +698,12 @@ TEST(LIMITER_LINEAR_FUNCTION_FRACTURES)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: Limiters for linear functions in fractures." << std::endl;
 
   // create rectangular mesh
   MeshFactory meshfactory(comm);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
   Teuchos::RCP<const Mesh> mesh = meshfactory.create("test/fractures.exo");
 
   // create and initialize cell-based field
@@ -747,7 +715,7 @@ TEST(LIMITER_LINEAR_FUNCTION_FRACTURES)
   int ncells_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
 
   for (int c = 0; c < ncells_wghost; c++) {
-    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c);
+    const AmanziGeometry::Point& xc = mesh->getCellCentroid(c)
     if (fabs(xc[2] - 0.5) < 1e-10) {
       (*field)[0][c] = xc[0] + 2 * xc[1];
       if (c < ncells_owned) {
@@ -765,7 +733,22 @@ TEST(LIMITER_LINEAR_FUNCTION_FRACTURES)
     }
   }
 
+  // create and initialize flux
+  // Since limiters do not allow maximum on the outflow bounadry,
+  // we use this trick: re-entering flow everywhere.
+  const Epetra_Map& fmap = mesh->getMap(AmanziMesh::Entity_kind::FACE,true);
+  Teuchos::RCP<Epetra_MultiVector> flux = Teuchos::rcp(new Epetra_MultiVector(fmap, 1));
+
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
+  int nnodes_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
+  AmanziGeometry::Point velocity(3), center(0.5, 0.5, 0.5);
+
+  for (int f = 0; f < nfaces_wghost; f++) {
+    const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
+    velocity = center - xf;
+    const AmanziGeometry::Point& normal = mesh->getFaceNormal(f)
+    (*flux)[0][f] = (velocity * normal) / mesh->getFaceArea(f)
+  }
 
   for (int i = 1; i < 2; i++) {
     std::vector<int> bc_model;
@@ -781,7 +764,7 @@ TEST(LIMITER_LINEAR_FUNCTION_FRACTURES)
       bc_value.assign(nfaces_wghost, 0.0);
 
       for (int f = 0; f < nfaces_wghost; f++) {
-        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f);
+        const AmanziGeometry::Point& xf = mesh->getFaceCentroid(f)
         if (fabs(xf[0]) < 1e-6 || fabs(1.0 - xf[0]) < 1e-6 || fabs(xf[1]) < 1e-6 ||
             fabs(1.0 - xf[1]) < 1e-6 || fabs(xf[2]) < 1e-6 || fabs(1.0 - xf[2]) < 1e-6) {
           bc_model[f] = OPERATOR_BC_DIRICHLET;
@@ -791,16 +774,16 @@ TEST(LIMITER_LINEAR_FUNCTION_FRACTURES)
     }
 
     // Compute reconstruction
-    ReconstructionCellLinear lifting(mesh);
-    lifting.Init(plist);
-    lifting.Compute(field);
+    ReconstructionCell lifting(mesh);
+    lifting.Init(field, plist);
+    lifting.ComputeGradient();
 
     // calculate gradient error
     double err_int, err_glb, gnorm;
-    auto& grad_computed = *lifting.data()->ViewComponent("cell");
+    Epetra_MultiVector& grad_computed = *lifting.gradient()->ViewComponent("cell");
 
-    ComputePolyError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
-    CHECK_CLOSE(0.0, err_int + err_glb, 2.0e-10);
+    ComputeGradError(mesh, grad_computed, grad_exact, err_int, err_glb, gnorm);
+    CHECK_CLOSE(0.0, err_int + err_glb, 1.0e-12);
 
     if (MyPID == 0) printf("%9s: errors: %8.4f %8.4f\n", LIMITERS[i].c_str(), err_int, err_glb);
   }

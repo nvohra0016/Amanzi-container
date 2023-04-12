@@ -22,7 +22,7 @@
 
 #include "Teuchos_RCP.hpp"
 
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 
 namespace Amanzi {
 namespace Operators {

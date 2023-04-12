@@ -33,7 +33,7 @@ include_directories(${WHETSTONE_SOURCE_DIR})
 
 # External (TPL) include directories
 include_directories(${ASCEMIO_INCLUDE_DIR})
-include_directories(${Epetra_INCLUDE_DIRS})
+include_directories(${Tpetra_INCLUDE_DIRS})
 include_directories(${HDF5_INCLUDE_DIRS})
 
 #
@@ -47,7 +47,7 @@ add_amanzi_library(pks
                    SOURCE ${pks_src_files}
                    HEADERS ${pks_inc_files}
 		   LINK_LIBS state data_structures error_handling atk
-                             ${Epetra_LIBRARIES})
+                             ${Tpetra_LIBRARIES})
 
 #
 # Install Targets

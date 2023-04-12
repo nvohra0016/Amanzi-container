@@ -39,8 +39,8 @@
 #include "HeatConduction.hh"
 
 /* *****************************************************************
-* Comparison of gravity models with constant and vector density.
-***************************************************************** */
+ * Comparison of gravity models with constant and vector density.
+ ***************************************************************** */
 void
 RunTestGravity(std::string op_list_name)
 {
@@ -50,7 +50,7 @@ RunTestGravity(std::string op_list_name)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: check gravity induced rhs" << std::endl;
 
   // read parameter list
@@ -68,12 +68,12 @@ RunTestGravity(std::string op_list_name)
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
-  const WhetStone::Tensor Kc(2, 1);
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  const WhetStone:Tensor<> Kc(2, 1);
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
 
   for (int c = 0; c < ncells; c++) {
-    Kc(0, 0) = 1.0 + fabs((mesh->getCellCentroid(c))[0]);
+    Kc(0, 0) = 1.0 + fabs((mesh->getCellCentroid(c))[0])
     K->push_back(Kc);
   }
 
@@ -93,7 +93,7 @@ RunTestGravity(std::string op_list_name)
 
   double rho(2.0);
   Teuchos::RCP<CompositeVector> rho_cv = Teuchos::rcp(new CompositeVector(cvs));
-  rho_cv->PutScalar(2.0);
+  rho_cv->putScalar(2.0);
 
   // we need flux and dummy solution to populate nonlinear coefficient
   Teuchos::RCP<CompositeVector> flux = Teuchos::rcp(new CompositeVector(cvs));
@@ -101,7 +101,7 @@ RunTestGravity(std::string op_list_name)
 
   Point velocity(-1.0, 0.0);
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& normal = mesh->getFaceNormal(f);
+    const Point& normal = mesh->getFaceNormal(f)
     flx[0][f] = velocity * normal;
   }
   CompositeVector u(cvs);
@@ -111,7 +111,7 @@ RunTestGravity(std::string op_list_name)
 
   // create upwind model
   Teuchos::ParameterList& ulist = plist.sublist("PK operator").sublist("upwind");
-  UpwindFlux upwind(mesh);
+  UpwindFlux<HeatConduction> upwind(mesh, knc);
   upwind.Init(ulist);
 
   knc->UpdateValues(*flux, bc_model, bc_value); // argument is not used
@@ -147,8 +147,8 @@ RunTestGravity(std::string op_list_name)
 
 
 /* *****************************************************************
-* Two tests for MFD and FV methods.
-* **************************************************************** */
+ * Two tests for MFD and FV methods.
+ * **************************************************************** */
 TEST(OPERATOR_DIFFUSION_GRAVITY_MFD)
 {
   RunTestGravity("diffusion operator gravity mfd");

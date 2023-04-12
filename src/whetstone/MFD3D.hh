@@ -54,25 +54,25 @@ class MFD3D : public BilinearForm {
   void ModifyStabilityScalingFactor(double factor);
 
  protected:
-  void StabilityScalar_(DenseMatrix& N, DenseMatrix& M);
-  void StabilityScalarNonSymmetric_(DenseMatrix& N, DenseMatrix& M);
-  int StabilityOptimized_(const Tensor& T, DenseMatrix& N, DenseMatrix& M);
+  void StabilityScalar_(DenseMatrix<>& N, DenseMatrix<>& M);
+  void StabilityScalarNonSymmetric_(DenseMatrix<>& N, DenseMatrix<>& M);
+  int StabilityOptimized_(const Tensor<>& T, DenseMatrix<>& N, DenseMatrix<>& M);
 
-  double CalculateStabilityScalar_(DenseMatrix& Mc);
-  void GrammSchmidt_(DenseMatrix& N);
+  double CalculateStabilityScalar_(DenseMatrix<>& Mc);
+  void GrammSchmidt_(DenseMatrix<>& N);
 
   // supporting stability methods (add matrix M += Mstab)
   // use R, Wc, W for the inverse matrix
-  int StabilityMonotoneHex(int c, const Tensor& T, DenseMatrix& Mc, DenseMatrix& M);
+  int StabilityMonotoneHex(int c, const Tensor<>& T, DenseMatrix<>& Mc, DenseMatrix<>& M);
 
   int StabilityMMatrix_(int c,
-                        DenseMatrix& N,
-                        DenseMatrix& M,
+                        DenseMatrix<>& N,
+                        DenseMatrix<>& M,
                         int objective = WHETSTONE_SIMPLEX_FUNCTIONAL_SUMALL);
 
-  int SimplexFindFeasibleSolution_(DenseMatrix& T, int m1, int m2, int m3, int* izrow, int* iypos);
-  void SimplexPivotElement_(DenseMatrix& T, int kp, int* ip);
-  void SimplexExchangeVariables_(DenseMatrix& T, int kp, int ip);
+  int SimplexFindFeasibleSolution_(DenseMatrix<>& T, int m1, int m2, int m3, int* izrow, int* iypos);
+  void SimplexPivotElement_(DenseMatrix<>& T, int kp, int* ip);
+  void SimplexExchangeVariables_(DenseMatrix<>& T, int kp, int ip);
 
  protected:
   int stability_method_; // stability parameters
@@ -85,7 +85,7 @@ class MFD3D : public BilinearForm {
 
 // non-member functions
 void
-AddGradient(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh, int c, DenseMatrix& N);
+AddGradient(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh, int c, DenseMatrix<>& N);
 
 } // namespace WhetStone
 } // namespace Amanzi

@@ -21,7 +21,6 @@ its functionality.
 #include <string>
 #include <vector>
 
-#include "Epetra_Vector.h"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_RCP.hpp"
 

@@ -36,21 +36,21 @@ namespace WhetStone {
 ****************************************************************** */
 int
 MFD3D_Elasticity::L2consistency(int c,
-                                const Tensor& T,
-                                DenseMatrix& N,
-                                DenseMatrix& Mc,
+                                const Tensor<>& T,
+                                DenseMatrix<>& N,
+                                DenseMatrix<>& Mc,
                                 bool symmetry)
 {
   const auto& faces = mesh_->getCellFaces(c);
   int nfaces = faces.size();
 
-  N.Reshape(nfaces, d_);
-  Mc.Reshape(nfaces, nfaces);
+  N.reshape(nfaces, d_);
+  Mc.reshape(nfaces, nfaces);
 
   AmanziGeometry::Point v1(d_), v2(d_);
   const AmanziGeometry::Point& cm = mesh_->getCellCentroid(c);
 
-  Tensor Tinv(T);
+  Tensor<> Tinv(T);
   Tinv.Inverse();
 
   for (int i = 0; i < nfaces; i++) {
@@ -72,7 +72,7 @@ MFD3D_Elasticity::L2consistency(int c,
 * Only the upper triangular part of Ac is calculated.
 ****************************************************************** */
 int
-MFD3D_Elasticity::H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMatrix& Ac)
+MFD3D_Elasticity::H1consistency(int c, const Tensor<>& T, DenseMatrix<>& N, DenseMatrix<>& Ac)
 {
   auto nodes = mesh_->getCellNodes(c);
   int nnodes = nodes.size();
@@ -83,16 +83,16 @@ MFD3D_Elasticity::H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMat
   double volume = mesh_->getCellVolume(c);
 
   int nrows = d_ * nnodes;
-  N.Reshape(nrows, d_ * (d_ + 1));
-  Ac.Reshape(nrows, nrows);
+  N.reshape(nrows, d_ * (d_ + 1));
+  Ac.reshape(nrows, nrows);
 
   AmanziGeometry::Point p(d_), pnext(d_), pprev(d_), v1(d_), v2(d_), v3(d_);
 
   // convolution of tensors
-  std::vector<Tensor> vE, vTE;
+  std::vector<Tensor<>> vE, vTE;
 
   for (int k = 0; k < d_; k++) {
-    Tensor E(d_, 2);
+    Tensor<> E(d_, 2);
     E(k, k) = 1.0;
     vE.push_back(E);
     vTE.push_back(T * E);
@@ -100,7 +100,7 @@ MFD3D_Elasticity::H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMat
 
   for (int k = 0; k < d_; k++) {
     for (int l = k + 1; l < d_; l++) {
-      Tensor E(d_, 2);
+      Tensor<> E(d_, 2);
       E(k, l) = E(l, k) = 1.0;
       vE.push_back(E);
       vTE.push_back(T * E);
@@ -119,7 +119,7 @@ MFD3D_Elasticity::H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMat
   }
 
   // to calculate matrix R, we use temporary matrix N
-  N.PutScalar(0.0);
+  N.putScalar(0.0);
 
   for (int i = 0; i < nfaces; i++) {
     int f = faces[i];
@@ -176,7 +176,7 @@ MFD3D_Elasticity::H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMat
   }
 
   // calculate matrix N
-  N.PutScalar(0.0);
+  N.putScalar(0.0);
   const AmanziGeometry::Point& cm = mesh_->getCellCentroid(c);
 
   for (int i = 0; i < nnodes; i++) {
@@ -216,7 +216,7 @@ MFD3D_Elasticity::H1consistency(int c, const Tensor& T, DenseMatrix& N, DenseMat
 * Lame stiffness matrix: a wrapper for other low-level routines
 ****************************************************************** */
 int
-MFD3D_Elasticity::StiffnessMatrix(int c, const Tensor& T, DenseMatrix& A)
+MFD3D_Elasticity::StiffnessMatrix(int c, const Tensor<>& T, DenseMatrix<>& A)
 {
   DenseMatrix N;
 
@@ -232,7 +232,7 @@ MFD3D_Elasticity::StiffnessMatrix(int c, const Tensor& T, DenseMatrix& A)
 * Lame stiffness matrix: a wrapper for other low-level routines
 ****************************************************************** */
 int
-MFD3D_Elasticity::StiffnessMatrixOptimized(int c, const Tensor& T, DenseMatrix& A)
+MFD3D_Elasticity::StiffnessMatrixOptimized(int c, const Tensor<>& T, DenseMatrix<>& A)
 {
   DenseMatrix N;
 
@@ -249,7 +249,7 @@ MFD3D_Elasticity::StiffnessMatrixOptimized(int c, const Tensor& T, DenseMatrix& 
 * For education purpose only: ther are no M-matrices in elasticity.
 ****************************************************************** */
 int
-MFD3D_Elasticity::StiffnessMatrixMMatrix(int c, const Tensor& T, DenseMatrix& A)
+MFD3D_Elasticity::StiffnessMatrixMMatrix(int c, const Tensor<>& T, DenseMatrix<>& A)
 {
   DenseMatrix N;
 

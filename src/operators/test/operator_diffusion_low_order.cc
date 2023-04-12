@@ -72,8 +72,8 @@ SUITE(DIFFUSION)
   //            Analytic00_Quadratic: coef=1, quadratic solution (exact for second order methods!)
 
   //            Analytic00b: 3D variant of Analytic00
-  //            Analytic03: discontinuous scalar Tensor coef, no scalar coef
-  //            Analytic03b: same as 03, but with Tensor coef=1 and scalar coef as the scalar
+  //            Analytic03: discontinuous scalarTensor<> coef, no scalar coef
+  //            Analytic03b: same as 03, but withTensor<> coef=1 and scalar coef as the scalar
   //
 
   // Not all combinations make sense, obviously.  2D problems must be run with
@@ -130,7 +130,7 @@ SUITE(DIFFUSION)
     fix.global_op->ComputeResidual(*fix.solution, res);
 
     double norminf;
-    res.NormInf(&norminf);
+    res.normInf(&norminf);
     std::cout << "Residual norm = " << norminf << std::endl;
     CHECK_CLOSE(0.0, norminf, 1e-10);
   }
@@ -198,7 +198,7 @@ SUITE(DIFFUSION)
     CompositeVector res(fix.global_op->DomainMap());
     fix.global_op->ComputeResidual(*fix.solution, res);
     double norminf;
-    res.NormInf(&norminf);
+    res.normInf(&norminf);
     std::cout << "Residual norm = " << norminf << std::endl;
     CHECK_CLOSE(0.0, norminf, 1e-10);
   }
@@ -1278,7 +1278,7 @@ SUITE(DIFFUSION)
 #  endif
 
   //
-  // Analytic02: Tensor diffusion.  Note FV cannot be exact for this problem.
+  // Analytic02:Tensor<> diffusion.  Note FV cannot be exact for this problem.
   // This test replaces old operator_diffusion.cc mixed tests.
 #  if FV
   TEST(Analytic02_FV_DirichletNeumann_structured2d_ifpack2_ILUT)

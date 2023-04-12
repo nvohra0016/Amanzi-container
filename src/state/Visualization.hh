@@ -60,7 +60,6 @@ Example:
 #include <string>
 
 #include "Teuchos_ParameterList.hpp"
-#include "Epetra_MultiVector.h"
 
 #include "Units.hh"
 #include "Mesh.hh"
@@ -72,76 +71,52 @@ Example:
 
 namespace Amanzi {
 
+class State;
+
 class Visualization : public IOEvent {
  public:
-  Visualization(Teuchos::ParameterList& plist);
+  Visualization(Teuchos::ParameterList& plist,
+                const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
+                bool include_io_set);
   Visualization();
 
-  Teuchos::RCP<const AmanziMesh::Mesh> mesh() const { return mesh_; }
-  void set_mesh(const Teuchos::RCP<const AmanziMesh::Mesh> mesh) { mesh_ = mesh; }
-
-  std::string get_name() const { return name_; }
-  void set_name(const std::string& name);
-  void AddDomain(const std::string& name);
-  bool WritesDomain(const std::string& name) const;
-
-  Tag get_tag() const { return tag_; }
-  void set_tag(const Tag& tag) { tag_ = tag; }
+  void addDomain(const std::string& name);
+  bool writesDomain(const std::string& name) const;
 
   // public interface for coordinator clients
-  void CreateFiles(bool include_io_set = true);
-  void CreateTimestep(double time, int cycle, const std::string& tag);
-  virtual void FinalizeTimestep() const;
+  void createFiles(bool include_io_set = true);
+  void createTimestep(double time, int cycle);
+  void finalizeTimestep();
 
   // public interface for data clients
   template <typename T>
-  void Write(const std::string& name, const T& t) const;
+  void write(const Teuchos::ParameterList& attrs, const T& t) const {
+    output_->write(attrs, t);
+  }
 
-  virtual void
-  WriteVector(const Epetra_MultiVector& vec, const std::vector<std::string>& names) const;
-  virtual void WriteVector(const Epetra_Vector& vec, const std::string& name) const;
-  virtual void WriteRegions();
-  virtual void WritePartition();
+  void writeRegions() const;;
+  void writePartition() const;
+
+  void write(const State& S);
 
  protected:
-  virtual void ReadParameters_();
+  void readParameters_();
 
   std::vector<std::string> domains_;
   std::string my_units_;
   std::string name_;
-  Tag tag_;
   bool time_unit_written_;
+  int count_;
 
+  std::unique_ptr<Output> output_;
   Teuchos::RCP<const AmanziMesh::Mesh> mesh_;
-  Teuchos::RCP<Output> visualization_output_;
 
-  std::map<std::string, Teuchos::Array<std::string>> regions_;
   bool write_partition_;
   bool dynamic_mesh_;
   bool write_mesh_exo_;
+  std::map<std::string, Teuchos::Array<std::string>> regions_;
 };
 
-
-template <>
-inline void
-Visualization::Write<Epetra_Vector>(const std::string& name, const Epetra_Vector& t) const
-{
-  WriteVector(t, name);
-}
-
-template <>
-inline void
-Visualization::Write<double>(const std::string& name, const double& t) const
-{
-  visualization_output_->WriteAttribute(t, name);
-}
-
-template <>
-inline void
-Visualization::Write<int>(const std::string& name, const int& t) const
-{
-  visualization_output_->WriteAttribute(t, name);
-}
 
 } // namespace Amanzi
 

@@ -22,7 +22,6 @@
 #include <DenseVector.hh>
 
 #include <Mini_Operator1D.hh>
-#include <OperatorDefs.hh>
 
 namespace Amanzi {
 namespace Operators {
@@ -34,15 +33,15 @@ class Mini_Diffusion1D : public Mini_Operator1D {
 
   // set up operator
   void Setup(double K) { Kconst_ = K; }
-  void Setup(const std::shared_ptr<WhetStone::DenseVector> k,
-             const std::shared_ptr<WhetStone::DenseVector> dkdp)
+  void Setup(const std::shared_ptr<WhetStone::DenseVector<>> k,
+             const std::shared_ptr<WhetStone::DenseVector<>> dkdp)
   {
     k_ = k;
     dkdp_ = dkdp;
   }
-  void Setup(const std::shared_ptr<WhetStone::DenseVector> K,
-             const std::shared_ptr<WhetStone::DenseVector> k,
-             const std::shared_ptr<WhetStone::DenseVector> dkdp)
+  void Setup(const std::shared_ptr<WhetStone::DenseVector<>> K,
+             const std::shared_ptr<WhetStone::DenseVector<>> k,
+             const std::shared_ptr<WhetStone::DenseVector<>> dkdp)
   {
     K_ = K;
     k_ = k;
@@ -51,29 +50,25 @@ class Mini_Diffusion1D : public Mini_Operator1D {
 
   // generate linearized operators
   // -- build phisical model
-  void UpdateMatrices(const PDEType method = PDE_DIFFUSION_MFD);
-
+  void UpdateMatrices();
   // -- build Jacobian
   void
-  UpdateJacobian(const WhetStone::DenseVector& p, double bcl, int type_l, double bcr, int type_r);
+  UpdateJacobian(const WhetStone::DenseVector<>& p, double bcl, int type_l, double bcr, int type_r);
 
   // modify matrix due to boundary conditions
   void ApplyBCs(double bcl, int type_l, double bcr, int type_r);
 
   // postprocessing
   // -- flux calculation uses potential p to calculate flux u
-  // void UpdateFlux(const WhetStone::DenseVector& p, WhetStone::DenseVector& u);
+  // void UpdateFlux(const WhetStone::DenseVector<>& p, WhetStone::DenseVector<>&
+  // u);
 
   // access
-  WhetStone::DenseVector& k() { return *k_; }
-  WhetStone::DenseVector& dkdp() { return *dkdp_; }
-
- protected:
-  void UpdateMatricesMFD_();
-  void UpdateMatricesFD_();
+  WhetStone::DenseVector<>& k() { return *k_; }
+  WhetStone::DenseVector<>& dkdp() { return *dkdp_; }
 
  private:
-  std::shared_ptr<WhetStone::DenseVector> K_, k_, dkdp_;
+  std::shared_ptr<WhetStone::DenseVector<>> K_, k_, dkdp_;
   double Kconst_;
 };
 

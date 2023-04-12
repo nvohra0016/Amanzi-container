@@ -19,9 +19,7 @@
 #include <algorithm>
 
 #include "Teuchos_ParameterList.hpp"
-#include "Epetra_Map.h"
 #include "AmanziComm.hh"
-#include "Epetra_SerialComm.h"
 
 #include "VerboseObject.hh"
 #include "dbc.hh"
@@ -160,11 +158,11 @@ void MeshSurfaceCell::getNodeFaces(const Entity_ID nodeid,
 // cell_get_faces_and_dirs method of this class
 void MeshSurfaceCell::getCellFacesAndDirs(const Entity_ID cellid,
         cEntity_ID_View& faceids,
-        cEntity_Direction_View * const face_dirs) const
+        cDirection_View * const face_dirs) const
 {
   AMANZI_ASSERT(cellid == 0);
   Entity_ID_View lfaceids("lfaceids", nodes_.size()); 
-  Entity_Direction_View lface_dirs; 
+  Direction_View lface_dirs; 
   for (int i=0; i!=nodes_.size(); ++i) lfaceids[i] = i;
   if (face_dirs) {
     Kokkos::resize(lface_dirs,nodes_.size());

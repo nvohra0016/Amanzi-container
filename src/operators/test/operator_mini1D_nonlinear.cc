@@ -36,7 +36,7 @@ using namespace Amanzi;
 using namespace Amanzi::Operators;
 using namespace Amanzi::WhetStone;
 
-class NonlinearProblem : public AmanziSolvers::SolverFnBase<DenseVector> {
+class NonlinearProblem : public AmanziSolvers::SolverFnBase<DenseVector<>> {
  public:
   // constructor keeps static data
   NonlinearProblem(Teuchos::RCP<Operators::Mini_Diffusion1D> op,
@@ -54,7 +54,7 @@ class NonlinearProblem : public AmanziSolvers::SolverFnBase<DenseVector> {
     type_r_ = type_r;
   }
 
-  void Residual(const Teuchos::RCP<DenseVector>& u, const Teuchos::RCP<DenseVector>& f)
+  void Residual(const Teuchos::RCP<DenseVector<>>& u, const Teuchos::RCP<DenseVector<>>& f)
   {
     op_->rhs() = *rhs0_;
 
@@ -78,21 +78,21 @@ class NonlinearProblem : public AmanziSolvers::SolverFnBase<DenseVector> {
   }
 
   int
-  ApplyPreconditioner(const Teuchos::RCP<const DenseVector>& u, const Teuchos::RCP<DenseVector>& hu)
+  ApplyPreconditioner(const Teuchos::RCP<const DenseVector<>>& u, const Teuchos::RCP<DenseVector<>>& hu)
   {
     op_->ApplyInverse(*u, *hu);
     return 0;
   }
 
   double
-  ErrorNorm(const Teuchos::RCP<const DenseVector>& u, const Teuchos::RCP<const DenseVector>& du)
+  ErrorNorm(const Teuchos::RCP<const DenseVector<>>& u, const Teuchos::RCP<const DenseVector<>>& du)
   {
     double tmp;
-    du->NormInf(&tmp);
+    du->normInf(&tmp);
     return tmp;
   }
 
-  void UpdatePreconditioner(const Teuchos::RCP<const DenseVector>& u)
+  void UpdatePreconditioner(const Teuchos::RCP<const DenseVector<>>& u)
   {
     int ncells = u->NumRows();
     for (int i = 0; i < ncells; ++i) {
@@ -103,14 +103,14 @@ class NonlinearProblem : public AmanziSolvers::SolverFnBase<DenseVector> {
 
     // accumulation term to the main diagonal
     if (dt_ > 0.0) {
-      DenseVector s1(ncells);
+      DenseVector<> s1(ncells);
       for (int i = 0; i < ncells; ++i) { s1(i) = 2.0 * (*u)(i) / dt_; }
       op_->AddAccumulationTerm(s1);
     }
   }
   void ChangedSolution(){};
 
-  void SetICs(std::shared_ptr<DenseVector>& rhs, Teuchos::RCP<DenseVector>& u0)
+  void SetICs(std::shared_ptr<DenseVector<>>& rhs, Teuchos::RCP<DenseVector<>>& u0)
   {
     rhs0_ = rhs;
     u0_ = u0;
@@ -128,14 +128,14 @@ class NonlinearProblem : public AmanziSolvers::SolverFnBase<DenseVector> {
   Teuchos::RCP<Amanzi::Operators::Mini_Diffusion1D> op_;
   double dt_, bcl_, bcr_;
   int type_l_, type_r_;
-  std::shared_ptr<DenseVector> rhs0_;
-  Teuchos::RCP<DenseVector> u0_;
+  std::shared_ptr<DenseVector<>> rhs0_;
+  Teuchos::RCP<DenseVector<>> u0_;
 };
 
 
 /* *****************************************************************
-* This test nonlinear diffusion solver in 1D: u(x) = x^2, k(u) = 1 + u^2.
-* **************************************************************** */
+ * This test nonlinear diffusion solver in 1D: u(x) = x^2, k(u) = 1 + u^2.
+ * **************************************************************** */
 void
 MiniDiffusion1D_Nonlinear(double bcl, int type_l, double bcr, int type_r)
 {
@@ -145,7 +145,7 @@ MiniDiffusion1D_Nonlinear(double bcl, int type_l, double bcr, int type_r)
   for (int loop = 0; loop < 2; ++loop) {
     int ncells = (loop + 1) * 30;
     double length(1.0);
-    auto mesh = std::make_shared<DenseVector>(DenseVector(ncells + 1));
+    auto mesh = std::make_shared<DenseVector<>>(DenseVector(ncells + 1));
     // make a non-uniform mesh
     double h = length / ncells;
     for (int i = 0; i < ncells + 1; ++i) (*mesh)(i) = h * i;
@@ -155,16 +155,16 @@ MiniDiffusion1D_Nonlinear(double bcl, int type_l, double bcr, int type_r)
     auto op = Teuchos::rcp(new Operators::Mini_Diffusion1D());
     op->Init(mesh);
 
-    auto Ka = std::make_shared<DenseVector>(DenseVector(ncells));
-    auto kr = std::make_shared<DenseVector>(DenseVector(ncells));
-    auto dkdu = std::make_shared<DenseVector>(DenseVector(ncells));
-    auto rhs = std::make_shared<DenseVector>(DenseVector(ncells));
+    auto Ka = std::make_shared<DenseVector<>>(DenseVector(ncells));
+    auto kr = std::make_shared<DenseVector<>>(DenseVector(ncells));
+    auto dkdu = std::make_shared<DenseVector<>>(DenseVector(ncells));
+    auto rhs = std::make_shared<DenseVector<>>(DenseVector(ncells));
     auto sol = Teuchos::rcp(new DenseVector(ncells));
 
-    Ka->PutScalar(1.0);
-    kr->PutScalar(2.0);
-    sol->PutScalar(1.0);
-    dkdu->PutScalar(2.0);
+    Ka->putScalar(1.0);
+    kr->putScalar(2.0);
+    sol->putScalar(1.0);
+    dkdu->putScalar(2.0);
 
     op->Setup(Ka, kr, dkdu);
 
@@ -224,9 +224,9 @@ TEST(OPERATOR_MINI_DIFFUSION_NONLINEAR)
 
 
 /* *****************************************************************
-* This test nonlinear transient diffusion solver in 1D:
-* u(t, x) = t x^2, k(u) = 1 + u^2, c(u) = 1 + u^2.
-* **************************************************************** */
+ * This test nonlinear transient diffusion solver in 1D:
+ * u(t, x) = t x^2, k(u) = 1 + u^2, c(u) = 1 + u^2.
+ * **************************************************************** */
 void
 MiniDiffusion1D_Transient(int type_l, int type_r)
 {
@@ -235,16 +235,16 @@ MiniDiffusion1D_Transient(int type_l, int type_r)
   int ncells = 20;
   auto u0 = Teuchos::rcp(new DenseVector(ncells));
   auto u1 = Teuchos::rcp(new DenseVector(ncells));
-  auto rhs = std::make_shared<DenseVector>(DenseVector(ncells));
-  auto kr = std::make_shared<DenseVector>(DenseVector(ncells));
-  auto dkdu = std::make_shared<DenseVector>(DenseVector(ncells));
+  auto rhs = std::make_shared<DenseVector<>>(DenseVector(ncells));
+  auto kr = std::make_shared<DenseVector<>>(DenseVector(ncells));
+  auto dkdu = std::make_shared<DenseVector<>>(DenseVector(ncells));
 
-  u0->PutScalar(0.0);
-  u1->PutScalar(0.0);
-  kr->PutScalar(1.0);
-  dkdu->PutScalar(0.0);
+  u0->putScalar(0.0);
+  u1->putScalar(0.0);
+  kr->putScalar(1.0);
+  dkdu->putScalar(0.0);
 
-  auto mesh = std::make_shared<DenseVector>(DenseVector(ncells + 1));
+  auto mesh = std::make_shared<DenseVector<>>(DenseVector(ncells + 1));
   double length(1.0);
   double h = length / ncells;
   for (int i = 0; i < ncells + 1; ++i) (*mesh)(i) = h * i;
@@ -307,6 +307,6 @@ MiniDiffusion1D_Transient(int type_l, int type_r)
 TEST(OPERATOR_MINI_DIFFUSION_NONLINEAR_TRANSINET)
 {
   int dir = Amanzi::Operators::OPERATOR_BC_DIRICHLET;
-  // int neu = Amanzi::Operators::OPERATOR_BC_NEUMANN;
+  int neu = Amanzi::Operators::OPERATOR_BC_NEUMANN;
   MiniDiffusion1D_Transient(dir, dir);
 }

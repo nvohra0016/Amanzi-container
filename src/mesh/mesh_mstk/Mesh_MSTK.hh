@@ -25,8 +25,6 @@
 #include "errors.hh"
 
 namespace Amanzi {
-class MeshCache;
-
 namespace AmanziMesh {
 
 // Mesh class based on the MSTK framework.
@@ -81,7 +79,7 @@ class Mesh_MSTK : public MeshFramework {
   // volume mesh, constructor can be asked to "flatten" the mesh to a
   // lower dimensional space.
   Mesh_MSTK(const Teuchos::RCP<const MeshFramework>& parent_mesh,
-            const Entity_ID_View& entity_ids,
+            const cEntity_ID_View& entity_ids,
             const Entity_kind entity_kind,
             const bool flatten=false,
             const Comm_ptr_type& comm=Teuchos::null,
@@ -151,12 +149,12 @@ class Mesh_MSTK : public MeshFramework {
   // In 2D, direction is 1 if face/edge is defined in the same
   // direction as the cell polygon, and -1 otherwise
   virtual void getCellFacesAndDirs(const Entity_ID cellid,
-          View_type<const Entity_ID,MemSpace_kind::HOST>& faceids,
-          View_type<const Direction_type,MemSpace_kind::HOST> * const face_dirs) const override;
+          cEntity_ID_View& faceids,
+          cDirection_View * const face_dirs) const override;
 
   // Get edges of a cell
   virtual void getCellEdges(const Entity_ID cellid,
-                  View_type<const Entity_ID,MemSpace_kind::HOST>& edgeids) const override;
+                  cEntity_ID_View& edgeids) const override;
 
   // Get nodes of cell
   // On a distributed mesh, all nodes (OWNED or GHOST) of the cell
@@ -168,13 +166,13 @@ class Mesh_MSTK : public MeshFramework {
   // In 2D, the nodes of the polygon will be returned in ccw order
   // consistent with the face normal
   virtual void getCellNodes(const Entity_ID cellid,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& nodeids) const override;
+                          cEntity_ID_View& nodeids) const override;
 
 
   // Edges and edge directions of a face
   virtual void getFaceEdgesAndDirs(const Entity_ID cellid,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& edgeids,
-                           View_type<const Direction_type,MemSpace_kind::HOST> * edgedirs) const override;
+                           cEntity_ID_View& edgeids,
+                           cDirection_View * edgedirs) const override;
 
   // Get nodes of face
   // On a distributed mesh, all nodes (OWNED or GHOST) of the face
@@ -183,12 +181,12 @@ class Mesh_MSTK : public MeshFramework {
   // with the face normal
   // In 2D, nfnodes is 2
   virtual void getFaceNodes(const Entity_ID faceid,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& nodeids) const override;
+                          cEntity_ID_View& nodeids) const override;
 
   // Get nodes of edge On a distributed mesh all nodes (OWNED or
   // GHOST) of the face are returned
   virtual void getEdgeNodes(const Entity_ID edgeid,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& nodes) const override;
+                          cEntity_ID_View& nodes) const override;
 
   //
   // Upward adjacencies
@@ -196,32 +194,32 @@ class Mesh_MSTK : public MeshFramework {
   // Cells connected to a face
   virtual void getFaceCells(const Entity_ID faceid,
                           const Parallel_kind ptype,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& cellids) const override;
+                          cEntity_ID_View& cellids) const override;
 
   // Cells of type 'ptype' connected to an edge
   virtual void getEdgeCells(const Entity_ID edgeid,
                           const Parallel_kind ptype,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& cellids) const override;
+                          cEntity_ID_View& cellids) const override;
 
   // Faces of type 'ptype' connected to an edge
   virtual void getEdgeFaces(const Entity_ID edgeid,
                           const Parallel_kind ptype,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& faceids) const override;
+                          cEntity_ID_View& faceids) const override;
 
   // Cells of type 'ptype' connected to a node
   virtual void getNodeCells(const Entity_ID nodeid,
                           const Parallel_kind ptype,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& cellids) const override;
+                          cEntity_ID_View& cellids) const override;
 
   // Faces of type 'ptype' connected to a node
   virtual void getNodeFaces(const Entity_ID nodeid,
                           const Parallel_kind ptype,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& faceids) const override;
+                          cEntity_ID_View& faceids) const override;
 
   // Edges of type 'ptype' connected to a node
   virtual void getNodeEdges(const Entity_ID nodeid,
                           const Parallel_kind ptype,
-                          View_type<const Entity_ID,MemSpace_kind::HOST>& edgeids) const override;
+                          cEntity_ID_View& edgeids) const override;
 
   //
   // Get list of entities of type kind from a framework set.
@@ -235,7 +233,7 @@ class Mesh_MSTK : public MeshFramework {
   virtual void getSetEntities(const AmanziGeometry::RegionLabeledSet& region,
           const Entity_kind kind,
           const Parallel_kind ptype,
-          View_type<const Entity_ID,MemSpace_kind::HOST>& entids) const override;
+          cEntity_ID_View& entids) const override;
 
   // Run MSTK's internal checks - meant for debugging only
   // Returns true if everything is ok, false otherwise
@@ -316,12 +314,12 @@ class Mesh_MSTK : public MeshFramework {
   }
 
   void getCellFacesAndDirs_ordered_(const Entity_ID cellid,
-          View_type<const Entity_ID,MemSpace_kind::HOST>& faceids,
-          View_type<const Direction_type,MemSpace_kind::HOST> * face_dirs) const;
+          cEntity_ID_View& faceids,
+          cDirection_View * face_dirs) const;
 
   void getCellFacesAndDirs_unordered_(const Entity_ID cellid,
-          View_type<const Entity_ID,MemSpace_kind::HOST> &faceids,
-          View_type<const Direction_type,MemSpace_kind::HOST> * face_dirs) const;
+          cEntity_ID_View &faceids,
+          cDirection_View * face_dirs) const;
 
  private:
   MPI_Comm mpicomm_;

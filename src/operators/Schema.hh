@@ -19,9 +19,10 @@
 #include <tuple>
 #include <vector>
 
-#include "BilinearForm.hh"
+#include "WhetStoneDefs.hh"
+// #include "BilinearForm.hh"
 #include "CompositeVectorSpace.hh"
-#include "Mesh.hh"
+#include "MeshFramework.hh"
 #include "MeshDefs.hh"
 
 #include "OperatorDefs.hh"
@@ -36,14 +37,14 @@ class Schema {
   Schema(AmanziMesh::Entity_kind kind, int nvec) { Init(kind, nvec); }
   Schema(int schema_old) { Init(schema_old); } // old schema must go away FIXME
 
-  ~Schema(){};
+  KOKKOS_INLINE_FUNCTION ~Schema(){};
 
   // member functions
   void Init(int schema_old);
   void Init(AmanziMesh::Entity_kind kind, int nvec);
-  void Init(Teuchos::RCP<const WhetStone::BilinearForm> form,
-            Teuchos::RCP<const AmanziMesh::Mesh> mesh,
-            AmanziMesh::Entity_kind base);
+  // void Init(Teuchos::RCP<const WhetStone::BilinearForm> form,
+  //           Teuchos::RCP<const AmanziMesh::Mesh> mesh,
+  //           AmanziMesh::Entity_kind base);
 
   void AddItem(AmanziMesh::Entity_kind kind, WhetStone::DOF_Type type, int num)
   {
@@ -60,27 +61,24 @@ class Schema {
   int OldSchema() const;
 
   std::string KindToString(AmanziMesh::Entity_kind kind) const;
-  AmanziMesh::Entity_kind StringToKind(const std::string& name) const;
-  WhetStone::DOF_Type StringToType(const std::string& name) const;
+  AmanziMesh::Entity_kind StringToKind(std::string& name) const;
+  WhetStone::DOF_Type StringToType(std::string& name) const;
 
   // fancy io
   std::string CreateUniqueName() const;
 
-  // accessers and modifiers
+  // access
   void set_base(AmanziMesh::Entity_kind base) { base_ = base; }
-  AmanziMesh::Entity_kind get_base() const { return base_; }
+  AmanziMesh::Entity_kind base() const { return base_; }
 
   std::vector<WhetStone::SchemaItem>::const_iterator begin() const { return items_.begin(); }
   std::vector<WhetStone::SchemaItem>::const_iterator end() const { return items_.end(); }
   int size() const { return items_.size(); }
 
-  // only constant access should be used in apps
-  const WhetStone::SchemaItem& operator[](int i) const { return items_[i]; }
-
   // output
   friend std::ostream& operator<<(std::ostream& os, const Schema& s)
   {
-    os << "base=" << s.KindToString(s.get_base()) << "\n";
+    os << "base=" << s.KindToString(s.base()) << "\n";
     for (auto it = s.begin(); it != s.end(); ++it) {
       os << " item: kind=" << s.KindToString(std::get<0>(*it)) << ", num=" << std::get<2>(*it)
          << ", type=" << (int)std::get<1>(*it) << "\n";
@@ -103,7 +101,7 @@ class Schema {
 inline bool
 operator==(const Schema& s1, const Schema& s2)
 {
-  if (s1.get_base() != s2.get_base()) return false;
+  if (s1.base() != s2.base()) return false;
   if (s1.size() != s2.size()) return false;
 
   for (auto it1 = s1.begin(), it2 = s2.begin(); it1 != s1.end(); ++it1, ++it2) {

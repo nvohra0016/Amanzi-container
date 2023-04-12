@@ -26,6 +26,7 @@
 
 // Amanzi
 #include "GMVMesh.hh"
+#include "LinearOperatorPCG.hh"
 #include "MeshExtractedManifold.hh"
 #include "MeshFactory.hh"
 #include "Tensor.hh"
@@ -39,8 +40,8 @@
 
 
 /* *****************************************************************
-* TBW.
-* **************************************************************** */
+ * TBW.
+ * **************************************************************** */
 void
 RunTest(int icase, double gravity)
 {
@@ -51,7 +52,7 @@ RunTest(int icase, double gravity)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0)
     std::cout << "\nTest: Darcy flow in fractures, gravity=" << gravity << " case=" << icase
@@ -81,26 +82,20 @@ RunTest(int icase, double gravity)
   } else if (icase == 1) {
     surfmesh = meshfactory.create("test/fractures.exo");
   } else if (icase == 2) {
-    auto plist_edges = Teuchos::rcp(new Teuchos::ParameterList());
-    plist_edges->set<bool>("request faces",true);
-    plist_edges->set<bool>("request edges", true);  
-    MeshFactory meshfactory_edges(comm, gm, plist_edges);
-    meshfactory.set_preference(Preference({ Framework::MSTK }));
-    RCP<Mesh> mesh = meshfactory_edges.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 10, 10, 10);
+    RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 10, 10, 10, true, true);
     std::string setname("fractures");
-    auto sm = Teuchos::rcp(
-      new MeshExtractedManifold(mesh, setname, AmanziMesh::Entity_kind::FACE, comm, gm, plist));
-    surfmesh = Teuchos::rcp(new Mesh(sm,Teuchos::rcp(new Amanzi::AmanziMesh::MeshFrameworkAlgorithms()),Teuchos::null)); 
+    surfmesh = Teuchos::rcp(
+      new MeshExtractedManifold(mesh, setname, AmanziMesh::Entity_kind::FACE, comm, gm, plist, true, false));
   }
 
   // modify diffusion coefficient
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells_owned = surfmesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_owned = surfmesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = surfmesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
 
-  WhetStone::Tensor Kc(2, 1);
+  WhetStone:Tensor<> Kc(2, 1);
   Kc(0, 0) = 1.0;
   for (int c = 0; c < ncells_owned; c++) K->push_back(Kc);
 
@@ -114,7 +109,7 @@ RunTest(int icase, double gravity)
   std::vector<double>& bc_value = bc->bc_value();
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = surfmesh->getFaceCentroid(f);
+    const Point& xf = surfmesh->getFaceCentroid(f)
     if (fabs(xf[2] - 0.5) < 1e-6 && (fabs(xf[0]) < 1e-6 || fabs(xf[0] - 1.0) < 1e-6 ||
                                      fabs(xf[1]) < 1e-6 || fabs(xf[1] - 1.0) < 1e-6)) {
       bc_model[f] = OPERATOR_BC_DIRICHLET;
@@ -133,52 +128,58 @@ RunTest(int icase, double gravity)
   cvs->AddComponent("face", AmanziMesh::Entity_kind::FACE, 1);
 
   auto solution = Teuchos::rcp(new CompositeVector(*cvs));
-  solution->PutScalar(0.0);
+  solution->putScalar(0.0);
 
   // create diffusion operator
   double rho(1.0);
-  AmanziGeometry::Point gvec(0.0, 0.0, -gravity);
+  AmanziGeometry::Point g(0.0, 0.0, -gravity);
   Teuchos::ParameterList olist = plist->sublist("PK operator").sublist("diffusion operator");
   olist.set<bool>("gravity", (gravity > 0.0));
 
-  Operators::PDE_DiffusionFactory opfactory(olist, surfmesh);
-  opfactory.SetVariableTensorCoefficient(K);
-  if (gravity > 0.0) opfactory.SetConstantGravitationalTerm(gvec, rho);
-
-  Teuchos::RCP<Operators::PDE_Diffusion> op = opfactory.Create();
+  Operators::PDE_DiffusionFactory opfactory;
+  Teuchos::RCP<Operators::PDE_Diffusion> op = opfactory.Create(olist, surfmesh, bc, rho, g);
   op->SetBCs(bc, bc);
 
   Teuchos::RCP<Operator> global_op = op->global_operator();
   global_op->Init();
 
   // populate diffusion operator
+  op->Setup(K, Teuchos::null, Teuchos::null);
   op->UpdateMatrices(Teuchos::null, Teuchos::null);
+
+  // apply BCs and assemble
   op->ApplyBCs(true, true, true);
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
 
   // create preconditoner
-  global_op->set_inverse_parameters(
-    "Hypre AMG", plist->sublist("preconditioners"), "PCG", plist->sublist("solvers"));
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  ParameterList slist = plist->sublist("preconditioners").sublist("Hypre AMG");
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
+
+  // solve the problem
+  ParameterList lop_list = plist->sublist("solvers").sublist("PCG").sublist("pcg parameters");
+  AmanziSolvers::LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace> solver(
+    global_op, global_op);
+  solver.Init(lop_list);
 
   CompositeVector rhs = *global_op->rhs();
-  global_op->ApplyInverse(rhs, *solution);
+  int ierr = solver.ApplyInverse(rhs, *solution);
 
   // post-processing
-  auto cvs2 = Operators::CreateManifoldCVS(surfmesh);
+  auto cvs2 = Operators::CreateNonManifoldCVS(surfmesh);
   auto flux = Teuchos::rcp(new CompositeVector(*cvs2));
 
-  op->UpdateFlux(solution.ptr(), flux.ptr());
+  op->UpdateFluxNonManifold(solution.ptr(), flux.ptr());
 
   // statistics
   int ndofs = global_op->A()->NumGlobalRows();
   double a;
   rhs.Norm2(&a);
   if (MyPID == 0) {
-    std::cout << "pressure solver"
-              << ": ||r||=" << global_op->residual() << " itr=" << global_op->num_itrs()
-              << "  ||f||=" << a << "  #dofs=" << ndofs << " code=" << global_op->returned_code()
-              << std::endl;
+    std::cout << "pressure solver (" << solver.name() << "): ||r||=" << solver.residual()
+              << " itr=" << solver.num_itrs() << "  ||f||=" << a << "  #dofs=" << ndofs
+              << " code=" << solver.returned_code() << std::endl;
   }
 
   // calculate error in potential
@@ -194,7 +195,7 @@ RunTest(int icase, double gravity)
   Epetra_MultiVector& flx_long = *flux->ViewComponent("face", true);
   Epetra_MultiVector flx_short(surfmesh->getMap(AmanziMesh::Entity_kind::FACE,false), 1);
 
-  const auto& fmap = *flux->Map().Map("face", true);
+  const auto& fmap = *flux->getMap().getMap("face", true);
   for (int f = 0; f < nfaces_owned; ++f) {
     int g = fmap.FirstPointInElement(f);
     flx_short[0][f] = flx_long[0][g];
@@ -211,8 +212,8 @@ RunTest(int icase, double gravity)
   // remove gravity to check symmetry
   if (gravity > 0.0) {
     for (int c = 0; c < ncells_owned; c++) {
-      const Point& xc = surfmesh->getCellCentroid(c);
-      p[0][c] -= rho * gvec[2] * xc[2];
+      const Point& xc = surfmesh->getCellCentroid(c)
+      p[0][c] -= rho * g[2] * xc[2];
     }
   }
 

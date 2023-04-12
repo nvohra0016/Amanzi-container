@@ -8,6 +8,8 @@
 */
 
 //! Implementation of the Mesh interface leveraging MSTK.
+#include "Teuchos_CommHelpers.hpp"
+
 #include "dbc.hh"
 #include "errors.hh"
 
@@ -52,7 +54,7 @@ Mesh_MSTK::Mesh_MSTK(const std::string& filename,
 
   int cell_dim = MESH_Num_Regions(mesh_) ? 3 : 2;
   int max;
-  comm->MaxAll(&cell_dim,&max,1);
+  Teuchos::reduceAll(*comm, Teuchos::REDUCE_MAX, 1, &cell_dim, &max);
 
   if (max != cell_dim) {
     Errors::Message mesg("cell dimension on this processor is different from max cell dimension across all processors");
@@ -81,7 +83,7 @@ Mesh_MSTK::Mesh_MSTK(const std::string& filename,
     }
 
     if (planar) space_dim = 2;
-    comm->MaxAll(&space_dim,&max,1);
+    Teuchos::reduceAll(*comm, Teuchos::REDUCE_MAX, 1, &space_dim,&max);
     space_dim = max;
     setSpaceDimension(space_dim);
   }
@@ -232,7 +234,7 @@ Mesh_MSTK::Mesh_MSTK(const double x0, const double y0,
 // Extract MSTK entities from an ID list and make a new MSTK mesh
 //---------------------------------------------------------
 Mesh_MSTK::Mesh_MSTK(const Teuchos::RCP<const MeshFramework>& parent_mesh,
-                     const Entity_ID_View& entity_ids,
+                     const cEntity_ID_View& entity_ids,
                      const Entity_kind entity_kind,
                      const bool flatten,
                      const Comm_ptr_type& comm,
@@ -461,9 +463,9 @@ Cell_kind Mesh_MSTK::getCellType(const Entity_ID cellid) const
 // violated here to allow for a default input argument
 
 // On a distributed mesh, this will return all the faces of the
-// cell, OWNED or GHOST. If cells_initialized_ = true, the faces will be
+// cell, OWNED or GHOST. If ordered = true, the faces will be
 // returned in a standard order according to Exodus II convention
-// for standard cells; in all other situations (cells_initialized_ = false or
+// for standard cells; in all other situations (ordered = false or
 // non-standard cells), the list of faces will be in arbitrary order
 
 // In 3D, direction is 1 if face normal points out of cell
@@ -472,8 +474,8 @@ Cell_kind Mesh_MSTK::getCellType(const Entity_ID cellid) const
 // direction as the cell polygon, and -1 otherwise
 //---------------------------------------------------------
 void Mesh_MSTK::getCellFacesAndDirs_ordered_(const Entity_ID cellid,
-                                                View_type<const Entity_ID,MemSpace_kind::HOST>& faceids,
-                                                View_type<const Direction_type,MemSpace_kind::HOST> * face_dirs) const
+                                                cEntity_ID_View& faceids,
+                                                cDirection_View * face_dirs) const
 {
   if (getManifoldDimension() == 3) {
     Cell_kind celltype = getCellType(cellid);
@@ -483,7 +485,7 @@ void Mesh_MSTK::getCellFacesAndDirs_ordered_(const Entity_ID cellid,
         celltype == Cell_kind::HEX) {
       
       Entity_ID_View lfaceids; 
-      Entity_Direction_View lface_dirs;
+      Direction_View lface_dirs;
       int lid, nf;
       MEntity_ptr cell = cell_id_to_handle_[cellid];
 
@@ -606,12 +608,12 @@ void Mesh_MSTK::getCellFacesAndDirs_ordered_(const Entity_ID cellid,
 
 
 void Mesh_MSTK::getCellFacesAndDirs_unordered_(const Entity_ID cellid,
-        View_type<const Entity_ID,MemSpace_kind::HOST>& faceids,
-        View_type<const Direction_type,MemSpace_kind::HOST> * face_dirs) const
+        cEntity_ID_View& faceids,
+        cDirection_View * face_dirs) const
 {
-  
+
   Entity_ID_View lfaceids; 
-  Entity_Direction_View lface_dirs;
+  Direction_View lface_dirs;
   MEntity_ptr cell = cell_id_to_handle_[cellid];
 
   if (getManifoldDimension() == 3) {
@@ -695,8 +697,8 @@ void Mesh_MSTK::getCellFacesAndDirs_unordered_(const Entity_ID cellid,
 
 
 void Mesh_MSTK::getCellFacesAndDirs(const Entity_ID cellid,
-        View_type<const Entity_ID,MemSpace_kind::HOST>& faceids,
-        View_type<const Direction_type,MemSpace_kind::HOST> * const face_dirs) const
+        cEntity_ID_View& faceids,
+        cDirection_View * const face_dirs) const
 {
   AMANZI_ASSERT(faces_initialized_);
   if (cells_initialized_) {
@@ -708,7 +710,7 @@ void Mesh_MSTK::getCellFacesAndDirs(const Entity_ID cellid,
 
 
 void Mesh_MSTK::getCellEdges(const Entity_ID cellid,
-        View_type<const Entity_ID,MemSpace_kind::HOST>& edgeids) const
+        cEntity_ID_View& edgeids) const
 {
   Entity_ID_View ledgeids; 
   AMANZI_ASSERT(edges_initialized_);
@@ -789,7 +791,7 @@ void Mesh_MSTK::getCellEdges(const Entity_ID cellid,
 // consistent with the face normal
 //---------------------------------------------------------
 void Mesh_MSTK::getCellNodes(const Entity_ID cellid,
-                               View_type<const Entity_ID,MemSpace_kind::HOST>& nodeids) const
+                               cEntity_ID_View& nodeids) const
 {
   Entity_ID_View lnodeids; 
   int nn, lid;
@@ -821,14 +823,14 @@ void Mesh_MSTK::getCellNodes(const Entity_ID cellid,
 
 
 void Mesh_MSTK::getFaceEdgesAndDirs(const Entity_ID faceid,
-                                                  View_type<const Entity_ID,MemSpace_kind::HOST>& edgeids,
-                                                  View_type<const Direction_type,MemSpace_kind::HOST> * edge_dirs) const
+                                                  cEntity_ID_View& edgeids,
+                                                  cDirection_View * edge_dirs) const
 {  
   AMANZI_ASSERT(faces_initialized_);
   AMANZI_ASSERT(edges_initialized_);
 
   Entity_ID_View ledgeids; 
-  Entity_Direction_View ledge_dirs; 
+  Direction_View ledge_dirs; 
 
   MEntity_ptr face = face_id_to_handle_[faceid];
   if (getManifoldDimension() == 3) {
@@ -898,7 +900,7 @@ void Mesh_MSTK::getFaceEdgesAndDirs(const Entity_ID faceid,
 // In 2D, nfnodes is 2
 //---------------------------------------------------------
 void Mesh_MSTK::getFaceNodes(const Entity_ID faceid,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& nodeids) const
+                           cEntity_ID_View& nodeids) const
 {
   AMANZI_ASSERT(faces_initialized_);
   Entity_ID_View lnodeids; 
@@ -939,7 +941,7 @@ void Mesh_MSTK::getFaceNodes(const Entity_ID faceid,
 // Get nodes of an edge
 //---------------------------------------------------------
 void Mesh_MSTK::getEdgeNodes(const Entity_ID edgeid,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& nodes) const
+                           cEntity_ID_View& nodes) const
 {
   Entity_ID_View lnodes; 
   AMANZI_ASSERT(edges_initialized_);
@@ -963,7 +965,7 @@ void Mesh_MSTK::getEdgeNodes(const Entity_ID edgeid,
 //---------------------------------------------------------
 void Mesh_MSTK::getNodeCells(const Entity_ID nodeid,
                            const Parallel_kind ptype,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& cellids) const
+                           cEntity_ID_View& cellids) const
 {
   Entity_ID_View lcellids; 
   int idx, lid, nc;
@@ -972,35 +974,6 @@ void Mesh_MSTK::getNodeCells(const Entity_ID nodeid,
 
   MVertex_ptr mv = (MVertex_ptr)vtx_id_to_handle_[nodeid];
 
-  /* Reserved for next major release of MSTK
-  if (MV_PType(mv) == PINTERIOR && ptype != Parallel_type::GHOST) {
-
-    if (manifold_dimension() == 3) {
-      int nvr, regionids[200];
-      MV_RegionIDs(mv,&nvr,regionids);
-      AMANZI_ASSERT(nvr < 200);
-      cellids->resize(nvr);
-      Entity_ID_List::iterator it = cellids->begin();
-      for (int i = 0; i < nvr; ++i) {
-        *it = regionids[i]-1;  // assign to next spot by dereferencing iterator
-        ++it;
-      }
-    }
-    else {
-      int nvf, faceids[200];
-      MV_FaceIDs(mv,&nvf,faceids);
-      AMANZI_ASSERT(nvf < 200);
-      cellids->resize(nvf);
-      Entity_ID_List::iterator it = cellids->begin();
-      for (int i = 0; i < nvf; ++i) {
-        *it = faceids[i]-1;  // assign to next spot by dereferencing iterator
-        ++it;
-      }
-    }
-
-  }
-  else {
-  */
   // mesh vertex on a processor boundary may be connected to owned
   // and ghost cells. So depending on the requested cell type, we
   // may have to omit some entries
@@ -1041,7 +1014,7 @@ void Mesh_MSTK::getNodeCells(const Entity_ID nodeid,
 //---------------------------------------------------------
 void Mesh_MSTK::getNodeFaces(const Entity_ID nodeid,
                            const Parallel_kind ptype,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& faceids) const
+                           cEntity_ID_View& faceids) const
 {
   Entity_ID_View lfaceids; 
   int idx, lid, n;
@@ -1051,42 +1024,8 @@ void Mesh_MSTK::getNodeFaces(const Entity_ID nodeid,
   AMANZI_ASSERT(faces_initialized_);
   MVertex_ptr mv = (MVertex_ptr) vtx_id_to_handle_[nodeid];
 
-  /* Reserved for next major release of MSTK
-  if (MV_PType(mv) == PINTERIOR && ptype != Parallel_type::GHOST) {
-    if (manifold_dimension() == 3) {
-      int nvf, vfaceids[200];
-
-      MV_FaceIDs(mv,&nvf,vfaceids);
-      AMANZI_ASSERT(nvf < 200);
-
-      faceids->resize(nvf);
-      Entity_ID_List::iterator it = faceids->begin();
-      for (int i = 0; i < nvf; ++i) {
-        *it = vfaceids[i]-1;  // assign to next spot by dereferencing iterator
-        ++it;
-      }
-    }
-    else if (manifold_dimension() == 2) {
-      int nve, vedgeids[200];
-
-      MV_EdgeIDs(mv,&nve,vedgeids);
-      AMANZI_ASSERT(nve < 200);
-
-      faceids->resize(nve);
-      Entity_ID_List::iterator it = faceids->begin();
-      for (int i = 0; i < nve; ++i) {
-        *it = vedgeids[i]-1;  // assign to next spot by dereferencing iterator
-        ++it;
-      }
-    }
-  }
-  else {
-  */
-
-  if (getManifoldDimension() == 3)
-    face_list = MV_Faces(mv);
-  else
-    face_list = MV_Edges(mv);
+  if (getManifoldDimension() == 3) face_list = MV_Faces(mv);
+  else face_list = MV_Edges(mv);
 
   int nf = List_Num_Entries(face_list);
   Kokkos::resize(lfaceids, nf); // resize to the maximum
@@ -1116,7 +1055,7 @@ void Mesh_MSTK::getNodeFaces(const Entity_ID nodeid,
 //---------------------------------------------------------
 void Mesh_MSTK::getNodeEdges(const Entity_ID nodeid,
                            const Parallel_kind ptype,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& edgeids) const
+                           cEntity_ID_View& edgeids) const
 {
   Entity_ID_View ledgeids; 
   int idx, lid, nc;
@@ -1160,7 +1099,7 @@ void Mesh_MSTK::getNodeEdges(const Entity_ID nodeid,
 //---------------------------------------------------------
 void Mesh_MSTK::getEdgeFaces(const Entity_ID edgeid,
                            const Parallel_kind ptype,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& faceids) const
+                           cEntity_ID_View& faceids) const
 {
   Entity_ID_View lfaceids; 
   int idx, lid, nc;
@@ -1204,7 +1143,7 @@ void Mesh_MSTK::getEdgeFaces(const Entity_ID edgeid,
 //---------------------------------------------------------
 void Mesh_MSTK::getEdgeCells(const Entity_ID edgeid,
                            const Parallel_kind ptype,
-                           View_type<const Entity_ID,MemSpace_kind::HOST>& cellids) const
+                           cEntity_ID_View& cellids) const
 {
   Entity_ID_View lcellids; 
   MEdge_ptr me = (MEdge_ptr) edge_id_to_handle_[edgeid];
@@ -1249,7 +1188,7 @@ void Mesh_MSTK::getEdgeCells(const Entity_ID edgeid,
 //---------------------------------------------------------
 void Mesh_MSTK::getFaceCells(const Entity_ID faceid,
         const Parallel_kind ptype,
-        View_type<const Entity_ID,MemSpace_kind::HOST>& cellids) const
+        cEntity_ID_View& cellids) const
 {
   AMANZI_ASSERT(faces_initialized_);
   Entity_ID_List vcellids; 
@@ -1324,7 +1263,7 @@ Mesh_MSTK::getNodeCoordinate(const Entity_ID nodeid) const
 //---------------------------------------------------------
 // Modify a node's coordinates
 //---------------------------------------------------------
-void Mesh_MSTK::setNodeCoordinate(const AmanziMesh::Entity_ID nodeid,
+void Mesh_MSTK::setNodeCoordinate(const Entity_ID nodeid,
                                      const AmanziGeometry::Point& coords)
 {
   MVertex_ptr v = vtx_id_to_handle_[nodeid];
@@ -1394,6 +1333,7 @@ Entity_GID Mesh_MSTK::getEntityGID(const Entity_kind kind, const Entity_ID lid) 
     ent = face_id_to_handle_[lid];
     break;
   case Entity_kind::CELL:
+    AMANZI_ASSERT(lid < cell_id_to_handle_.size());
     ent = cell_id_to_handle_[lid];
     break;
   default:
@@ -1401,7 +1341,11 @@ Entity_GID Mesh_MSTK::getEntityGID(const Entity_kind kind, const Entity_ID lid) 
   }
 
   if (serial_run) return MEnt_ID(ent)-1;
-  else return MEnt_GlobalID(ent)-1;
+  else {
+    auto val = MEnt_GlobalID(ent)-1;
+    AMANZI_ASSERT(val >= 0);
+    return val;
+  }
 }
 
 
@@ -1415,7 +1359,13 @@ void Mesh_MSTK::post_create_steps_()
   // requested
   init_nodes_();
   edgeflip_ = nullptr;
-  if (edges_requested_) init_edges_();
+  if (edges_requested_) {
+    // if (getManifoldDimension() == 3) {
+      init_edges_();
+    // } else { // edges are not valid
+    //   edges_requested_ = false;
+    // }
+  }
   if (faces_requested_) init_faces_();
   init_cells_();
 }
@@ -1975,7 +1925,7 @@ void
 Mesh_MSTK::getSetEntities(const AmanziGeometry::RegionLabeledSet& region,
                             const Entity_kind kind,
                             const Parallel_kind ptype,
-                            View_type<const Entity_ID,MemSpace_kind::HOST>& entids) const
+                            cEntity_ID_View& entids) const
 {
   Entity_ID_View lentids; 
   if (kind != createEntityKind(region.entity_str())) {
@@ -2837,9 +2787,9 @@ void Mesh_MSTK::pre_create_steps_(const int space_dimension)
     myprocid = 0;
     numprocs = 1;
   } else {
-    mpicomm_ = mpicomm->GetMpiComm();
-    myprocid = comm_->MyPID();
-    numprocs = comm_->NumProc();
+    mpicomm_ = *mpicomm->getRawMpiComm();
+    myprocid = comm_->getRank();
+    numprocs = comm_->getSize();
     serial_run = (numprocs == 1);
   }
 }
@@ -3239,8 +3189,8 @@ void Mesh_MSTK::extract_mstk_mesh_(List_ptr src_entities,
     MAttrib_ptr rparentgid_att = MAttrib_New(mesh_,"rparent_gid",INT,MREGION);
 
     // Attach parent global ID info to entities used by other processors
-    int size = getComm()->NumProc();
-    int rank = getComm()->MyPID();
+    int size = getComm()->getSize();
+    int rank = getComm()->getRank();
 
     idx = 0;
     MVertex_ptr mv = nullptr;

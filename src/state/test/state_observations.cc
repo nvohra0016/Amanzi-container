@@ -12,7 +12,6 @@
 #include "AmanziComm.hh"
 #include "CompositeVector.hh"
 #include "IO.hh"
-#include "MeshFrameworkColumn.hh"
 #include "MeshFactory.hh"
 #include "State.hh"
 #include "Observable.hh"
@@ -126,34 +125,31 @@ struct obs_test {
   void setup()
   {
     S->Setup();
-    S->GetW<CompositeVector>("constant", Tags::DEFAULT, "my_password").PutScalar(2.0);
-    S->GetW<CompositeVector>("linear", Tags::DEFAULT, "my_password").PutScalar(0.0);
+    S->GetW<CompositeVector>("constant", Tags::DEFAULT, "my_password").putScalar(2.0);
+    S->GetW<CompositeVector>("linear", Tags::DEFAULT, "my_password").putScalar(0.0);
 
-    (*S->GetW<CV>("multi_dof", Tags::DEFAULT, "my_password").ViewComponent("cell"))(0)->PutScalar(
-      0.0);
-    (*S->GetW<CV>("multi_dof", Tags::DEFAULT, "my_password").ViewComponent("cell"))(1)->PutScalar(
-      1.0);
-    (*S->GetW<CV>("multi_dof", Tags::DEFAULT, "my_password").ViewComponent("cell"))(2)->PutScalar(
-      2.0);
+    S->GetW<CV>("multi_dof", Tags::DEFAULT, "my_password").getComponent("cell")->getVectorNonConst(0)->putScalar(0.0);
+    S->GetW<CV>("multi_dof", Tags::DEFAULT, "my_password").getComponent("cell")->getVectorNonConst(1)->putScalar(1.0);
+    S->GetW<CV>("multi_dof", Tags::DEFAULT, "my_password").getComponent("cell")->getVectorNonConst(2)->putScalar(2.0);
 
     auto mesh = S->GetMesh("domain");
-    Epetra_MultiVector& flux_f =
-      *S->GetW<CV>("flux", Tags::DEFAULT, "my_password").ViewComponent("face");
-    AmanziGeometry::Point plus_xz(1.0, 0.0, 1.0);
+    {
+      auto flux_f = S->GetW<CV>("flux", Tags::DEFAULT, "my_password").viewComponent<Kokkos::HostSpace>("face");
+      AmanziGeometry::Point plus_xz(1.0, 0.0, 1.0);
+      for (int f = 0; f != flux_f.extent(0); ++f) flux_f(f,0) = mesh->getFaceNormal(f) * plus_xz;
+    }
 
-    for (int f = 0; f != flux_f.MyLength(); ++f) { flux_f[0][f] = mesh->getFaceNormal(f) * plus_xz; }
-
-    Epetra_MultiVector& id_c =
-      *S->GetW<CV>("id", Tags::DEFAULT, "my_password").ViewComponent("cell");
-    auto& cell_map = S->GetMesh("domain")->getMap(AmanziMesh::Entity_kind::CELL, false);
-
-    for (int c = 0; c != id_c.MyLength(); ++c) { id_c[0][c] = cell_map.GID(c); }
+    {
+      auto id_c = S->GetW<CV>("id", Tags::DEFAULT, "my_password").viewComponent<Kokkos::HostSpace>("cell");
+      auto& cell_map = S->GetMesh("domain")->getMap(AmanziMesh::Entity_kind::CELL, false);
+      for (int c = 0; c != id_c.extent(0); ++c) id_c(c,0) = cell_map->getGlobalElement(c);
+    }
   }
 
   void advance(double dt)
   {
     S->advance_time(dt);
-    S->GetW<CV>("linear", Tags::DEFAULT, "my_password").PutScalar(S->get_time() * 0.1);
+    S->GetW<CV>("linear", Tags::DEFAULT, "my_password").putScalar(S->get_time() * 0.1);
     S->advance_cycle();
   }
 
@@ -176,9 +172,11 @@ struct obs_domain_set_test : public obs_test {
 
     // create domain set
     parent->buildColumns();
+    AMANZI_ASSERT(parent->columns.num_columns_owned * parent->columns.getCells(0).extent(0) ==
+                  parent->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::OWNED));
     std::vector<std::string> cols;
     for (int i = 0; i != parent->columns.num_columns_owned; ++i) {
-      cols.emplace_back(std::to_string(surface_mesh->getMap(AmanziMesh::Entity_kind::CELL,false).GID(i)));
+      cols.emplace_back(std::to_string(surface_mesh->getMap(AmanziMesh::Entity_kind::CELL,false)->getGlobalElement(i)));
     }
     auto domain_set =
       Teuchos::rcp(new AmanziMesh::DomainSet("column", S->GetMesh("surface"), cols));
@@ -187,9 +185,7 @@ struct obs_domain_set_test : public obs_test {
     // create subdomain meshes
     int i = 0;
     for (auto& ds : *domain_set) {
-      auto parent_list = Teuchos::rcp(new Teuchos::ParameterList(*parent->getParameterList()));
-      Teuchos::RCP<AmanziMesh::Mesh> col_mesh =
-        AmanziMesh::createColumnMesh(parent, i, parent_list);
+      auto col_mesh = fac.createColumn(parent, i);
       S->RegisterMesh(ds, col_mesh);
       i++;
     }
@@ -209,7 +205,7 @@ struct obs_domain_set_test : public obs_test {
     for (auto& dname : *ds) {
       int index = Keys::getDomainSetIndex<int>(dname);
       S->GetW<CompositeVector>(Keys::getKey(dname, "variable"), Tags::DEFAULT, "my_password")
-        .PutScalar(index);
+        .putScalar(index);
     }
   }
 };
@@ -223,7 +219,7 @@ SUITE(STATE_OBSERVATIONS)
     int num_cells =
       S->GetMesh("domain")->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
     int num_cells_total = 0;
-    S->GetMesh("domain")->getComm()->SumAll(&num_cells, &num_cells_total, 1);
+    Teuchos::reduceAll<int>(*S->GetMesh("domain")->getComm(),Teuchos::REDUCE_SUM, 1,&num_cells, &num_cells_total);
     CHECK_EQUAL(27, num_cells_total);
 
     // globally empty regions now error
@@ -234,7 +230,7 @@ SUITE(STATE_OBSERVATIONS)
     int cells_all =
       S->GetMesh("domain")->getSetSize("all", AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
     int cells_all_total = 0;
-    S->GetMesh("domain")->getComm()->SumAll(&cells_all, &cells_all_total, 1);
+    Teuchos::reduceAll<int>(*S->GetMesh("domain")->getComm(),Teuchos::REDUCE_SUM, 1,&cells_all, &cells_all_total);
     CHECK_EQUAL(27, cells_all_total);
   }
 

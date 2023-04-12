@@ -27,6 +27,7 @@
 // Amanzi
 #include "MeshFactory.hh"
 #include "GMVMesh.hh"
+#include "LinearOperatorPCG.hh"
 #include "Tensor.hh"
 
 // Operators
@@ -38,19 +39,20 @@
 
 
 /* *****************************************************************
-* This test replaves tensor and boundary conditions by continuous
-* functions. It analyzes accuracy of the MFD discretization with
-* respect to scaling the stability term.
-**************************************************************** */
+ * This test replaves tensor and boundary conditions by continuous
+ * functions. It analyzes accuracy of the MFD discretization with
+ * respect to scaling the stability term.
+ **************************************************************** */
 TEST(OPERATOR_MIXED_DIFFUSION)
 {
   using namespace Amanzi;
   using namespace Amanzi::AmanziMesh;
   using namespace Amanzi::AmanziGeometry;
   using namespace Amanzi::Operators;
+  using namespace Amanzi::AmanziSolvers;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
 
   if (MyPID == 0)
     std::cout << "Test: 2D steady-state elliptic solver, mixed discretization" << std::endl;
@@ -73,15 +75,15 @@ TEST(OPERATOR_MIXED_DIFFUSION)
 
   // create diffusion coefficient
   // -- since rho=mu=1.0, we do not need to scale the diffusion coefficient.
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells_owned = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
 
   Analytic01 ana(mesh);
 
   for (int c = 0; c < ncells_owned; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.TensorDiffusivity(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.TensorDiffusivity(xc, 0.0);
     K->push_back(Kc);
   }
 
@@ -90,10 +92,11 @@ TEST(OPERATOR_MIXED_DIFFUSION)
   std::vector<int>& bc_model = bc->bc_model();
   std::vector<double>& bc_value = bc->bc_value();
 
+  int nfaces = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::OWNED);
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
   Point xv(2);
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
+    const Point& xf = mesh->getFaceCentroid(f)
     if (fabs(xf[0]) < 1e-6 || fabs(xf[0] - 1.0) < 1e-6 || fabs(xf[1]) < 1e-6 ||
         fabs(xf[1] - 1.0) < 1e-6) {
       bc_value[f] = ana.pressure_exact(xf, 0.0);
@@ -118,7 +121,7 @@ TEST(OPERATOR_MIXED_DIFFUSION)
 
   Epetra_MultiVector& src = *source.ViewComponent("cell");
   for (int c = 0; c < ncells_owned; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
+    const Point& xc = mesh->getCellCentroid(c)
     src[0][c] += ana.source_exact(xc, 0.0);
   }
 
@@ -129,7 +132,7 @@ TEST(OPERATOR_MIXED_DIFFUSION)
     // create the local diffusion operator
     Teuchos::ParameterList olist = plist.sublist("PK operators").sublist("mixed diffusion");
     PDE_DiffusionMFD op2(olist, mesh);
-    op2.Init(olist);
+    op2.Init();
     op2.SetBCs(bc, bc);
 
     int schema_dofs = op2.schema_dofs();
@@ -148,14 +151,23 @@ TEST(OPERATOR_MIXED_DIFFUSION)
     Teuchos::RCP<Operator> global_op = op2.global_operator();
     global_op->UpdateRHS(source, false);
     op2.ApplyBCs(true, true, true);
+    global_op->SymbolicAssembleMatrix();
+    global_op->AssembleMatrix();
 
-    global_op->set_inverse_parameters(
-      "Hypre AMG", plist.sublist("preconditioners"), "PCG", plist.sublist("solvers"));
-    global_op->InitializeInverse();
-    global_op->ComputeInverse();
+    Teuchos::ParameterList slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+    global_op->InitializePreconditioner(slist);
+    global_op->UpdatePreconditioner();
+
+    // solve the problem
+    Teuchos::ParameterList lop_list =
+      plist.sublist("solvers").sublist("PCG").sublist("pcg parameters");
+    solution->putScalar(0.0);
+    auto solver = Teuchos::rcp(
+      new LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace>(global_op, global_op));
+    solver->Init(lop_list);
 
     CompositeVector& rhs = *global_op->rhs();
-    global_op->ApplyInverse(rhs, *solution);
+    int ierr = solver->ApplyInverse(rhs, *solution);
 
     // calculate pressure errors
     Epetra_MultiVector& p = *solution->ViewComponent("cell", false);
@@ -173,13 +185,14 @@ TEST(OPERATOR_MIXED_DIFFUSION)
     if (MyPID == 0) {
       pl2_err /= pnorm;
       ul2_err /= unorm;
-      printf("scale=%7.4g  L2(p)=%9.6f  Inf(p)=%9.6f  L2(u)=%9.6g  Inf(u)=%9.6f itr=%3d\n",
+      printf("scale=%7.4g  L2(p)=%9.6f  Inf(p)=%9.6f  L2(u)=%9.6g  "
+             "Inf(u)=%9.6f itr=%3d\n",
              factor,
              pl2_err,
              pinf_err,
              ul2_err,
              uinf_err,
-             global_op->num_itrs());
+             solver->num_itrs());
 
       CHECK(pl2_err < 0.15 && ul2_err < 0.15);
     }
@@ -194,10 +207,10 @@ TEST(OPERATOR_MIXED_DIFFUSION)
 
 
 /* *****************************************************************
-* This test replaces tensor and boundary conditions by continuous
-* functions. It analyzed accuracy of the MFd discretization with
-* respect to scaling of the stability term.
-**************************************************************** */
+ * This test replaces tensor and boundary conditions by continuous
+ * functions. It analyzed accuracy of the MFd discretization with
+ * respect to scaling of the stability term.
+ **************************************************************** */
 TEST(OPERATOR_NODAL_DIFFUSION)
 {
   using namespace Teuchos;
@@ -205,9 +218,10 @@ TEST(OPERATOR_NODAL_DIFFUSION)
   using namespace Amanzi::AmanziMesh;
   using namespace Amanzi::AmanziGeometry;
   using namespace Amanzi::Operators;
+  using namespace Amanzi::AmanziSolvers;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0)
     std::cout << "\nTest: 2D steady-state elliptic solver, nodal discretization" << std::endl;
 
@@ -228,16 +242,17 @@ TEST(OPERATOR_NODAL_DIFFUSION)
 
   // create diffusion coefficient
   // -- since rho=mu=1.0, we do not need to scale the diffusion coefficient.
-  Teuchos::RCP<std::vector<WhetStone::Tensor>> K =
-    Teuchos::rcp(new std::vector<WhetStone::Tensor>());
+  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K =
+    Teuchos::rcp(new std::vector<WhetStone:Tensor<>>());
   int ncells_owned = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+  int nnodes_owned = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::OWNED);
   int nnodes_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
 
   Analytic01 ana(mesh);
 
   for (int c = 0; c < ncells_owned; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.TensorDiffusivity(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.TensorDiffusivity(xc, 0.0);
     K->push_back(Kc);
   }
 
@@ -263,7 +278,7 @@ TEST(OPERATOR_NODAL_DIFFUSION)
   cvs->SetComponent("node", AmanziMesh::Entity_kind::NODE, 1);
 
   CompositeVector solution(*cvs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
   // create source
   CompositeVector source(*cvs);
@@ -283,7 +298,7 @@ TEST(OPERATOR_NODAL_DIFFUSION)
     // create the local diffusion operator
     Teuchos::ParameterList olist = plist.sublist("PK operators").sublist("nodal diffusion");
     PDE_DiffusionMFD op2(olist, mesh);
-    op2.Init(olist);
+    op2.Init();
     op2.SetBCs(bc, bc);
 
     int schema_dofs = op2.schema_dofs();
@@ -298,16 +313,25 @@ TEST(OPERATOR_NODAL_DIFFUSION)
     Teuchos::RCP<Operator> global_op = op2.global_operator();
     global_op->UpdateRHS(source, false);
     op2.ApplyBCs(true, true, true);
+    global_op->SymbolicAssembleMatrix();
+    global_op->AssembleMatrix();
 
-    global_op->set_inverse_parameters(
-      "Hypre AMG", plist.sublist("preconditioners"), "PCG", plist.sublist("solvers"));
-    global_op->InitializeInverse();
-    global_op->ComputeInverse();
+    Teuchos::ParameterList slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+    global_op->InitializePreconditioner(slist);
+    global_op->UpdatePreconditioner();
+
+    // solve the problem
+    Teuchos::ParameterList lop_list =
+      plist.sublist("solvers").sublist("PCG").sublist("pcg parameters");
+    solution.putScalar(0.0);
+    auto solver = Teuchos::rcp(
+      new LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace>(global_op, global_op));
+    solver->Init(lop_list);
 
     CompositeVector& rhs = *global_op->rhs();
-    solution.PutScalar(0.0);
-    int ierr = global_op->ApplyInverse(rhs, solution);
-    CHECK(ierr == 0);
+    solution.putScalar(0.0);
+    int ierr = solver->ApplyInverse(rhs, solution);
+    CHECK(ierr > 0);
 
     // calculate errors
 #ifdef HAVE_MPI
@@ -322,12 +346,13 @@ TEST(OPERATOR_NODAL_DIFFUSION)
       pl2_err /= pnorm;
       ph1_err /= hnorm;
       double tmp = op2.nfailed_primary() * 100.0 / ncells_owned;
-      printf("scale=%7.4g  L2(p)=%9.6f  Inf(p)=%9.6f  H1(p)=%9.6g  itr=%3d  nfailed=%4.1f\n",
+      printf("scale=%7.4g  L2(p)=%9.6f  Inf(p)=%9.6f  H1(p)=%9.6g  itr=%3d  "
+             "nfailed=%4.1f\n",
              factor,
              pl2_err,
              pinf_err,
              ph1_err,
-             global_op->num_itrs(),
+             solver->num_itrs(),
              tmp);
 
       CHECK(pl2_err < 0.1 && ph1_err < 0.15);

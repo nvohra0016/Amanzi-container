@@ -32,8 +32,8 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Initialization
-****************************************************************** */
+ * Initialization
+ ****************************************************************** */
 void
 PDE_DiffusionDG::Init_(Teuchos::ParameterList& plist)
 {
@@ -73,7 +73,7 @@ PDE_DiffusionDG::Init_(Teuchos::ParameterList& plist)
     // constructor was given an Operator
     global_schema_col_ = global_op_->schema_col();
     global_schema_row_ = global_op_->schema_row();
-    mesh_ = global_op_->DomainMap().Mesh();
+    mesh_ = global_op_->DomainMap().getMesh();
   }
 
   // create local operators
@@ -99,49 +99,52 @@ PDE_DiffusionDG::Init_(Teuchos::ParameterList& plist)
 
 
 /* ******************************************************************
-* Populate face-based 2x2 matrices on interior faces and 1x1 matrices
-* on boundary faces.
-****************************************************************** */
+ * Populate face-based 2x2 matrices on interior faces and 1x1 matrices
+ * on boundary faces.
+ ****************************************************************** */
 void
 PDE_DiffusionDG::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& flux,
                                 const Teuchos::Ptr<const CompositeVector>& u)
 {
-  WhetStone::DenseMatrix Acell, Aface;
+  WhetStone::DenseMatrix<> Acell, Aface;
 
+  int d = mesh_->getSpaceDimension();
   double Kf(1.0);
+  AmanziMesh::Entity_ID_List cells;
+
   // volumetric term
   for (int c = 0; c != ncells_owned; ++c) {
     interface_->StiffnessMatrix(c, Acell);
-    local_op_->matrices[c] = Acell;
+    local_op_->matrices[c].assign(Acell);
   }
 
   // strenghen stability term
   for (int f = 0; f != nfaces_owned; ++f) {
     if (Kf_.get()) Kf = (*Kf_)[f];
     dg_->FaceMatrixPenalty(f, Kf, Aface);
-    penalty_op_->matrices[f] = Aface;
+    penalty_op_->matrices[f].assign(Aface);
   }
 
   // stability terms
   for (int f = 0; f != nfaces_owned; ++f) {
-    auto cells = mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+    mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
     int c1 = cells[0];
     int c2 = (cells.size() > 1) ? cells[1] : c1;
 
     interface_->FaceMatrixJump(f, c1, c2, Aface);
 
     Aface *= -1.0;
-    jump_up_op_->matrices[f] = Aface;
+    jump_up_op_->matrices[f].assign(Aface);
 
     Aface.Transpose();
-    jump_pu_op_->matrices[f] = Aface;
+    jump_pu_op_->matrices[f].assign(Aface);
   }
 }
 
 
 /* ******************************************************************
-* Apply boundary conditions to the local matrices.
-****************************************************************** */
+ * Apply boundary conditions to the local matrices.
+ ****************************************************************** */
 void
 PDE_DiffusionDG::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
 {
@@ -151,55 +154,58 @@ PDE_DiffusionDG::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
   const std::vector<std::vector<double>>& bc_value = bcs_trial_[0]->bc_value_vector();
   int nk = bc_value[0].size();
 
-  Epetra_MultiVector& rhs_c = *global_op_->rhs()->ViewComponent("cell", true);
+  Epetra_MultiVector& rhs_c = *global_op_->rhs()->viewComponent("cell", true);
 
-  int d = mesh_->getSpaceDimension();
+  AmanziMesh::Entity_ID_List cells;
+
+  int dir, d = mesh_->getSpaceDimension();
   std::vector<AmanziGeometry::Point> tau(d - 1);
 
   // create integration object for all mesh cells
-  WhetStone::NumericalIntegration numi(mesh_);
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh_);
 
   for (int f = 0; f != nfaces_owned; ++f) {
     if (bc_model[f] == OPERATOR_BC_DIRICHLET || bc_model[f] == OPERATOR_BC_NEUMANN) {
-      auto cells = mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
+      mesh_->getFaceCells(f, AmanziMesh::Parallel_kind::ALL, cells);
       int c = cells[0];
 
-      const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f);
+      const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f)
+      const AmanziGeometry::Point& normal = mesh_->face_normal(f, false, c, &dir);
 
       // set polynomial with Dirichlet data
-      WhetStone::DenseVector coef(nk);
+      WhetStone::DenseVector<> coef(nk);
       for (int i = 0; i < nk; ++i) { coef(i) = bc_value[f][i]; }
 
-      WhetStone::Polynomial pf(d, method_order_, coef);
+      WhetStone::Polynomial<> pf(d, method_order_, coef);
       pf.set_origin(xf);
 
       // convert boundary polynomial to space polynomial
-      pf.ChangeOrigin(mesh_->getCellCentroid(c));
+      pf.ChangeOrigin(mesh_->getCellCentroid(c))
 
       // extract coefficients and update right-hand side
-      WhetStone::DenseMatrix& Pcell = penalty_op_->matrices[f];
+      WhetStone::DenseMatrix<>& Pcell = penalty_op_->matrices[f];
       int nrows = Pcell.NumRows();
       int ncols = Pcell.NumCols();
 
-      WhetStone::DenseVector v(nrows), pv(ncols), jv(ncols);
+      WhetStone::DenseVector<> v(nrows), pv(ncols), jv(ncols);
       v = pf.coefs();
       dg_->cell_basis(c).ChangeBasisNaturalToMy(v);
 
       if (bc_model[f] == OPERATOR_BC_DIRICHLET) {
-        WhetStone::DenseMatrix& Jcell = jump_up_op_->matrices[f];
+        WhetStone::DenseMatrix<>& Jcell = jump_up_op_->matrices[f];
         Pcell.Multiply(v, pv, false);
         Jcell.Multiply(v, jv, false);
 
         for (int i = 0; i < ncols; ++i) { rhs_c[i][c] += pv(i) + jv(i); }
       } else if (bc_model[f] == OPERATOR_BC_NEUMANN) {
-        WhetStone::DenseMatrix& Jcell = jump_pu_op_->matrices[f];
+        WhetStone::DenseMatrix<>& Jcell = jump_pu_op_->matrices[f];
         Jcell.Multiply(v, jv, false);
 
         for (int i = 0; i < ncols; ++i) { rhs_c[i][c] -= jv(i); }
 
-        Pcell.PutScalar(0.0);
-        Jcell.PutScalar(0.0);
-        jump_up_op_->matrices[f].PutScalar(0.0);
+        Pcell.putScalar(0.0);
+        Jcell.putScalar(0.0);
+        jump_up_op_->matrices[f].putScalar(0.0);
       }
     }
   }
@@ -207,8 +213,8 @@ PDE_DiffusionDG::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
 
 
 /* ******************************************************************
-* Calculate mass flux from cell-centered data
-****************************************************************** */
+ * Calculate mass flux from cell-centered data
+ ****************************************************************** */
 void
 PDE_DiffusionDG::UpdateFlux(const Teuchos::Ptr<const CompositeVector>& solution,
                             const Teuchos::Ptr<CompositeVector>& flux)

@@ -19,13 +19,11 @@
 
 #pragma once
 
+#include "Teuchos_ParameterList.hpp"
+
 #include "Region.hh"
 #include "RegionBox.hh"
 #include "MeshDefs.hh"
-
-namespace Teuchos {
-  class ParameterList;
-}
 
 namespace Amanzi {
 namespace AmanziMesh {

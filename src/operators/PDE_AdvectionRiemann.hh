@@ -30,7 +30,7 @@ namespace Amanzi {
 namespace Operators {
 
 struct SurfaceFluxData {
-  WhetStone::DenseMatrix Uface, Dface;
+  WhetStone::DenseMatrix<> Uface, Dface;
   double uflux, dflux;
 };
 
@@ -51,10 +51,10 @@ class PDE_AdvectionRiemann : public PDE_Advection {
 
   // main members
   // -- setup for various flux algorithms
-  virtual void Setup(const CompositeVector& u) final{};
+  virtual void Setup(const CompositeVector& u) override{};
 
   void Setup(const Teuchos::RCP<std::vector<WhetStone::VectorPolynomial>>& Kc,
-             const Teuchos::RCP<std::vector<WhetStone::Polynomial>>& Kf)
+             const Teuchos::RCP<std::vector<WhetStone::Polynomial<>>>& Kf)
   {
     Kc_ = Kc;
     Kf_ = Kf;
@@ -66,22 +66,29 @@ class PDE_AdvectionRiemann : public PDE_Advection {
   }
 
   // -- generate linearized operator: standard interface
-  using PDE_Advection::UpdateMatrices;
-  virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
-                              const Teuchos::Ptr<const CompositeVector>& p) final{};
+  virtual void
+  UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
+                 const Teuchos::Ptr<const CompositeVector>& dhdu = Teuchos::null) override
+  {
+    AMANZI_ASSERT(false);
+  }
+  virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u) override
+  {
+    AMANZI_ASSERT(false);
+  }
 
   // -- generate linearized operator: new interface
-  void UpdateMatrices(const std::vector<WhetStone::Polynomial>& u);
+  void UpdateMatrices(const Teuchos::Ptr<const std::vector<WhetStone::Polynomial<>>>& u);
   void UpdateMatrices(double t);
 
   // -- determine advected flux of potential u
   virtual void UpdateFlux(const Teuchos::Ptr<const CompositeVector>& h,
                           const Teuchos::Ptr<const CompositeVector>& u,
                           const Teuchos::RCP<BCs>& bc,
-                          const Teuchos::Ptr<CompositeVector>& flux) final;
+                          const Teuchos::Ptr<CompositeVector>& flux) override;
 
   // boundary conditions
-  virtual void ApplyBCs(bool primary, bool eliminate, bool essential_eqn) final;
+  virtual void ApplyBCs(bool primary, bool eliminate, bool essential_eqn) override;
 
   // access
   const WhetStone::DG_Modal& dg() const { return *dg_; }
@@ -98,7 +105,7 @@ class PDE_AdvectionRiemann : public PDE_Advection {
 
   // support of Rusanov flux
   Teuchos::RCP<std::vector<WhetStone::VectorPolynomial>> Kc_;
-  Teuchos::RCP<std::vector<WhetStone::Polynomial>> Kf_;
+  Teuchos::RCP<std::vector<WhetStone::Polynomial<>>> Kf_;
 
   // support of space-time polynomial velocity
   bool static_matrices_initialized_;

@@ -44,21 +44,18 @@ class PDE_MagneticDiffusion : public PDE_Electromagnetics {
                         const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
     : PDE_Electromagnetics(plist, mesh)
   {
-    pde_type_ = PDE_MAGNETIC_DIFFUSION;
     InitMagneticDiffusion_(plist);
   }
 
   // main virtual members
   // -- create a linearized operator
-  using PDE_HelperDiscretization::UpdateMatrices;
-  virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
-                              const Teuchos::Ptr<const CompositeVector>& p) override;
+  virtual void UpdateMatrices();
 
   // -- before solving the problem
-  virtual void ModifyMatrices(CompositeVector& E, CompositeVector& B, double dt) override;
+  virtual void ModifyMatrices(CompositeVector& E, CompositeVector& B, double dt);
 
   // -- after solving the problem
-  virtual void ModifyFields(CompositeVector& E, CompositeVector& B, double dt) override;
+  virtual void ModifyFields(CompositeVector& E, CompositeVector& B, double dt);
 
   // physical quantities
   // -- energies
@@ -72,8 +69,8 @@ class PDE_MagneticDiffusion : public PDE_Electromagnetics {
   void InitMagneticDiffusion_(Teuchos::ParameterList& plist);
 
  protected:
-  std::vector<WhetStone::DenseMatrix> mass_op_;
-  std::vector<WhetStone::DenseMatrix> curl_op_;
+  std::vector<WhetStone::DenseMatrix<>> mass_op_;
+  std::vector<WhetStone::DenseMatrix<>> curl_op_;
 };
 
 } // namespace Operators

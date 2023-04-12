@@ -7,15 +7,14 @@
   Authors:
 */
 
-#ifndef DATADEBUG_HH__
-#define DATADEBUG_HH__
+#ifndef DATADEBUG_HH_
+#define DATADEBUG_HH_
 
-#include "Epetra_Vector.h"
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_VerboseObject.hpp"
 
+#include "AmanziTypes.hh"
 #include "Mesh.hh"
-#include "VerboseObject_objs.hh"
 
 namespace Amanzi {
 
@@ -25,9 +24,9 @@ class DataDebug {
   ~DataDebug() {}
 
   void
-  write_region_data(std::string& region_name, const Epetra_Vector& data, std::string& description);
+  write_region_data(std::string& region_name, const Vector_type& data, std::string& description);
   void write_region_statistics(std::string& region_name,
-                               const Epetra_Vector& data,
+                               const Vector_type& data,
                                std::string& description);
 
  private:

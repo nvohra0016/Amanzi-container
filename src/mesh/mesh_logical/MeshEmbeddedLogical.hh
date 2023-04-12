@@ -10,20 +10,14 @@
 #ifndef AMANZI_EMBEDDED_LOGICAL_MESH_H_
 #define AMANZI_EMBEDDED_LOGICAL_MESH_H_
 
-#include <Epetra_Map.h>
-#include <AmanziComm.hh>
-#include <Epetra_SerialComm.h>
-
 #include <memory>
 #include <vector>
 
 #include "Teuchos_ParameterList.hpp"
-#include "Mesh.hh"
-#include "Region.hh"
+#include "AmanziComm.hh"
+#include "AmanziTypes.hh"
 
-#include "VerboseObject.hh"
-#include "dbc.hh"
-#include "errors.hh"
+#include "MeshFramework.hh"
 
 namespace Amanzi {
 
@@ -31,20 +25,20 @@ namespace AmanziMesh {
 
 struct MeshEmbeddedLogicalAlgorithms: public MeshLogicalAlgorithms { 
   // Get the bisectors, i.e. vectors from cell centroid to face centroids.
-  virtual void getCellFacesAndBisectors(
-          const Mesh& mesh, 
+  virtual void computeCellFacesAndBisectors(
+          const MeshHost& mesh, 
           const Entity_ID cellid,
-          cEntity_ID_View& faceids,
-          cPoint_View * const bisectors) const override;
+          MeshFramework::cEntity_ID_View& faceids,
+          MeshFramework::cPoint_View * const bisectors) const override;
 
-  virtual double getCellVolume(const Mesh& mesh, const Entity_ID c) const override;
-  virtual AmanziGeometry::Point getCellCentroid(const Mesh& mesh, const Entity_ID c) const override;
-  virtual double getFaceArea(const Mesh& mesh, const Entity_ID f) const override;
-  virtual AmanziGeometry::Point getFaceCentroid(const Mesh& mesh, const Entity_ID f) const override;
-  virtual AmanziGeometry::Point getFaceNormal(const Mesh& mesh, const Entity_ID f,
+  virtual double computeCellVolume(const MeshHost& mesh, const Entity_ID c) const override;
+  virtual AmanziGeometry::Point computeCellCentroid(const MeshHost& mesh, const Entity_ID c) const override;
+  virtual double computeFaceArea(const MeshHost& mesh, const Entity_ID f) const override;
+  virtual AmanziGeometry::Point computeFaceCentroid(const MeshHost& mesh, const Entity_ID f) const override;
+  virtual AmanziGeometry::Point computeFaceNormal(const MeshHost& mesh, const Entity_ID f,
           const Entity_ID c, int * const orientation=nullptr) const override;
 
-}; 
+};
 
 // An embedded logical mesh is the union of a standard volumetric mesh and a
 // logical mesh.
@@ -112,12 +106,12 @@ class MeshEmbeddedLogical : public MeshFramework {
   getNodeCoordinate(const Entity_ID node) const override;
 
   virtual void
-  getFaceNodes(const Entity_ID f, cEntity_ID_View& nodes) const override;
+  getFaceNodes(const Entity_ID f, MeshFramework::cEntity_ID_View& nodes) const override;
 
   virtual void
   getNodeFaces(const Entity_ID nodeid,
                const Parallel_kind ptype,
-               cEntity_ID_View& faceids) const override;
+               MeshFramework::cEntity_ID_View& faceids) const override;
 
 
   //
@@ -125,14 +119,14 @@ class MeshEmbeddedLogical : public MeshFramework {
   //
   virtual void getCellFacesAndDirs(
     const Entity_ID c,
-    cEntity_ID_View& faces,
-    cEntity_Direction_View * const dirs) const override;
+    MeshFramework::cEntity_ID_View& faces,
+    MeshFramework::cDirection_View * const dirs) const override;
 
   // Get the bisectors, i.e. vectors from cell centroid to face centroids.
   void getCellFacesAndBisectors(
           const Entity_ID cellid,
-          cEntity_ID_View& faceids,
-          cPoint_View * const bisectors) const;
+          MeshFramework::cEntity_ID_View& faceids,
+          MeshFramework::cPoint_View * const bisectors) const;
 
   double getCellVolume(const Entity_ID c) const;
   AmanziGeometry::Point getCellCentroid(const Entity_ID c) const;
@@ -142,7 +136,7 @@ class MeshEmbeddedLogical : public MeshFramework {
   //
   virtual void getFaceCells(const Entity_ID f,
                             const Parallel_kind ptype,
-                            cEntity_ID_View& cells) const override;
+                            MeshFramework::cEntity_ID_View& cells) const override;
   double getFaceArea(const Entity_ID f) const;
   AmanziGeometry::Point getFaceCentroid(const Entity_ID f) const;
   AmanziGeometry::Point getFaceNormal(const Entity_ID f,
@@ -151,15 +145,15 @@ class MeshEmbeddedLogical : public MeshFramework {
  protected:
 
   RaggedArray_DualView<Entity_ID> extra_face_cell_ids_;
-  Point_View extra_face_area_normals_;
+  MeshFramework::Point_View extra_face_area_normals_;
   RaggedArray_DualView<double> extra_face_cell_lengths_;
   RaggedArray_DualView<AmanziGeometry::Point> extra_face_cell_bisectors_;
 
   Teuchos::RCP<Mesh> bg_mesh_;  // background mesh, typically a Mesh_MSTK
   Teuchos::RCP<Mesh> log_mesh_;  // embedded mesh, typically a MeshLogical
 
-  Teuchos::RCP<Epetra_Map> cell_map_;
-  Teuchos::RCP<Epetra_Map> face_map_;
+  Teuchos::RCP<Map_type> cell_map_;
+  Teuchos::RCP<Map_type> face_map_;
 };
 
 }  // namespace AmanziMesh

@@ -25,11 +25,11 @@ namespace AmanziMesh {
 class MeshLogicalAudit {
 public:
 
-  MeshLogicalAudit(const Teuchos::RCP<const AmanziMesh::Mesh> &mesh_, std::ostream& os=std::cout);
+  MeshLogicalAudit(const Teuchos::RCP<const MeshCache<MemSpace_kind::HOST>> &mesh_, std::ostream& os=std::cout);
 
   // This is the main method.
   int Verify() const;
-  
+
   // The individual tests are also available.  While the tests are all formally
   // independent, there is an implicit order dependence of the tests in that a
   // test may assume certain mesh data has been verified, and that verification
@@ -48,32 +48,33 @@ public:
   bool check_cell_maps() const;
   bool check_cell_to_faces_ghost_data() const;
   bool check_face_partition() const;
-  bool check_cell_face_bisector_geometry() const;  
-  
+  bool check_cell_face_bisector_geometry() const;
+
 private:
 
-  Teuchos::RCP<const AmanziMesh::Mesh> mesh;
+  Teuchos::RCP<const MeshCache<MemSpace_kind::HOST>> mesh;
 
   Comm_ptr_type comm_;
-  const int MyPID;
+  const int getRank;
   const int nface;
   const int ncell;
 
   std::ostream& os;
   unsigned int MAX_OUT;
 
-  bool distinct_values(const AmanziMesh::cEntity_ID_View& list) const;
-  void write_list(const Entity_ID_List&, unsigned int) const;
-  bool global_any(bool) const;
-  int same_face(const AmanziMesh::Entity_ID_View, const AmanziMesh::Entity_ID_View) const;
-  
-  bool check_maps(const Epetra_Map&, const Epetra_Map&) const;
-  bool check_get_set_ids(AmanziMesh::Entity_kind) const;
-  bool check_valid_set_id(AmanziMesh::Entity_kind) const;
-  bool check_sets(AmanziMesh::Entity_kind, const Epetra_Map&, const Epetra_Map&) const;
-  bool check_get_set(AmanziMesh::Set_ID, AmanziMesh::Entity_kind, AmanziMesh::Parallel_kind, const Epetra_Map&) const;
-  bool check_used_set(AmanziMesh::Set_ID, AmanziMesh::Entity_kind, const Epetra_Map&, const Epetra_Map&) const;
-  
+  bool areDistinctValues_(const View_type<const Entity_ID, MemSpace_kind::HOST>& list) const;
+  void writeList_(const Entity_ID_List&, unsigned int) const;
+  bool globalAny_(bool) const;
+  int isSameFace_(const MeshCache<MemSpace_kind::HOST>::cEntity_ID_View,
+                  const MeshCache<MemSpace_kind::HOST>::cEntity_ID_View) const;
+
+  bool check_maps(const Map_type&, const Map_type&) const;
+  bool check_get_set_ids(Entity_kind) const;
+  bool check_valid_set_id(Entity_kind) const;
+  bool check_sets(Entity_kind, const Map_type&, const Map_type&) const;
+  bool check_get_set(Set_ID, Entity_kind, Parallel_kind, const Map_type&) const;
+  bool check_used_set(Set_ID, Entity_kind, const Map_type&, const Map_type&) const;
+
   // This is the vertex type for the test dependency graph.
   typedef bool (MeshLogicalAudit::* Test)() const;
   struct Vertex
@@ -86,13 +87,13 @@ private:
 
   typedef boost::adjacency_list<boost::listS, boost::vecS, boost::directedS, Vertex> Graph;
   Graph g;
-  
+
   struct mark_do_not_run : public boost::bfs_visitor<>
   {
     template <class Vertex, class Graph>
     void discover_vertex(Vertex v, Graph &gr) { gr[v].run = false; }
   };
-  
+
   void create_test_dependencies();
 };
 

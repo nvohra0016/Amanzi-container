@@ -35,7 +35,14 @@ class FunctionConstant : public Function {
  public:
   FunctionConstant(double c) : c_(c) {}
   std::unique_ptr<Function> Clone() const { return std::make_unique<FunctionConstant>(*this); }
-  double operator()(const std::vector<double>& x) const { return c_; }
+  double operator()(const Kokkos::View<double*, Kokkos::HostSpace>& x) const { return c_; }
+
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const
+  {
+    assert(in.extent(1) == out.extent(0));
+    Kokkos::parallel_for(
+      "FunctionConstant::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) { out(i) = c_; });
+  }
 
  private:
   double c_;

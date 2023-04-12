@@ -46,7 +46,7 @@ MeshMaps_VEM::VelocityCell(int c,
     LeastSquareProjector_Cell_(order_, c, vf, vc);
   } else {
     for (int i = 0; i < d_; ++i) {
-      std::vector<Polynomial> vvf, vve;
+      std::vector<Polynomial<>> vvf, vve;
       for (int n = 0; n < vf.size(); ++n) { vvf.push_back(vf[n][i]); }
 
       for (int n = 0; n < ve.size(); ++n) { vve.push_back(ve[n][i]); }
@@ -82,7 +82,7 @@ MeshMaps_VEM::VelocityFace(int f, VectorPolynomial& vf) const
     vf.resize(d_);
     for (int i = 0; i < d_; ++i) {
       VectorPolynomial v;
-      std::vector<Polynomial> ve;
+      std::vector<Polynomial<>> ve;
 
       for (int n = 0; n < nedges; ++n) {
         int e = edges[n];
@@ -110,7 +110,7 @@ MeshMaps_VEM::LeastSquareProjector_Cell_(int order,
 {
   AMANZI_ASSERT(order == 1 || order == 2);
 
-  vc.Reshape(d_, d_, order);
+  vc.reshape(d_, d_, order);
 
   AmanziGeometry::Point px1, px2;
   AmanziMesh::Point_List x1, x2;

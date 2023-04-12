@@ -23,10 +23,10 @@ namespace Amanzi {
 #define DEBUG_FLAG 0
 
 /* ******************************************************************
-* Nonlinear function F(x) = k(p0 - x) * [(T*dir) * (p - x) + g] - bc
-* where k is the nonlinear function provided by the model
-* and p0, T, dir, p, g, bc are constant parameters.
-****************************************************************** */
+ * Nonlinear function F(x) = k(p0 - x) * [(T*dir) * (p - x) + g] - bc
+ * where k is the nonlinear function provided by the model
+ * and p0, T, dir, p, g, bc are constant parameters.
+ ****************************************************************** */
 template <class Model>
 class BoundaryFluxFn {
  public:
@@ -78,8 +78,8 @@ class BoundaryFluxFn {
 
 
 /* ******************************************************************
-* Auxiliaty class for toms748: convergence criteria.
-****************************************************************** */
+ * Auxiliaty class for toms748: convergence criteria.
+ ****************************************************************** */
 struct Tol_ {
   Tol_(double eps) : eps_(eps){};
   bool operator()(const double& a, const double& b) const { return std::abs(a - b) <= eps_; }
@@ -88,8 +88,8 @@ struct Tol_ {
 
 
 /* ******************************************************************
-* Bisection solver based on toms748 algorithm.
-****************************************************************** */
+ * Bisection solver based on toms748 algorithm.
+ ****************************************************************** */
 template <class Model>
 class BoundaryFaceSolver {
  public:
@@ -107,15 +107,15 @@ class BoundaryFaceSolver {
                      double eps,
                      Teuchos::RCP<const Model> model,
                      NonlinFunc test_fun)
-    : lambda_(lambda),
-      cell_val_(cell_val),
-      trans_f_(trans_f),
+    : trans_f_(trans_f),
       g_f_(g_f),
+      cell_val_(cell_val),
+      lambda_(lambda),
       patm_(patm),
-      bnd_flux_(bnd_flux),
       min_val_(min_val),
       max_val_(max_val),
-      eps_(eps)
+      eps_(eps),
+      bnd_flux_(bnd_flux)
   {
     func_ = Teuchos::rcp(new BoundaryFluxFn<Model>(
       trans_f, lambda, cell_val, bnd_flux, g_f, dir, patm, model, test_fun));
@@ -207,7 +207,8 @@ BoundaryFaceSolver<Model>::SolveBisection(double face_val,
     std::pair<double, double> result;
     result = boost::math::tools::toms748_solve(func, left, right, lres, rres, tol, actual_it);
     // if (actual_it >= max_it) {
-    //   std::cout << " Failed to converged in " << actual_it << " steps." << std::endl;
+    //   std::cout << " Failed to converged in " << actual_it << " steps." <<
+    //   std::endl;
     // }
     face_val = (result.first + result.second) / 2.0;
   }

@@ -15,7 +15,6 @@
 #include <vector>
 
 // TPLs
-#include "Epetra_Vector.h"
 
 // Amanzi
 #include "errors.hh"
@@ -29,18 +28,16 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
-* Populate contains of elemental matrices.
-* NOTE: The input parameters are not yet used.
-****************************************************************** */
+ * Populate contains of elemental matrices.
+ ****************************************************************** */
 void
-PDE_MagneticDiffusion::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& u,
-                                      const Teuchos::Ptr<const CompositeVector>& p)
+PDE_MagneticDiffusion::UpdateMatrices()
 {
   Teuchos::ParameterList plist;
   WhetStone::MFD3D_Electromagnetics mfd(plist, mesh_);
-  WhetStone::DenseMatrix Mcell, Ccell, Acell;
+  WhetStone::DenseMatrix<> Mcell, Ccell, Acell;
 
-  WhetStone::Tensor Kc(mesh_->getSpaceDimension(), 1);
+  WhetStone:Tensor<> Kc(mesh_->getSpaceDimension(), 1);
   Kc(0, 0) = 1.0;
 
   for (int c = 0; c < ncells_owned; c++) {
@@ -54,43 +51,46 @@ PDE_MagneticDiffusion::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>&
 
 
 /* ******************************************************************
-* System modification before solving the problem:
-* A := invK I + dt/2 A   and  f += Curl M B
-* **************************************************************** */
+ * System modification before solving the problem:
+ * A := invK I + dt/2 A   and  f += Curl M B
+ * **************************************************************** */
 void
 PDE_MagneticDiffusion::ModifyMatrices(CompositeVector& E, CompositeVector& B, double dt)
 {
   B.ScatterMasterToGhosted("face");
   global_op_->rhs()->PutScalarGhosted(0.0);
 
-  const Epetra_MultiVector& Bf = *B.ViewComponent("face", true);
-  Epetra_MultiVector& rhs_e = *global_op_->rhs()->ViewComponent("edge", true);
+  const Epetra_MultiVector& Bf = *B.viewComponent("face", true);
+  Epetra_MultiVector& rhs_e = *global_op_->rhs()->viewComponent("edge", true);
 
   Teuchos::ParameterList plist;
   WhetStone::MFD3D_Electromagnetics mfd(plist, mesh_);
 
+  std::vector<int> dirs;
+  AmanziMesh::Entity_ID_List faces, edges;
+
   for (int c = 0; c < ncells_owned; ++c) {
-    WhetStone::DenseMatrix& Acell = local_op_->matrices[c];
+    WhetStone::DenseMatrix<>& Acell = local_op_->matrices[c];
     Acell.Scale(dt / 2);
 
-    const WhetStone::DenseMatrix& Mcell = mass_op_[c];
-    const WhetStone::DenseMatrix& Ccell = curl_op_[c];
+    const WhetStone::DenseMatrix<>& Mcell = mass_op_[c];
+    const WhetStone::DenseMatrix<>& Ccell = curl_op_[c];
 
-    const auto& [faces,dirs] = mesh_->getCellFacesAndDirections(c);
-    auto edges = mesh_->getCellEdges(c);
+    mesh_->getCellFacesAndDirs(c, faces, &dirs);
+    mesh_->getCellEdges(c, edges);
 
     int nfaces = faces.size();
     int nedges = edges.size();
 
-    WhetStone::DenseMatrix Tcell(nedges, nedges);
+    WhetStone::DenseMatrix<> Tcell(nedges, nedges);
     mfd.MassMatrix(c, (*K_)[c], Tcell);
     Acell += Tcell;
 
-    WhetStone::DenseVector v1(nfaces), v2(nfaces), v3(nedges);
+    WhetStone::DenseVector<> v1(nfaces), v2(nfaces), v3(nedges);
 
     for (int n = 0; n < nfaces; ++n) {
       int f = faces[n];
-      v1(n) = Bf[0][f] * dirs[n] * mesh_->getFaceArea(f);
+      v1(n) = Bf[0][f] * dirs[n] * mesh_->getFaceArea(f)
     }
 
     Mcell.Multiply(v1, v2, false);
@@ -107,28 +107,31 @@ PDE_MagneticDiffusion::ModifyMatrices(CompositeVector& E, CompositeVector& B, do
 
 
 /* ******************************************************************
-* Solution postprocessing
-* **************************************************************** */
+ * Solution postprocessing
+ * **************************************************************** */
 void
 PDE_MagneticDiffusion::ModifyFields(CompositeVector& E, CompositeVector& B, double dt)
 {
   E.ScatterMasterToGhosted("edge");
 
-  Epetra_MultiVector& Ee = *E.ViewComponent("edge", true);
-  Epetra_MultiVector& Bf = *B.ViewComponent("face", false);
+  Epetra_MultiVector& Ee = *E.viewComponent("edge", true);
+  Epetra_MultiVector& Bf = *B.viewComponent("face", false);
+
+  std::vector<int> dirs;
+  AmanziMesh::Entity_ID_List faces, edges;
 
   std::vector<bool> fflag(nedges_wghost, false);
 
   for (int c = 0; c < ncells_owned; ++c) {
-    const WhetStone::DenseMatrix& Ccell = curl_op_[c];
+    const WhetStone::DenseMatrix<>& Ccell = curl_op_[c];
 
-    const auto& [faces,dirs] = mesh_->getCellFacesAndDirections(c);
-    auto edges = mesh_->getCellEdges(c);
+    mesh_->getCellFacesAndDirs(c, faces, &dirs);
+    mesh_->getCellEdges(c, edges);
 
     int nfaces = faces.size();
     int nedges = edges.size();
 
-    WhetStone::DenseVector v1(nedges), v2(nfaces);
+    WhetStone::DenseVector<> v1(nedges), v2(nfaces);
 
     for (int n = 0; n < nedges; ++n) {
       int e = edges[n];
@@ -140,7 +143,7 @@ PDE_MagneticDiffusion::ModifyFields(CompositeVector& E, CompositeVector& B, doub
     for (int n = 0; n < nfaces; ++n) {
       int f = faces[n];
       if (!fflag[f]) {
-        Bf[0][f] -= dt * v2(n) * dirs[n] / mesh_->getFaceArea(f);
+        Bf[0][f] -= dt * v2(n) * dirs[n] / mesh_->getFaceArea(f)
         fflag[f] = true;
       }
     }
@@ -149,26 +152,27 @@ PDE_MagneticDiffusion::ModifyFields(CompositeVector& E, CompositeVector& B, doub
 
 
 /* ******************************************************************
-* Calculates Ohmic heating
-****************************************************************** */
+ * Calculates Ohmic heating
+ ****************************************************************** */
 double
 PDE_MagneticDiffusion::CalculateOhmicHeating(const CompositeVector& E)
 {
-  const Epetra_MultiVector& Ee = *E.ViewComponent("edge", true);
+  const Epetra_MultiVector& Ee = *E.viewComponent("edge", true);
   E.ScatterMasterToGhosted("edge");
 
+  AmanziMesh::Entity_ID_List edges;
   Teuchos::ParameterList plist;
   WhetStone::MFD3D_Electromagnetics mfd(plist, mesh_);
 
   double energy(0.0);
   for (int c = 0; c < ncells_owned; ++c) {
-    auto edges = mesh_->getCellEdges(c);
+    mesh_->getCellEdges(c, edges);
     int nedges = edges.size();
 
-    WhetStone::DenseMatrix Mcell;
+    WhetStone::DenseMatrix<> Mcell;
     mfd.MassMatrix(c, (*K_)[c], Mcell);
 
-    WhetStone::DenseVector v1(nedges), v2(nedges);
+    WhetStone::DenseVector<> v1(nedges), v2(nedges);
 
     for (int n = 0; n < nedges; ++n) {
       int e = edges[n];
@@ -181,33 +185,36 @@ PDE_MagneticDiffusion::CalculateOhmicHeating(const CompositeVector& E)
 
   // parallel collective operation
   double tmp(energy);
-  mesh_->getComm()->SumAll(&tmp, &energy, 1);
+  Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &energy);
 
   return energy;
 }
 
 
 /* ******************************************************************
-* Calculates integral of 1/2 |B|^2
-****************************************************************** */
+ * Calculates integral of 1/2 |B|^2
+ ****************************************************************** */
 double
 PDE_MagneticDiffusion::CalculateMagneticEnergy(const CompositeVector& B)
 {
-  const Epetra_MultiVector& Bf = *B.ViewComponent("face", true);
+  const Epetra_MultiVector& Bf = *B.viewComponent("face", true);
   B.ScatterMasterToGhosted("face");
+
+  std::vector<int> dirs;
+  AmanziMesh::Entity_ID_List faces;
 
   double energy(0.0);
   for (int c = 0; c < ncells_owned; ++c) {
-    const auto& [faces,dirs] = mesh_->getCellFacesAndDirections(c);
+    mesh_->getCellFacesAndDirs(c, faces, &dirs);
     int nfaces = faces.size();
 
-    const WhetStone::DenseMatrix& Mcell = mass_op_[c];
+    const WhetStone::DenseMatrix<>& Mcell = mass_op_[c];
 
-    WhetStone::DenseVector v1(nfaces), v2(nfaces);
+    WhetStone::DenseVector<> v1(nfaces), v2(nfaces);
 
     for (int n = 0; n < nfaces; ++n) {
       int f = faces[n];
-      v1(n) = Bf[0][f] * dirs[n] * mesh_->getFaceArea(f);
+      v1(n) = Bf[0][f] * dirs[n] * mesh_->getFaceArea(f)
     }
 
     Mcell.Multiply(v1, v2, false);
@@ -216,40 +223,57 @@ PDE_MagneticDiffusion::CalculateMagneticEnergy(const CompositeVector& B)
 
   // parallel collective operation
   double tmp(energy);
-  mesh_->getComm()->SumAll(&tmp, &energy, 1);
+  Teuchos::reduceAll<int>(*mesh_->get_comm(),Teuchos::REDUCE_SUM, 1,&tmp, &energy);
 
   return energy / 2;
 }
 
 
 /* ******************************************************************
-* Useful tools
-* **************************************************************** */
+ * Useful tools
+ * **************************************************************** */
 double
 PDE_MagneticDiffusion::CalculateDivergence(int c, const CompositeVector& B)
 {
-  const Epetra_MultiVector& Bf = *B.ViewComponent("face", false);
+  const Epetra_MultiVector& Bf = *B.viewComponent("face", false);
 
-  const auto& [faces,dirs] = mesh_->getCellFacesAndDirections(c);
+  std::vector<int> dirs;
+  AmanziMesh::Entity_ID_List faces;
+
+  mesh_->getCellFacesAndDirs(c, faces, &dirs);
   int nfaces = faces.size();
 
   double div(0.0);
   for (int n = 0; n < nfaces; ++n) {
     int f = faces[n];
-    div += Bf[0][f] * dirs[n] * mesh_->getFaceArea(f);
+    div += Bf[0][f] * dirs[n] * mesh_->getFaceArea(f)
   }
-  div /= mesh_->getCellVolume(c);
+  div /= mesh_->getCellVolume(c)
 
   return div;
 }
 
 
 /* ******************************************************************
-* Put here stuff that has to be done in constructor.
-****************************************************************** */
+ * Put here stuff that has to be done in constructor.
+ ****************************************************************** */
 void
 PDE_MagneticDiffusion::InitMagneticDiffusion_(Teuchos::ParameterList& plist)
 {
+  // Primary discretization methods
+  std::string primary = plist.get<std::string>("discretization primary");
+
+  if (primary == "mfd: default") {
+    mfd_primary_ = WhetStone::ELECTROMAGNETICS_DEFAULT;
+  } else if (primary == "mfd: generalized") {
+    mfd_primary_ = WhetStone::ELECTROMAGNETICS_GENERALIZED;
+  } else {
+    Errors::Message msg;
+    msg << "Primary discretization method \"" << primary << "\" is not supported.";
+    Exceptions::amanzi_throw(msg);
+  }
+
+  // Define stencil for the MFD diffusion method.
   mass_op_.resize(ncells_owned);
   curl_op_.resize(ncells_owned);
 }

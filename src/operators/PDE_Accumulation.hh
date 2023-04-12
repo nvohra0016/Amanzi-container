@@ -29,23 +29,19 @@
 #include "Schema.hh"
 
 /*!
-``PDE_Accumulation`` assembles the discrete form of :math:`\frac{\partial A}{\partial t}`.
+``PDE_Accumulation`` assembles the discrete form of :math:`\frac{\partial
+A}{\partial t}`.
 
-This class is usually used as part of a preconditioner, providing the linearization:
+This class is usually used as part of a preconditioner, providing the
+linearization:
 
 .. math::
-  \frac{\partial}{\partial A} \left[ \frac{\partial A}{\partial t} \right]_{A_0} i
-  = \frac{|\Omega_E|}{\Delta t}
+  \frac{\partial}{\partial A} \left[ \frac{\partial A}{\partial t} \right]_{A_0}
+i = \frac{|\Omega_E|}{\Delta t}
 
 for a grid element :math:`\Omega_E`.
 
-
-.. _pde-accumulation-spec:
-.. admonition:: pde-accumulation-spec
-
-  * `"entity kind`" ``[string]`` **optional** Typically set by the PK
-  * `"number of vectors`" ``[int]`` **optional** Typically set by the PK
-
+No options are available here.
 */
 
 namespace Amanzi {
@@ -75,7 +71,7 @@ class PDE_Accumulation : public PDE_HelperBCsList {
   }
 
   PDE_Accumulation(Teuchos::ParameterList& plist, Teuchos::RCP<Operator> global_op)
-    : global_op_(global_op), plist_(plist), mesh_(Teuchos::null)
+    : global_op_(global_op), mesh_(Teuchos::null), plist_(plist)
   {
     Schema schema;
     std::string name = plist_.get<std::string>("entity kind");
@@ -86,7 +82,7 @@ class PDE_Accumulation : public PDE_HelperBCsList {
   }
 
   PDE_Accumulation(Teuchos::ParameterList& plist, Teuchos::RCP<AmanziMesh::Mesh> mesh)
-    : global_op_(Teuchos::null), plist_(plist), mesh_(mesh)
+    : global_op_(Teuchos::null), mesh_(mesh), plist_(plist)
   {
     Schema schema;
     std::string name = plist_.get<std::string>("entity kind");
@@ -97,7 +93,7 @@ class PDE_Accumulation : public PDE_HelperBCsList {
   }
 
   PDE_Accumulation(Teuchos::ParameterList& plist, Teuchos::RCP<const AmanziMesh::Mesh> mesh)
-    : global_op_(Teuchos::null), plist_(plist), mesh_(mesh)
+    : global_op_(Teuchos::null), mesh_(mesh), plist_(plist)
   {
     Schema schema;
     std::string name = plist_.get<std::string>("entity kind");
@@ -122,7 +118,7 @@ class PDE_Accumulation : public PDE_HelperBCsList {
                            double dT,
                            const std::string& name,
                            bool volume = true);
-  // -- modifiers for diagonal operators and rhs
+  // // -- modifiers for diagonal operators and rhs
   void AddAccumulationRhs(const CompositeVector& s1,
                           const CompositeVector& s2,
                           double alpha,

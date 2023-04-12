@@ -43,8 +43,8 @@
 
 
 /* *****************************************************************
-* This tests diffusion solvers with zero coefficients
-* **************************************************************** */
+ * This tests diffusion solvers with zero coefficients
+ * **************************************************************** */
 TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
 {
   using namespace Teuchos;
@@ -54,7 +54,7 @@ TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
   using namespace Amanzi::Operators;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0)
     std::cout << "\nTest: 2D elliptic solver, TPFA with zero permeability" << std::endl;
 
@@ -89,11 +89,11 @@ TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
   // create source
   CompositeVector source(*cell_space);
   Epetra_MultiVector& src = *source.ViewComponent("cell", false);
-  src.PutScalar(0.0);
+  src.putScalar(0.0);
 
   for (int c = 0; c < ncells; c++) {
-    const Point& xc = mesh->getCellCentroid(c);
-    double volume = mesh->getCellVolume(c);
+    const Point& xc = mesh->getCellCentroid(c)
+    double volume = mesh->getCellVolume(c)
     src[0][c] = ana.source_exact(xc, 0.0) * volume;
   }
 
@@ -102,11 +102,11 @@ TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
 
   // modify diffusion coefficient
   // -- since rho=mu=1.0, we do not need to scale the tensor coefficient.
-  std::vector<WhetStone::Tensor> K;
+  std::vector<WhetStone:Tensor<>> K;
 
   for (int c = 0; c != ncells; ++c) {
-    const Point& xc = mesh->getCellCentroid(c);
-    const WhetStone::Tensor& Kc = ana.Tensor(xc, 0.0);
+    const Point& xc = mesh->getCellCentroid(c)
+    const WhetStone:Tensor<>& Kc = ana.Tensor(xc, 0.0);
     K.push_back(Kc);
   }
 
@@ -116,11 +116,12 @@ TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
     Epetra_MultiVector& coef_faces = *coef->ViewComponent("face", false);
 
     for (int f = 0; f != nfaces; ++f) {
-      const Point& xf = mesh->getFaceCentroid(f);
+      const Point& xf = mesh->getFaceCentroid(f)
       coef_faces[0][f] = ana.ScalarCoefficient(xf, 0.0);
     }
   }
   coef->ScatterMasterToGhosted("face");
+  double rho(1.0), mu(1.0);
 
   // create boundary data
   Point xv(2);
@@ -128,19 +129,19 @@ TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
   std::vector<double> bc_value(nfaces_wghost);
   std::vector<double> bc_mixed;
 
-  AmanziMesh::Entity_ID_View left;
-  mesh->getSetEntities("Left side", AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL, &left);
+  AmanziMesh::Entity_ID_List left;
+  mesh->get_set_entities("Left side", AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL, &left);
   for (int f = 0; f != left.size(); ++f) {
     bc_model[f] = Operators::OPERATOR_BC_DIRICHLET;
-    mesh->getFaceCentroid(f, &xv);
+    mesh->face_centroid(f, &xv);
     bc_value[f] = ana.pressure_exact(xv, 0.0);
   }
 
-  AmanziMesh::Entity_ID_View right;
-  mesh->getSetEntities("Right side", AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL, &right);
+  AmanziMesh::Entity_ID_List right;
+  mesh->get_set_entities("Right side", AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL, &right);
   for (int f = 0; f != right.size(); ++f) {
     bc_model[f] = Operators::OPERATOR_BC_DIRICHLET;
-    mesh->getFaceCentroid(f, &xv);
+    mesh->face_centroid(f, &xv);
     bc_value[f] = ana.pressure_exact(xv, 0.0);
   }
 
@@ -148,7 +149,9 @@ TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
 
   // create diffusion operator
   ParameterList op_list = plist.sublist("PK operator").sublist("diffusion operator");
-  Point g(0.0, 0.0);
+  Point g(2);
+  g[0] = 0.0;
+  g[1] = 0.0;
 
   Teuchos::RCP<DiffusionTPFA> op2 = Teuchos::rcp(new DiffusionTPFA(*op1, op_list, bc));
   op2->SetUpwind(0);
@@ -168,14 +171,14 @@ TEST(OPERATOR_DIFFUSION_TPFA_ZEROCOEF)
   {
     Epetra_MultiVector& p_cell = *solution.ViewComponent("cell");
     for (int c = 0; c < ncells; c++) {
-      const Point& xc = mesh->getCellCentroid(c);
+      const Point& xc = mesh->getCellCentroid(c)
       p_cell[0][c] = ana.pressure_exact(xc, 0.0);
     }
   }
 
   // check residual
   CompositeVector residual(*cell_space);
-  // int ierr = op1->ComputeNegativeResidual(solution, residual);
+  //  int ierr = op1->ComputeNegativeResidual(solution, residual);
   solution.Print(std::cout);
 
   op2->rhs()->Print(std::cout);

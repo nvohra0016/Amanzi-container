@@ -36,7 +36,7 @@ class AnalyticDG04b : public AnalyticDGBase {
   virtual Amanzi::WhetStone::Tensor
   Tensor(const Amanzi::AmanziGeometry::Point& p, double t) override
   {
-    Amanzi::WhetStone::Tensor K(3, 1);
+    Amanzi::WhetStone:Tensor<> K(3, 1);
     K(0, 0) = 1.0;
     return K;
   }
@@ -44,9 +44,9 @@ class AnalyticDG04b : public AnalyticDGBase {
   // -- solution
   virtual void SolutionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& sol) override
+                              Amanzi::WhetStone::Polynomial<>& sol) override
   {
-    sol.Reshape(d_, order_, true);
+    sol.reshape(d_, order_, true);
     double snx(std::sin(3 * p[0])), csx(std::cos(3 * p[0]));
     double sny(std::sin(6 * p[1])), csy(std::cos(6 * p[1]));
     double snz(std::sin(4 * p[2])), csz(std::cos(4 * p[2]));
@@ -75,9 +75,9 @@ class AnalyticDG04b : public AnalyticDGBase {
   // -- accumulation
   virtual void AccumulationTaylor(const Amanzi::AmanziGeometry::Point& p,
                                   double t,
-                                  Amanzi::WhetStone::Polynomial& a) override
+                                  Amanzi::WhetStone::Polynomial<>& a) override
   {
-    a.Reshape(d_, 0, true);
+    a.reshape(d_, 0, true);
   }
 
   // -- velocity
@@ -88,23 +88,23 @@ class AnalyticDG04b : public AnalyticDGBase {
     v.resize(d_);
     v.set_origin(p);
 
-    for (int i = 0; i < d_; ++i) { v[i].Reshape(d_, 0, true); }
+    for (int i = 0; i < d_; ++i) { v[i].reshape(d_, 0, true); }
   }
 
   // -- reaction
   virtual void ReactionTaylor(const Amanzi::AmanziGeometry::Point& p,
                               double t,
-                              Amanzi::WhetStone::Polynomial& r) override
+                              Amanzi::WhetStone::Polynomial<>& r) override
   {
-    r.Reshape(d_, 0, true);
+    r.reshape(d_, 0, true);
   }
 
   // -- source term
   virtual void SourceTaylor(const Amanzi::AmanziGeometry::Point& p,
                             double t,
-                            Amanzi::WhetStone::Polynomial& src) override
+                            Amanzi::WhetStone::Polynomial<>& src) override
   {
-    Amanzi::WhetStone::Polynomial sol;
+    Amanzi::WhetStone::Polynomial<> sol;
     Amanzi::WhetStone::VectorPolynomial v;
 
     SolutionTaylor(p, 1.0, sol);

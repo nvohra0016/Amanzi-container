@@ -16,12 +16,13 @@
 // TPLs
 #include "UnitTest++.h"
 
-#include "IO.hh"
-#include "MeshFactory.hh"
-#include "TreeVector.hh"
-#include "State.hh"
 #include "errors.hh"
+#include "MeshFactory.hh"
+#include "CompositeVector.hh"
+#include "TreeVector.hh"
 
+#include "IO.hh"
+#include "State.hh"
 #include "Data_Helpers.hh"
 #include "Vec.hh"
 
@@ -74,16 +75,15 @@ TEST(STATE_FACTORIES_WITH_CREATE)
   s.Require<CompositeVector, CompositeVectorSpace>("my_vec", Tags::DEFAULT)
     .SetComponent("cell", AmanziMesh::CELL, 1);
 
-  s.Setup();
-  Teuchos::RCP<CompositeVector> cv =
-    s.GetPtrW<CompositeVector>("my_vec", Tags::DEFAULT, "my_vec_owner");
   // putting TreeVectors into state is a little tricky because they are
   // typically created from existing CompositeVectors.  We setup first, then
   // Require and stuff the pointer in.
-  s.Require<TreeVector, TreeVectorSpace>("my_tree_vec", Tags::DEFAULT, "my_tree_vec");
-  Teuchos::RCP<TreeVector> tv = Teuchos::rcp(new TreeVector());
-  tv->SetData(cv);
-  s.SetPtr<TreeVector>("my_tree_vec", Tags::DEFAULT, "my_tree_vec", tv);
+  s.Require<TreeVector, TreeVectorSpace>("my_tree_vec", Tags::DEFAULT, "my_tree_vec")
+    .setData(s.GetFactoryW<CompositeVector,CompositeVectorSpace>("my_vec")->CreateSpace());
+
+  s.Setup();
+  auto cv = s.GetPtrW<CompositeVector>("my_vec", Tags::DEFAULT, "my_vec_owner");
+  s.GetW<TreeVector>("my_tree_vec", Tags::DEFAULT, "my_tree_vec").setData(cv);
 }
 
 
@@ -92,11 +92,11 @@ TEST(STATE_FACTORIES_WITH_CONSTRUCTOR)
   using namespace Amanzi;
   auto comm = Amanzi::getDefaultComm();
   State s;
-  Epetra_Map my_map(-1, 3, 0, *comm);
-  s.Require<Epetra_Vector, Epetra_Map>(my_map, "e_vec", Tags::DEFAULT, "e_vec");
+  auto my_map = Teuchos::rcp(new Map_type(-1, 3, 0, comm));
+  s.Require<Vector_type, Map_type>(my_map, "e_vec", Tags::DEFAULT, "e_vec");
   s.Setup();
 
-  CHECK_EQUAL(comm->NumProc() * 3, s.Get<Epetra_Vector>("e_vec", Tags::DEFAULT).MyLength());
+  CHECK_EQUAL(comm->getSize() * 3, s.Get<Vector_type>("e_vec", Tags::DEFAULT).getGlobalLength());
 }
 
 
@@ -154,7 +154,7 @@ TEST(STATE_HETEROGENEOUS_DATA)
   CHECK(s.GetRecord("my_double").io_vis());
 
   // data access, construction
-  CHECK(s.Get<CompositeVector>("my_vec").HasComponent("cell"));
+  CHECK(s.Get<CompositeVector>("my_vec").hasComponent("cell"));
 
   // incorrect type in Get
   CHECK_THROW(s.Get<double>("my_vec"), Errors::Message);

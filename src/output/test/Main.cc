@@ -6,7 +6,6 @@
 
   Authors:
 */
-
 #include <iostream>
 #include "stdlib.h"
 #include <UnitTest++.h>
@@ -17,12 +16,11 @@
 
 #include "Kokkos_Core.hpp"
 
-int
-main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
   Teuchos::GlobalMPISession mpiSession(&argc, &argv);
-  Kokkos::initialize(); 
+  Kokkos::initialize();
   auto res = UnitTest::RunAllTests();
-  Kokkos::finalize(); 
-  return res; 
+  Kokkos::finalize();
+  return res;
 }

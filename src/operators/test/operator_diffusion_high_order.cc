@@ -27,7 +27,7 @@
 // Amanzi
 #include "MeshFactory.hh"
 #include "GMVMesh.hh"
-#include "IterativeMethodPCG.hh"
+#include "LinearOperatorPCG.hh"
 #include "NumericalIntegration.hh"
 #include "Tensor.hh"
 #include "SurfaceCoordinateSystem.hh"
@@ -40,8 +40,8 @@
 
 
 /* *****************************************************************
-* Exactness test for high-order Crouziex-Raviart elements.
-* **************************************************************** */
+ * Exactness test for high-order Crouziex-Raviart elements.
+ * **************************************************************** */
 TEST(OPERATOR_DIFFUSION_HIGH_ORDER_CROUZIEX_RAVIART)
 {
   using namespace Teuchos;
@@ -52,7 +52,7 @@ TEST(OPERATOR_DIFFUSION_HIGH_ORDER_CROUZIEX_RAVIART)
   using namespace Amanzi::WhetStone;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0)
     std::cout << "\nTest: 2D elliptic solver, high-order Crouzier-Raviart" << std::endl;
 
@@ -63,36 +63,37 @@ TEST(OPERATOR_DIFFUSION_HIGH_ORDER_CROUZIEX_RAVIART)
 
   // create a mesh framework
   Teuchos::RCP<GeometricModel> gm;
-  auto fac_list = Teuchos::rcp(new Teuchos::ParameterList());
-  fac_list->set<bool>("request edges", true);  
-  fac_list->set<bool>("request faces", true);
-  MeshFactory meshfactory(comm, gm, fac_list);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
-  // RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 4, 4, true, true);
-  RCP<const Mesh> mesh = meshfactory.create("test/median7x8_filtered.exo");
-  // RCP<const Mesh> mesh = meshfactory.create("test/median15x16.exo", true, true);
+  MeshFactory meshfactory(comm, gm);
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
+  // RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 4, 4, true,
+  // true);
+  RCP<const Mesh> mesh = meshfactory.create("test/median7x8_filtered.exo", true, true);
+  // RCP<const Mesh> mesh = meshfactory.create("test/median15x16.exo", true,
+  // true);
 
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
+  int nnodes_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
 
   // create boundary data (no mixed bc)
   ParameterList op_list =
     plist.sublist("PK operator").sublist("diffusion operator Crouzeix-Raviart");
   int order = op_list.sublist("schema").get<int>("method order");
 
-  Analytic00 ana(mesh, order);
+  Analytic00 ana(mesh, 1.0, 2.0, order);
 
   Point xv(2), x0(2), x1(2);
+  AmanziMesh::Entity_ID_List nodes;
 
   Teuchos::RCP<BCs> bc_f = Teuchos::rcp(new BCs(mesh, AmanziMesh::Entity_kind::FACE, DOF_Type::VECTOR));
   std::vector<int>& bc_model_f = bc_f->bc_model();
   std::vector<std::vector<double>>& bc_value_f = bc_f->bc_value_vector(order);
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
+    const Point& xf = mesh->getFaceCentroid(f)
 
     if (fabs(xf[0]) < 1e-6 || fabs(xf[0] - 1.0) < 1e-6 || fabs(xf[1]) < 1e-6 ||
         fabs(xf[1] - 1.0) < 1e-6) {
-      auto nodes = mesh->getFaceNodes(f);
+      mesh->getFaceNodes(f, nodes);
 
       x0 = mesh->getNodeCoordinate(nodes[0]);
       x1 = mesh->getNodeCoordinate(nodes[1]);
@@ -124,18 +125,32 @@ TEST(OPERATOR_DIFFUSION_HIGH_ORDER_CROUZIEX_RAVIART)
   op->UpdateMatrices(Teuchos::null, Teuchos::null);
   op->ApplyBCs(true, true, true);
 
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
+
   // create preconditioner using the base operator class
-  global_op->set_inverse_parameters(
-    "Hypre AMG", plist.sublist("preconditioners"), "AztecOO CG", plist.sublist("solvers"));
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  ParameterList slist;
+  // slist.set<std::string>("preconditioner type", "diagonal");
+  slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
 
   // solve the problem
+  ParameterList lop_list = plist.sublist("solvers").sublist("AztecOO CG").sublist("pcg parameters");
+  AmanziSolvers::LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace> solver(
+    global_op, global_op);
+  solver.Init(lop_list);
+
   CompositeVector rhs = *global_op->rhs();
   CompositeVector solution(rhs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
-  global_op->ApplyInverse(rhs, solution);
+  int ierr = solver.ApplyInverse(rhs, solution);
+
+  if (MyPID == 0) {
+    std::cout << "pressure solver (pcg): ||r||=" << solver.residual()
+              << " itr=" << solver.num_itrs() << " code=" << solver.returned_code() << std::endl;
+  }
 
   // compute pressure error
   solution.ScatterMasterToGhosted();
@@ -145,7 +160,7 @@ TEST(OPERATOR_DIFFUSION_HIGH_ORDER_CROUZIEX_RAVIART)
   ana.ComputeEdgeMomentsError(pf, 0.0, 3, pnorm, pl2_err, pinf_err);
 
   if (MyPID == 0) {
-    printf("L2(p)=%12.9f  Inf(p)=%12.9f  itr=%3d\n", pl2_err, pinf_err, global_op->num_itrs());
+    printf("L2(p)=%12.9f  Inf(p)=%12.9f  itr=%3d\n", pl2_err, pinf_err, solver.num_itrs());
 
     CHECK(pl2_err < 1e-10 && pinf_err < 1e-2);
   }
@@ -153,8 +168,8 @@ TEST(OPERATOR_DIFFUSION_HIGH_ORDER_CROUZIEX_RAVIART)
 
 
 /* *****************************************************************
-* Exactness test for high-order Lagrange elements in 2D.
-* **************************************************************** */
+ * Exactness test for high-order Lagrange elements in 2D.
+ * **************************************************************** */
 void
 RunHighOrderLagrange2D(std::string vem_name, bool polygonal_mesh)
 {
@@ -166,7 +181,7 @@ RunHighOrderLagrange2D(std::string vem_name, bool polygonal_mesh)
   using namespace Amanzi::WhetStone;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: 2D elliptic solver, high-order " << vem_name << std::endl;
 
   // read parameter list
@@ -176,16 +191,13 @@ RunHighOrderLagrange2D(std::string vem_name, bool polygonal_mesh)
 
   // create a mesh framework
   Teuchos::RCP<GeometricModel> gm;
-  auto fac_list = Teuchos::rcp(new Teuchos::ParameterList());
-  fac_list->set<bool>("request edges", true);  
-  fac_list->set<bool>("request faces", true);
-  MeshFactory meshfactory(comm, gm, fac_list);
-  meshfactory.set_preference(Preference({ Framework::MSTK }));
+  MeshFactory meshfactory(comm, gm);
+  meshfactory.set_preference(Preference({ Framework::MSTK, Framework::STK }));
   RCP<const Mesh> mesh;
   if (polygonal_mesh) {
-    mesh = meshfactory.create("test/median7x8_filtered.exo");
+    mesh = meshfactory.create("test/median7x8_filtered.exo", true, true);
   } else {
-    mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 4, 4);
+    mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 4, 4, true, true);
   }
 
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
@@ -195,9 +207,10 @@ RunHighOrderLagrange2D(std::string vem_name, bool polygonal_mesh)
   ParameterList op_list = plist.sublist("PK operator").sublist("diffusion operator " + vem_name);
   int order = op_list.sublist("schema").get<int>("method order");
 
-  Analytic00 ana(mesh, order);
+  Analytic00 ana(mesh, 1.0, 2.0, order);
 
   Point xv(2), x0(2), x1(2);
+  AmanziMesh::Entity_ID_List nodes;
 
   Teuchos::RCP<BCs> bc_v = Teuchos::rcp(new BCs(mesh, AmanziMesh::Entity_kind::NODE, DOF_Type::SCALAR));
   std::vector<int>& bc_model_v = bc_v->bc_model();
@@ -217,11 +230,11 @@ RunHighOrderLagrange2D(std::string vem_name, bool polygonal_mesh)
   std::vector<std::vector<double>>& bc_value_f = bc_f->bc_value_vector(order - 1);
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
+    const Point& xf = mesh->getFaceCentroid(f)
 
     if (fabs(xf[0]) < 1e-6 || fabs(xf[0] - 1.0) < 1e-6 || fabs(xf[1]) < 1e-6 ||
         fabs(xf[1] - 1.0) < 1e-6) {
-      auto nodes = mesh->getFaceNodes(f);
+      mesh->getFaceNodes(f, nodes);
 
       x0 = mesh->getNodeCoordinate(nodes[0]);
       x1 = mesh->getNodeCoordinate(nodes[1]);
@@ -249,23 +262,31 @@ RunHighOrderLagrange2D(std::string vem_name, bool polygonal_mesh)
   op->UpdateMatrices(Teuchos::null, Teuchos::null);
   op->ApplyBCs(true, true, true);
 
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
+
   // create preconditioner using the base operator class
   ParameterList slist;
-  slist.set<std::string>("preconditioning method", "diagonal");
-  slist.set("iterative method", "pcg");
-  slist.sublist("pcg parameters") =
-    plist.sublist("solvers").sublist("AztecOO CG").sublist("pcg parameters");
-  slist.sublist("verbose object").set<std::string>("verbosity level", "high");
+  slist.set<std::string>("preconditioner type", "diagonal");
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
 
-  global_op->set_inverse_parameters(slist);
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  // solve the problem
+  ParameterList lop_list = plist.sublist("solvers").sublist("AztecOO CG").sublist("pcg parameters");
+  AmanziSolvers::LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace> solver(
+    global_op, global_op);
+  solver.Init(lop_list);
 
   CompositeVector rhs = *global_op->rhs();
   CompositeVector solution(rhs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
-  global_op->ApplyInverse(rhs, solution);
+  int ierr = solver.ApplyInverse(rhs, solution);
+
+  if (MyPID == 0) {
+    std::cout << "pressure solver (pcg): ||r||=" << solver.residual()
+              << " itr=" << solver.num_itrs() << " code=" << solver.returned_code() << std::endl;
+  }
 
   // compute pressure error
   solution.ScatterMasterToGhosted();
@@ -280,14 +301,14 @@ RunHighOrderLagrange2D(std::string vem_name, bool polygonal_mesh)
 
   double l2c_err, infc_err;
   bool flag(false);
-  if (solution.HasComponent("cell")) {
+  if (solution.hasComponent("cell")) {
     flag = true;
     Epetra_MultiVector& pc = *solution.ViewComponent("cell", false);
     ana.ComputeCellError(pc, 0.0, tmp, l2c_err, infc_err);
   }
 
   if (MyPID == 0) {
-    printf("Node: L2(p)=%12.9f  H1(p)=%12.9f\n", l2n_err, h1n_err);
+    printf("Node: L2(p)=%12.9f  H1(p)=%12.9f  itr=%3d\n", l2n_err, h1n_err, solver.num_itrs());
     printf("Edge: L2(p)=%12.9f  Inf(p)=%12.9f \n", l2f_err, inff_err);
     if (flag) printf("Cell: L2(p)=%12.9f  Inf(p)=%12.9f \n", l2c_err, infc_err);
 
@@ -304,8 +325,8 @@ TEST(OPERATOR_DIFFUSION_HIGH_ORDER_LAGRANGE_2D)
 
 
 /* *****************************************************************
-* Exactness test for high-order Lagrange elements in 3D.
-***************************************************************** */
+ * Exactness test for high-order Lagrange elements in 3D.
+ ***************************************************************** */
 void
 RunHighOrderLagrange3D(const std::string& vem_name)
 {
@@ -317,7 +338,7 @@ RunHighOrderLagrange3D(const std::string& vem_name)
   using namespace Amanzi::WhetStone;
 
   auto comm = Amanzi::getDefaultComm();
-  int MyPID = comm->MyPID();
+  int MyPID = comm->getRank();
   if (MyPID == 0) std::cout << "\nTest: 3D elliptic solver, high-order " << vem_name << std::endl;
 
   // read parameter list
@@ -327,12 +348,10 @@ RunHighOrderLagrange3D(const std::string& vem_name)
 
   // create a mesh framework
   Teuchos::RCP<GeometricModel> gm;
-  auto fac_list = Teuchos::rcp(new Teuchos::ParameterList());
-  fac_list->set<bool>("request edges", true);  
-  fac_list->set<bool>("request faces", true);
-  MeshFactory meshfactory(comm, gm, fac_list);
+  MeshFactory meshfactory(comm, gm);
   meshfactory.set_preference(Preference({ Framework::MSTK }));
-  RCP<const Mesh> mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2, 3, 4);
+  RCP<const Mesh> mesh;
+  mesh = meshfactory.create(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2, 3, 4, true, true);
   // mesh = meshfactory.create("test/hexes.exo", true, true);
 
   int nfaces_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
@@ -340,7 +359,7 @@ RunHighOrderLagrange3D(const std::string& vem_name)
   int nnodes_wghost = mesh->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
 
   // numerical integration
-  WhetStone::NumericalIntegration numi(mesh);
+  WhetStone::NumericalIntegration<AmanziMesh::Mesh> numi(mesh);
 
   // create boundary data (no mixed bc)
   ParameterList op_list = plist.sublist("PK operator").sublist("diffusion operator 3D " + vem_name);
@@ -349,6 +368,7 @@ RunHighOrderLagrange3D(const std::string& vem_name)
   Analytic00b ana(mesh, 1.0, 2.0, 3.0, order);
 
   Point xv(3), x0(3), x1(3);
+  AmanziMesh::Entity_ID_List nodes;
 
   // -- nodes
   Teuchos::RCP<BCs> bc_v = Teuchos::rcp(new BCs(mesh, AmanziMesh::Entity_kind::NODE, DOF_Type::SCALAR));
@@ -374,17 +394,17 @@ RunHighOrderLagrange3D(const std::string& vem_name)
   funcs[0] = &ana;
 
   for (int e = 0; e < nedges_wghost; ++e) {
-    const Point& xe = mesh->getEdgeCentroid(e);
-    double length = mesh->getEdgeLength(e);
-    std::vector<AmanziGeometry::Point> tau(1, mesh->getEdgeVector(e));
+    const Point& xe = mesh.getEdgeCentroid(e);
+    double length = mesh->getEdgeLength(e)
+    std::vector<AmanziGeometry::Point> tau(1, mesh->getEdgeVector(e))
 
-    WhetStone::Polynomial pe(1, order - 2);
+    WhetStone::Polynomial<> pe(1, order - 2);
 
     if (fabs(xe[0]) < 1e-6 || fabs(xe[0] - 1.0) < 1e-6 || fabs(xe[1]) < 1e-6 ||
         fabs(xe[1] - 1.0) < 1e-6 || fabs(xe[2]) < 1e-6 || fabs(xe[2] - 1.0) < 1e-6) {
       for (auto jt = pe.begin(); jt < pe.end(); ++jt) {
         const int* jndex = jt.multi_index();
-        Polynomial fmono(1, jndex, 1.0);
+        Polynomial<> fmono(1, jndex, 1.0);
         fmono.InverseChangeCoordinates(xe, tau);
         funcs[1] = &fmono;
 
@@ -402,23 +422,23 @@ RunHighOrderLagrange3D(const std::string& vem_name)
   std::vector<std::vector<double>>& bc_value_f = bc_f->bc_value_vector(nkf);
 
   for (int f = 0; f < nfaces_wghost; f++) {
-    const Point& xf = mesh->getFaceCentroid(f);
-    const Point& normal = mesh->getFaceNormal(f);
-    double area = mesh->getFaceArea(f);
+    const Point& xf = mesh->getFaceCentroid(f)
+    const Point& normal = mesh->getFaceNormal(f)
+    double area = mesh->getFaceArea(f)
 
-    WhetStone::Polynomial pf(2, order - 2);
+    WhetStone::Polynomial<> pf(2, order - 2);
 
     if (fabs(xf[0]) < 1e-6 || fabs(xf[0] - 1.0) < 1e-6 || fabs(xf[1]) < 1e-6 ||
         fabs(xf[1] - 1.0) < 1e-6 || fabs(xf[2]) < 1e-6 || fabs(xf[2] - 1.0) < 1e-6) {
       // local coordinate system with origin at face centroid
-      AmanziGeometry::SurfaceCoordinateSystem coordsys(xf, normal);
+      SurfaceCoordinateSystem coordsys(xf, normal);
 
       for (auto it = pf.begin(); it < pf.end(); ++it) {
         int m = it.MonomialSetOrder();
         double scale = std::pow(area, -(double)m / 2);
 
         const int* index = it.multi_index();
-        Polynomial fmono(2, index, scale);
+        Polynomial<> fmono(2, index, scale);
         fmono.InverseChangeCoordinates(xf, *coordsys.tau());
 
         funcs[1] = &fmono;
@@ -442,27 +462,39 @@ RunHighOrderLagrange3D(const std::string& vem_name)
   op->UpdateMatrices(Teuchos::null, Teuchos::null);
   op->ApplyBCs(true, true, true);
 
-  // create preconditioner using the base operator class
-  ParameterList slist = plist.sublist("preconditioners").sublist("Hypre AMG");
-  slist.set("iterative method", "pcg");
-  slist.sublist("pcg parameters") =
-    plist.sublist("solvers").sublist("AztecOO CG").sublist("pcg parameters");
-  slist.sublist("verbose object").set<std::string>("verbosity level", "high");
+  global_op->SymbolicAssembleMatrix();
+  global_op->AssembleMatrix();
 
-  global_op->set_inverse_parameters(slist);
-  global_op->InitializeInverse();
-  global_op->ComputeInverse();
+  // create preconditioner using the base operator class
+  ParameterList slist;
+  // slist.set<std::string>("preconditioner type", "diagonal");
+  slist = plist.sublist("preconditioners").sublist("Hypre AMG");
+  global_op->InitializePreconditioner(slist);
+  global_op->UpdatePreconditioner();
+
+  // solve the problem
+  ParameterList lop_list = plist.sublist("solvers").sublist("AztecOO CG").sublist("pcg parameters");
+  AmanziSolvers::LinearOperatorPCG<Operator, CompositeVector, CompositeVectorSpace> solver(
+    global_op, global_op);
+  solver.Init(lop_list);
 
   CompositeVector rhs = *global_op->rhs();
   CompositeVector solution(rhs);
-  solution.PutScalar(0.0);
+  solution.putScalar(0.0);
 
-  global_op->ApplyInverse(rhs, solution);
+  int ierr = solver.ApplyInverse(rhs, solution);
+
+  if (MyPID == 0) {
+    std::cout << "pressure solver (pcg): ||r||=" << solver.residual()
+              << " size=" << global_op->A()->NumGlobalRows() << " itr=" << solver.num_itrs()
+              << " code=" << solver.returned_code() << std::endl;
+  }
 
   // compute pressure error
   solution.ScatterMasterToGhosted();
   Epetra_MultiVector& pn = *solution.ViewComponent("node", false);
   Epetra_MultiVector& pe = *solution.ViewComponent("edge", false);
+  Epetra_MultiVector& pf = *solution.ViewComponent("face", false);
 
   double pnorm, l2n_err, infn_err, hnorm, h1n_err;
   ana.ComputeNodeError(pn, 0.0, pnorm, l2n_err, infn_err, hnorm, h1n_err);
@@ -472,16 +504,16 @@ RunHighOrderLagrange3D(const std::string& vem_name)
 
   double l2c_err, infc_err;
   bool flag(false);
-  if (solution.HasComponent("cell")) {
+  if (solution.hasComponent("cell")) {
     flag = true;
     Epetra_MultiVector& pc = *solution.ViewComponent("cell", false);
     ana.ComputeCellError(pc, 0.0, tmp, l2c_err, infc_err);
   }
 
   if (MyPID == 0) {
-    printf("Node: L2(p)=%12.9f  H1(p)=%12.9f\n", l2n_err, h1n_err);
-    printf("Edge: L2(p)=%12.9f  Inf(p)=%12.9f\n", l2f_err, inff_err);
-    if (flag) printf("Cell: L2(p)=%12.9f  Inf(p)=%12.9f\n", l2c_err, infc_err);
+    printf("Node: L2(p)=%12.9f  H1(p)=%12.9f  itr=%3d\n", l2n_err, h1n_err, solver.num_itrs());
+    printf("Edge: L2(p)=%12.9f  Inf(p)=%12.9f \n", l2f_err, inff_err);
+    if (flag) printf("Cell: L2(p)=%12.9f  Inf(p)=%12.9f \n", l2c_err, infc_err);
 
     CHECK(l2n_err < 1e-10 && h1n_err < 2e-1);
     CHECK(l2f_err < 1e-10 && inff_err < 1e-10);

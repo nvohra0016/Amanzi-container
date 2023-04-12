@@ -31,12 +31,12 @@ class Analytic01b : public AnalyticBase {
     : AnalyticBase(mesh), g_(g){};
   ~Analytic01b(){};
 
-  Amanzi::WhetStone::Tensor TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t)
+  Amanzi::WhetStone:Tensor<> TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t)
   {
     double x = p[0];
     double y = p[1];
     double z = p[2];
-    Amanzi::WhetStone::Tensor K(3, 2);
+    Amanzi::WhetStone:Tensor<> K(3, 2);
     K(0, 0) = 2 + x * x;
     K(1, 1) = 2 + y * y;
     K(2, 2) = 2 + z * z;

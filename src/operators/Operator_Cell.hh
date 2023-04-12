@@ -31,16 +31,14 @@ class Operator_Cell : public Operator {
  public:
   // main constructor
   //   The CVS is the domain and range of the operator
-  Operator_Cell(const Teuchos::RCP<const CompositeVectorSpace>& cvs,
+  Operator_Cell(const Teuchos::RCP<const CompositeSpace>& cs,
                 Teuchos::ParameterList& plist,
                 int schema)
-    : Operator(cvs, plist, schema)
+    : Operator(cs, plist, schema)
   {
     set_schema_string("CELL");
-    cell_max_faces = mesh_->getCellMaxFaces();
+    cell_max_faces = mesh_->cell_get_max_faces();
   }
-
-  virtual Teuchos::RCP<Operator> Clone() const;
 
   // rhs update which multiplies by cell
   virtual void UpdateRHS(const CompositeVector& source, bool volume_included);
