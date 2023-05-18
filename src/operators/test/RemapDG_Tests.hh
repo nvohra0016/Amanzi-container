@@ -1,13 +1,15 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
+  Copyright 2010-201x held jointly by participating institutions.
   Amanzi is released under the three-clause BSD License.
   The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
+  Authors:
+      Konstantin Lipnikov (lipnikov@lanl.gov)
 */
 
 //! <MISSING_ONELINE_DOCSTRING>
+
 #ifndef AMANZI_OPERATOR_REMAP_DG_TESTS_HH_
 #define AMANZI_OPERATOR_REMAP_DG_TESTS_HH_
 
@@ -22,15 +24,17 @@ class RemapDG_Tests : public Operators::RemapDG {
   RemapDG_Tests(const Teuchos::RCP<const AmanziMesh::Mesh> mesh0,
                 const Teuchos::RCP<AmanziMesh::Mesh> mesh1,
                 Teuchos::ParameterList& plist)
-    : RemapDG(mesh0, mesh1, plist), tprint_(0.0), l2norm_(-1.0), dt_output_(0.1){};
+    : RemapDG(mesh0, mesh1, plist),
+      tprint_(0.0),
+      l2norm_(-1.0),
+      dt_output_(0.1){};
   ~RemapDG_Tests(){};
 
   // mesh deformation
   virtual void DeformMesh(int deform, double t);
-  AmanziGeometry::Point DeformNode(int deform,
-                                   double t,
-                                   const AmanziGeometry::Point& yv,
-                                   const AmanziGeometry::Point& rv = AmanziGeometry::Point(3));
+  AmanziGeometry::Point
+  DeformNode(int deform, double t, const AmanziGeometry::Point& yv,
+             const AmanziGeometry::Point& rv = AmanziGeometry::Point(3));
 
   // experimental options
   virtual void DynamicCellVelocity(double t);
@@ -42,7 +46,7 @@ class RemapDG_Tests : public Operators::RemapDG {
   void set_dt_output(double dt) { dt_output_ = dt; }
 
  protected:
-  std::vector<WhetStone::Polynomial<>> det0_, det1_;
+  std::vector<WhetStone::Polynomial> det0_, det1_;
 
   // statistics
   double tprint_, dt_output_, l2norm_;
@@ -78,7 +82,7 @@ RemapDG_Tests<AnalyticDG>::InitializeConsistentJacobianDeterminant()
 
   CompositeVector& tmp = *op_reac_->global_operator()->rhs();
   CompositeVector one(tmp), u0(tmp), u1(tmp);
-  Epetra_MultiVector& one_c = *one.ViewComponent("cell", true);
+  Epetra_MultiVector& one_c = *one.viewComponent("cell", true);
 
   one.putScalarMasterAndGhosted(0.0);
   for (int c = 0; c < ncells_wghost_; ++c) one_c[0][c] = 1.0;
@@ -104,9 +108,9 @@ RemapDG_Tests<AnalyticDG>::InitializeConsistentJacobianDeterminant()
 
   // save as polynomials
   int nk = one_c.getNumVectors();
-  Amanzi::WhetStone::DenseVector<> data(nk);
-  Epetra_MultiVector& u0c = *u0.ViewComponent("cell", true);
-  Epetra_MultiVector& u1c = *u1.ViewComponent("cell", true);
+  Amanzi::WhetStone::DenseVector data(nk);
+  Epetra_MultiVector& u0c = *u0.viewComponent("cell", true);
+  Epetra_MultiVector& u1c = *u1.viewComponent("cell", true);
 
   det0_.resize(ncells_owned_);
   det1_.resize(ncells_owned_);
@@ -152,10 +156,12 @@ RemapDG_Tests<AnalyticDG>::DynamicCellVelocity(double t)
     for (int n = 0; n < kC; ++n) {
       int m = n * dim_;
       for (int i = 0; i < dim_; ++i) {
-        (*velc_)[c][m + i].reshape(dim_, 0, true);
+        (*velc_)[c][m + i].Reshape(dim_, 0, true);
         (*velc_)[c][m + i].set_origin(uc_[c][0].origin());
 
-        for (int k = 0; k < dim_; ++k) { (*velc_)[c][m + i] -= C(m + k, i) * uc_[c][m + k]; }
+        for (int k = 0; k < dim_; ++k) {
+          (*velc_)[c][m + i] -= C(m + k, i) * uc_[c][m + k];
+        }
       }
     }
   }
@@ -179,14 +185,18 @@ RemapDG_Tests<AnalyticDG>::CollectStatistics(double t, const CompositeVector& u)
     op_reac_->global_operator()->apply(u, rhs);
     l2norm_ = rhs.dot(u);
 
-    Epetra_MultiVector& xc = *rhs.ViewComponent("cell");
+    Epetra_MultiVector& xc = *rhs.viewComponent("cell");
     int nk = xc.getNumVectors();
     double xmax[nk], xmin[nk];
     xc.MaxValue(xmax);
     xc.MinValue(xmin);
 
     if (mesh0_->get_comm()->getRank() == 0) {
-      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  umax: ", tglob, l2norm_, nfun_, sharp_);
+      printf("t=%8.5f  L2=%9.5g  nfnc=%5d  sharp=%5.1f%%  umax: ",
+             tglob,
+             l2norm_,
+             nfun_,
+             sharp_);
       for (int i = 0; i < std::min(nk, 4); ++i) printf("%9.5g ", xmax[i]);
       printf("  umin: %9.5g\n", xmin[0]);
     }
@@ -206,12 +216,13 @@ RemapDG_Tests<AnalyticDG>::DeformMesh(int deform, double t)
 {
   // create distributed random vector
   CompositeVectorSpace cvs;
-  cvs.SetMesh(mesh0_)->SetGhosted(true)->AddComponent("node", AmanziMesh::Entity_kind::NODE, dim_);
+  cvs.SetMesh(mesh0_)->SetGhosted(true)->AddComponent(
+    "node", AmanziMesh::NODE, dim_);
   CompositeVector random(cvs);
 
-  int gid = mesh0_->getMap(AmanziMesh::Entity_kind::NODE,false).MaxAllGID();
+  int gid = mesh0_->node_map(false).MaxAllGID();
   double scale = 0.2 * std::pow(gid, -1.0 / dim_);
-  Epetra_MultiVector& random_n = *random.ViewComponent("node", true);
+  Epetra_MultiVector& random_n = *random.viewComponent("node", true);
 
   random_n.Random();
   random_n.scale(scale);
@@ -222,11 +233,12 @@ RemapDG_Tests<AnalyticDG>::DeformMesh(int deform, double t)
   AmanziMesh::Entity_ID_List nodeids;
   AmanziGeometry::Point_List new_positions, final_positions;
 
-  int nnodes = mesh0_->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
+  int nnodes =
+    mesh0_->getNumEntities(AmanziMesh::NODE, AmanziMesh::Parallel_kind::ALL);
 
   for (int v = 0; v < nnodes; ++v) {
     for (int i = 0; i < dim_; ++i) rv[i] = random_n[i][v];
-    xv = mesh0_->getNodeCoordinate(v);
+    mesh0_->node_get_coordinates(v, &xv);
     nodeids.push_back(v);
     new_positions.push_back(DeformNode(deform, t, xv, rv));
   }
@@ -239,8 +251,7 @@ RemapDG_Tests<AnalyticDG>::DeformMesh(int deform, double t)
  ***************************************************************** */
 template <class AnalyticDG>
 AmanziGeometry::Point
-RemapDG_Tests<AnalyticDG>::DeformNode(int deform,
-                                      double t,
+RemapDG_Tests<AnalyticDG>::DeformNode(int deform, double t,
                                       const AmanziGeometry::Point& yv,
                                       const AmanziGeometry::Point& rv)
 {
@@ -254,9 +265,12 @@ RemapDG_Tests<AnalyticDG>::DeformNode(int deform,
         uv[0] = 0.2 * std::sin(M_PI * xv[0]) * std::cos(M_PI * xv[1]);
         uv[1] = -0.2 * std::cos(M_PI * xv[0]) * std::sin(M_PI * xv[1]);
       } else {
-        uv[0] = 0.2 * std::sin(M_PI * xv[0]) * std::cos(M_PI * xv[1]) * std::cos(M_PI * xv[2]);
-        uv[1] = -0.1 * std::cos(M_PI * xv[0]) * std::sin(M_PI * xv[1]) * std::cos(M_PI * xv[2]);
-        uv[2] = -0.1 * std::cos(M_PI * xv[0]) * std::cos(M_PI * xv[1]) * std::sin(M_PI * xv[2]);
+        uv[0] = 0.2 * std::sin(M_PI * xv[0]) * std::cos(M_PI * xv[1]) *
+                std::cos(M_PI * xv[2]);
+        uv[1] = -0.1 * std::cos(M_PI * xv[0]) * std::sin(M_PI * xv[1]) *
+                std::cos(M_PI * xv[2]);
+        uv[2] = -0.1 * std::cos(M_PI * xv[0]) * std::cos(M_PI * xv[1]) *
+                std::sin(M_PI * xv[2]);
       }
       xv += uv * ds;
     }

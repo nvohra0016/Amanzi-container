@@ -1,17 +1,14 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators 
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Ethan Coon (ecoon@lanl.gov)
+  Author: Ethan Coon (ecoon@lanl.gov)
 */
-
-/*
-  Operators
-
-*/
-#include "MeshFramework.hh"
+#include "Mesh.hh"
 
 #include "CompositeVector.hh"
 #include "OperatorDefs.hh"
@@ -25,28 +22,25 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
- * Estimate size of the matrix graph.
- ****************************************************************** */
-unsigned int
-MaxRowSize(const AmanziMesh::Mesh& mesh, int schema, unsigned int n_dofs)
+* Estimate size of the matrix graph.
+****************************************************************** */
+unsigned int MaxRowSize(const AmanziMesh::Mesh& mesh, int schema, unsigned int n_dofs)
 {
   unsigned int row_size(0);
   int dim = mesh.getSpaceDimension();
   if (schema & OPERATOR_SCHEMA_DOFS_FACE) {
-    unsigned int i = (dim == 2) ? OPERATOR_QUAD_FACES : OPERATOR_HEX_FACES;
+    size_t i = (dim == 2) ? OPERATOR_QUAD_FACES : OPERATOR_HEX_FACES;
 
-    for (int c = 0; c < mesh.getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
-         ++c) {
-      i = std::max(i, (unsigned int) mesh.getCellNumFaces(c));
+    for (int c = 0; c < mesh.getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::OWNED); ++c) {
+      i = std::max(i, mesh.getCellNumFaces(c));
     }
     row_size += 2 * i;
   }
 
   if (schema & OPERATOR_SCHEMA_DOFS_CELL) {
     row_size += OPERATOR_MAX_FACES;
-    //    unsigned int i = (dim == 2) ? OPERATOR_QUAD_FACES :
-    //    OPERATOR_HEX_FACES;
-    // row_size += i + 1;
+    //    unsigned int i = (dim == 2) ? OPERATOR_QUAD_FACES : OPERATOR_HEX_FACES;
+    //row_size += i + 1;
   }
 
   if (schema & OPERATOR_SCHEMA_DOFS_NODE) {
@@ -54,17 +48,18 @@ MaxRowSize(const AmanziMesh::Mesh& mesh, int schema, unsigned int n_dofs)
     row_size += 8 * i;
   }
 
-  if (schema & OPERATOR_SCHEMA_INDICES) { row_size += 1; }
+  if (schema & OPERATOR_SCHEMA_INDICES) {
+    row_size += 1;
+  }
 
   return row_size * n_dofs;
-}
+}    
 
 
 /* ******************************************************************
- * Estimate size of the matrix graph: general version
- ****************************************************************** */
-unsigned int
-MaxRowSize(const AmanziMesh::Mesh& mesh, Schema& schema)
+* Estimate size of the matrix graph: general version
+****************************************************************** */
+unsigned int MaxRowSize(const AmanziMesh::Mesh& mesh, Schema& schema)
 {
   unsigned int row_size(0);
   int dim = mesh.getSpaceDimension();
@@ -74,13 +69,13 @@ MaxRowSize(const AmanziMesh::Mesh& mesh, Schema& schema)
     AmanziMesh::Entity_kind kind;
     std::tie(kind, std::ignore, num) = *it;
 
-    if (kind == AmanziMesh::Entity_kind::FACE) {
+    if (kind == AmanziMesh::FACE) {
       ndofs = (dim == 2) ? OPERATOR_QUAD_FACES : OPERATOR_HEX_FACES;
-    } else if (kind == AmanziMesh::Entity_kind::CELL) {
+    } else if (kind == AmanziMesh::CELL) {
       ndofs = 1;
-    } else if (kind == AmanziMesh::Entity_kind::NODE) {
+    } else if (kind == AmanziMesh::NODE) {
       ndofs = (dim == 2) ? OPERATOR_QUAD_NODES : OPERATOR_HEX_NODES;
-    } else if (kind == AmanziMesh::Entity_kind::EDGE) {
+    } else if (kind == AmanziMesh::EDGE) {
       ndofs = (dim == 2) ? OPERATOR_QUAD_EDGES : OPERATOR_HEX_EDGES;
     }
 
@@ -91,5 +86,5 @@ MaxRowSize(const AmanziMesh::Mesh& mesh, Schema& schema)
 }
 
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi

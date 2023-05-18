@@ -1,17 +1,15 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
   Amanzi is released under the three-clause BSD License.
   The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
            Ethan Coon (ecoon@lanl.gov)
-*/
 
-/*
-  Operators
-
-  Operator whose unknowns are gives by the list of
+  Operator whose unknowns are gives by the list of 
 */
 
 #include "DenseMatrix.hh"
@@ -28,30 +26,32 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
- * Apply the local matrices directly as schemas match.
- ****************************************************************** */
-int
-Operator_Diagonal::ApplyMatrixFreeOp(const Op_Diagonal& op,
-                                     const CompositeVector& X,
-                                     CompositeVector& Y) const
+* Apply the local matrices directly as schemas match.
+****************************************************************** */
+int Operator_Diagonal::ApplyMatrixFreeOp(
+    const Op_Diagonal& op, const CompositeVector& X, CompositeVector& Y) const
 {
   const Epetra_MultiVector& Xi = *X.viewComponent(row_compname_, true);
   Epetra_MultiVector& Yi = *Y.viewComponent(col_compname_, true);
-
+ 
   const auto& col_lids = op.col_inds();
   const auto& row_lids = op.row_inds();
 
   for (int n = 0; n != row_lids.size(); ++n) {
-    const WhetStone::DenseMatrix<>& Acell = op.matrices[n];
+    const WhetStone::DenseMatrix& Acell = op.matrices[n];
     int nrows = Acell.NumRows();
     int ncols = Acell.NumCols();
 
-    WhetStone::DenseVector<> v(ncols), av(nrows);
-    for (int i = 0; i != ncols; ++i) { v(i) = Xi[0][col_lids[n][i]]; }
+    WhetStone::DenseVector v(ncols), av(nrows);
+    for (int i = 0; i != ncols; ++i) {
+      v(i) = Xi[0][col_lids[n][i]];
+    }
 
     Acell.Multiply(v, av, false);
 
-    for (int i = 0; i != nrows; ++i) { Yi[0][row_lids[n][i]] += av(i); }
+    for (int i = 0; i != nrows; ++i) {
+      Yi[0][row_lids[n][i]] += av(i);
+    }
   }
 
   return 0;
@@ -59,18 +59,15 @@ Operator_Diagonal::ApplyMatrixFreeOp(const Op_Diagonal& op,
 
 
 /* ******************************************************************
- * Visit methods for symbolic assemble.
- * Apply the local matrices directly as schemas match.
- ****************************************************************** */
-void
-Operator_Diagonal::SymbolicAssembleMatrixOp(const Op_Diagonal& op,
-                                            const SuperMap& map,
-                                            GraphFE& graph,
-                                            int my_block_row,
-                                            int my_block_col) const
+* Visit methods for symbolic assemble.
+* Apply the local matrices directly as schemas match.
+****************************************************************** */
+void Operator_Diagonal::SymbolicAssembleMatrixOp(
+    const Op_Diagonal& op, const SuperMap& map, GraphFE& graph,
+    int my_block_row, int my_block_col) const
 {
-  const std::vector<int>& row_gids = map.GhostIndices(my_block_row, row_compname_, 0);
-  const std::vector<int>& col_gids = map.GhostIndices(my_block_col, col_compname_, 0);
+  const std::vector<int>& row_gids = map.viewGhostIndices(my_block_row, row_compname_, 0);
+  const std::vector<int>& col_gids = map.viewGhostIndices(my_block_col, col_compname_, 0);
 
   const auto& col_lids = op.col_inds();
   const auto& row_lids = op.row_inds();
@@ -95,18 +92,15 @@ Operator_Diagonal::SymbolicAssembleMatrixOp(const Op_Diagonal& op,
 
 
 /* ******************************************************************
- * Visit methods for assemble
- * Apply the local matrices directly as schemas match.
- ****************************************************************** */
-void
-Operator_Diagonal::AssembleMatrixOp(const Op_Diagonal& op,
-                                    const SuperMap& map,
-                                    MatrixFE& mat,
-                                    int my_block_row,
-                                    int my_block_col) const
+* Visit methods for assemble
+* Apply the local matrices directly as schemas match.
+****************************************************************** */
+void Operator_Diagonal::AssembleMatrixOp(
+    const Op_Diagonal& op, const SuperMap& map, MatrixFE& mat,
+    int my_block_row, int my_block_col) const
 {
-  const std::vector<int>& row_gids = map.GhostIndices(my_block_row, row_compname_, 0);
-  const std::vector<int>& col_gids = map.GhostIndices(my_block_col, col_compname_, 0);
+  const std::vector<int>& row_gids = map.viewGhostIndices(my_block_row, row_compname_, 0);
+  const std::vector<int>& col_gids = map.viewGhostIndices(my_block_col, col_compname_, 0);
 
   const auto& col_lids = op.col_inds();
   const auto& row_lids = op.row_inds();
@@ -130,5 +124,8 @@ Operator_Diagonal::AssembleMatrixOp(const Op_Diagonal& op,
   AMANZI_ASSERT(!ierr);
 }
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
+
+
+

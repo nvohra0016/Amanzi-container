@@ -1,15 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators 
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
-
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 */
 
 #ifndef AMANZI_UPWIND_SECOND_ORDER_HH_
@@ -24,7 +21,7 @@
 
 // Amanzi
 #include "CompositeVector.hh"
-#include "MeshFramework.hh"
+#include "Mesh.hh"
 #include "WhetStoneMeshUtils.hh"
 
 // Operators
@@ -33,12 +30,13 @@
 namespace Amanzi {
 namespace Operators {
 
-template <class Model>
+template<class Model>
 class UpwindSecondOrder : public Upwind<Model> {
  public:
-  UpwindSecondOrder(Teuchos::RCP<const AmanziMesh::Mesh> mesh, Teuchos::RCP<const Model> model)
-    : Upwind<Model>(mesh, model){};
-  ~UpwindSecondOrder(){};
+  UpwindSecondOrder(Teuchos::RCP<const AmanziMesh::Mesh> mesh,
+                 Teuchos::RCP<const Model> model)
+      : Upwind<Model>(mesh, model) {};
+  ~UpwindSecondOrder() {};
 
   // main methods
   // -- initialization of control parameters
@@ -46,20 +44,18 @@ class UpwindSecondOrder : public Upwind<Model> {
 
   // -- upwind of a given cell-centered field on mesh faces
   // -- not all input parameters are use by some algorithms
-  void
-  Compute(const CompositeVector& flux, const std::vector<int>& bc_model, CompositeVector& field);
+  void Compute(const CompositeVector& flux, const CompositeVector& solution,
+               const std::vector<int>& bc_model, CompositeVector& field);
 
   // -- returns combined map for the original and upwinded fields.
-  // -- Currently, composite vector cannot be extended on a fly.
-  Teuchos::RCP<CompositeVectorSpace> Map()
-  {
+  // -- Currently, composite vector cannot be extended on a fly. 
+  Teuchos::RCP<CompositeVectorSpace> Map() {
     Teuchos::RCP<CompositeVectorSpace> cvs = Teuchos::rcp(new CompositeVectorSpace());
-    cvs->SetMesh(mesh_)
-      ->SetGhosted(true)
-      ->AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1)
-      ->AddComponent("dirichlet_faces", AmanziMesh::Entity_kind::BOUNDARY_FACE, 1)
-      ->AddComponent("face", AmanziMesh::Entity_kind::FACE, 1)
-      ->AddComponent("grad", AmanziMesh::Entity_kind::CELL, mesh_->getSpaceDimension());
+    cvs->SetMesh(mesh_)->SetGhosted(true)
+       ->AddComponent("cell", AmanziMesh::CELL, 1)
+       ->AddComponent("dirichlet_faces", AmanziMesh::BOUNDARY_FACE, 1)
+       ->AddComponent("face", AmanziMesh::FACE, 1)
+       ->AddComponent("grad", AmanziMesh::CELL, mesh_->space_dimension());
     return cvs;
   }
 
@@ -75,11 +71,10 @@ class UpwindSecondOrder : public Upwind<Model> {
 
 
 /* ******************************************************************
- * Public init method. It is not yet used.
- ****************************************************************** */
-template <class Model>
-void
-UpwindSecondOrder<Model>::Init(Teuchos::ParameterList& plist)
+* Public init method. It is not yet used.
+****************************************************************** */
+template<class Model>
+void UpwindSecondOrder<Model>::Init(Teuchos::ParameterList& plist)
 {
   method_ = Operators::OPERATOR_UPWIND_FLUX_SECOND_ORDER;
   tolerance_ = plist.get<double>("tolerance", OPERATOR_UPWIND_RELATIVE_TOLERANCE);
@@ -88,21 +83,19 @@ UpwindSecondOrder<Model>::Init(Teuchos::ParameterList& plist)
 
 
 /* ******************************************************************
- * Flux-based upwind consistent with mimetic discretization.
- ****************************************************************** */
-template <class Model>
-void
-UpwindSecondOrder<Model>::Compute(const CompositeVector& flux,
-                                  const CompositeVector& solution,
-                                  const std::vector<int>& bc_model,
-                                  CompositeVector& field)
+* Flux-based upwind consistent with mimetic discretization.
+****************************************************************** */
+template<class Model>
+void UpwindSecondOrder<Model>::Compute(
+    const CompositeVector& flux, const CompositeVector& solution,
+    const std::vector<int>& bc_model, CompositeVector& field)
 {
   AMANZI_ASSERT(field.hasComponent("cell"));
   AMANZI_ASSERT(field.hasComponent("grad"));
   AMANZI_ASSERT(field.hasComponent(face_comp_));
 
-  field.ScatterMasterToGhosted("cell");
-  flux.ScatterMasterToGhosted("face");
+  field.scatterMasterToGhosted("cell");
+  flux.scatterMasterToGhosted("face");
 
   const Epetra_MultiVector& flx_face = *flux.viewComponent("face", true);
   const Epetra_MultiVector& sol_face = *solution.viewComponent("face", true);
@@ -111,62 +104,63 @@ UpwindSecondOrder<Model>::Compute(const CompositeVector& flux,
   const Epetra_MultiVector& fld_grad = *field.viewComponent("grad", true);
   const Epetra_MultiVector& fld_boundary = *field.viewComponent("dirichlet_faces", true);
   const Epetra_Map& ext_face_map = mesh_->exterior_face_map(true);
-  const Epetra_Map& face_map = mesh_->getMap(AmanziMesh::Entity_kind::FACE,true);
+  const Epetra_Map& face_map = mesh_->face_map(true);
   Epetra_MultiVector& upw_face = *field.viewComponent(face_comp_, true);
-  upw_face.putScalar(0.0);
+  upw_face.PutScalar(0.0);
 
   double flxmin, flxmax;
   flx_face.MinValue(&flxmin);
   flx_face.MaxValue(&flxmax);
   double tol = tolerance_ * std::max(fabs(flxmin), fabs(flxmax));
 
-  int dim = mesh_->getSpaceDimension();
+  int dim = mesh_->space_dimension();
   std::vector<int> dirs;
   AmanziGeometry::Point grad(dim);
   AmanziMesh::Entity_ID_List faces;
 
-  int ncells_wghost = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
+  int ncells_wghost = mesh_->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::ALL);
   for (int c = 0; c < ncells_wghost; c++) {
-    mesh_->getCellFacesAndDirs(c, faces, &dirs);
+    mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
     int nfaces = faces.size();
 
     double kc(fld_cell[0][c]);
-    const AmanziGeometry::Point& xc = mesh_->getCellCentroid(c)
+    const AmanziGeometry::Point& xc = mesh_->getCellCentroid(c);
     for (int i = 0; i < dim; i++) grad[i] = fld_grad[i][c];
 
     for (int n = 0; n < nfaces; n++) {
       int f = faces[n];
-      bool flag = (flx_face[0][f] * dirs[n] <= -tol); // upwind flag
-
-      // Internal faces. We average field on almost vertical faces.
-      if (bc_model[f] == OPERATOR_BC_NONE && fabs(flx_face[0][f]) <= tol) {
+      bool flag = (flx_face[0][f] * dirs[n] <= -tol);  // upwind flag
+      
+      // Internal faces. We average field on almost vertical faces. 
+      if (bc_model[f] == OPERATOR_BC_NONE && fabs(flx_face[0][f]) <= tol) { 
         double tmp(0.5);
         int c2 = WhetStone::cell_get_face_adj_cell(*mesh_, c, f);
-        if (c2 >= 0) {
-          double v1 = mesh_->getCellVolume(c)
-          double v2 = mesh_->getCellVolume(c2)
+        if (c2 >= 0) { 
+          double v1 = mesh_->getCellVolume(c);
+          double v2 = mesh_->getCellVolume(c2);
           tmp = v2 / (v1 + v2);
         }
-        const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f)
+        const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f);
         upw_face[0][f] += (kc + grad * (xf - xc)) * tmp;
-        // Boundary faces. We upwind only on inflow dirichlet faces.
+      // Boundary faces. We upwind only on inflow dirichlet faces.
       } else if (bc_model[f] == OPERATOR_BC_DIRICHLET && flag) {
-        upw_face[0][f] = fld_boundary[0][ext_face_map.getLocalElement(face_map.getGlobalElement(f))];
+        upw_face[0][f] = fld_boundary[0][ext_face_map.LID(face_map.GID(f))];
       } else if (bc_model[f] == OPERATOR_BC_NEUMANN && flag) {
         // upw[0][f] = ((*model_).*Value)(c, sol_face[0][f]);
         upw_face[0][f] = kc;
       } else if (bc_model[f] == OPERATOR_BC_MIXED && flag) {
         upw_face[0][f] = kc;
-        // Internal and boundary faces.
+      // Internal and boundary faces. 
       } else if (!flag) {
-        const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f)
+        const AmanziGeometry::Point& xf = mesh_->getFaceCentroid(f);
         upw_face[0][f] = kc + grad * (xf - xc);
       }
     }
   }
 }
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
 
 #endif
+

@@ -1,22 +1,23 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-           Ethan Coon (ecoon@lanl.gov)
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
+          Ethan Coon (ecoon@lanl.gov)
 */
 
-//! Composes BCs, local_op, and global_operator objects for use by
-//! discretizations.
+//! Composes BCs, local_op, and global_operator objects for use by discretizations.
+
+
 #ifndef AMANZI_OPERATOR_PDE_HELPER_DISCRETIZATION_HH_
 #define AMANZI_OPERATOR_PDE_HELPER_DISCRETIZATION_HH_
 
 #include "Teuchos_RCP.hpp"
 
 #include "BCs.hh"
-#include "MeshFramework.hh"
+#include "Mesh.hh"
 #include "Op.hh"
 #include "Operator.hh"
 #include "Schema.hh"
@@ -42,8 +43,10 @@ class PDE_HelperDiscretization {
 
   // boundary conditions (BC) require information on test and
   // trial spaces. For a single PDE, these BCs could be the same.
-  void SetBCs(const Teuchos::RCP<const BCs>& bc_trial, const Teuchos::RCP<const BCs>& bc_test);
-  void AddBCs(const Teuchos::RCP<const BCs>& bc_trial, const Teuchos::RCP<const BCs>& bc_test);
+  void SetBCs(const Teuchos::RCP<const BCs>& bc_trial,
+              const Teuchos::RCP<const BCs>& bc_test);
+  void AddBCs(const Teuchos::RCP<const BCs>& bc_trial,
+              const Teuchos::RCP<const BCs>& bc_test);
 
  private:
   void PopulateDimensions_();
@@ -51,7 +54,7 @@ class PDE_HelperDiscretization {
  protected:
   Teuchos::RCP<Operator> global_op_;
   Teuchos::RCP<Op> local_op_;
-  std::vector<Teuchos::RCP<const BCs>> bcs_trial_, bcs_test_;
+  std::vector<Teuchos::RCP<const BCs> > bcs_trial_, bcs_test_;
 
   // mesh info
   Teuchos::RCP<const AmanziMesh::Mesh> mesh_;
@@ -63,29 +66,31 @@ class PDE_HelperDiscretization {
 };
 
 
-// non-member functions
-Teuchos::RCP<CompositeVectorSpace>
-CreateFracturedMatrixCVS(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
-                         const Teuchos::RCP<const AmanziMesh::Mesh>& fracture);
+// // non-member functions
+// Teuchos::RCP<CompositeVectorSpace>
+// CreateFracturedMatrixCVS(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
+//                          const Teuchos::RCP<const AmanziMesh::Mesh>& fracture);
 
-Teuchos::RCP<CompositeVectorSpace>
-CreateManifoldCVS(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh);
+// Teuchos::RCP<CompositeVectorSpace>
+// CreateManifoldCVS(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh);
 
-void
-CellToBoundaryFaces(const std::vector<int>& bc_model, CompositeVector& field);
+// void
+// CellToBoundaryFaces(const std::vector<int>& bc_model, CompositeVector& field);
 
-void
-CellToBoundaryFaces(CompositeVector& field);
+// void
+// CellToBoundaryFaces(CompositeVector& field);
 
-void
-BoundaryFacesToFaces(const std::vector<int>& bc_model,
-                     const CompositeVector& input,
-                     CompositeVector& output);
+// void
+// BoundaryFacesToFaces(const std::vector<int>& bc_model,
+//                      const CompositeVector& input,
+//                      CompositeVector& output);
 
-void
-BoundaryDataToFaces(const Teuchos::RCP<Operators::BCs>& op_bc, CompositeVector& field);
+// void
+// BoundaryDataToFaces(const Teuchos::RCP<Operators::BCs>& op_bc, CompositeVector& field);
 
 } // namespace Operators
 } // namespace Amanzi
 
 #endif
+
+

@@ -65,6 +65,8 @@ END
 
 #include "Kokkos_Core.hpp"
 #include "Kokkos_DualView.hpp"
+#include "AmanziTypes.hh"
+#include "MeshView.hh"
 
 namespace Amanzi {
 
@@ -76,7 +78,9 @@ class Function {
   // Keep host version working
   virtual double operator()(const Kokkos::View<double*, Kokkos::HostSpace>&) const = 0;
 
-  virtual void apply(const Kokkos::View<double**>&, Kokkos::View<double*>&) const = 0;
+  virtual void apply(const Kokkos::View<double**>&,
+                     Kokkos::View<double*>&,
+                     const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* = nullptr) const = 0;
 };
 
 } // namespace Amanzi

@@ -73,12 +73,13 @@ class MultiFunction {
   // contiguous.  Likely this is important for performance anyway, so I doubt
   // we're losing much generality, and may even be making performance more
   // robust.
-  void
-  apply(const Kokkos::View<double**>& in, Kokkos::View<double**, Kokkos::LayoutLeft>& out) const
+  void apply(const Kokkos::View<double**>& in,
+             Kokkos::View<double**, Kokkos::LayoutLeft>& out,
+             const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* ids = nullptr) const
   {
     for (int i = 0; i < size(); ++i) {
       Kokkos::View<double*> out_i = Kokkos::subview(out, Kokkos::ALL, i);
-      functions_[i]->apply(in, out_i);
+      functions_[i]->apply(in, out_i, ids);
     }
   }
 

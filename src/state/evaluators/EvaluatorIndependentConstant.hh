@@ -45,6 +45,10 @@ class EvaluatorIndependentConstant
   EvaluatorIndependentConstant(const EvaluatorIndependentConstant& other) = default;
   virtual Teuchos::RCP<Evaluator> Clone() const override;
 
+  virtual std::string getName() const override {
+    return "independent from file";
+  }
+
  protected:
   virtual void Update_(State& S) override;
 

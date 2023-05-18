@@ -69,7 +69,7 @@ class EvaluatorSecondary : public Evaluator {
     return ProvidesKey(wrt_key, wrt_tag) || IsDependency(S, wrt_key, wrt_tag);
   }
 
-  virtual std::string WriteToString() const override;
+  virtual std::ostream& writeInfo(std::ostream& os) const override final;
 
  protected:
   // These do the actual work

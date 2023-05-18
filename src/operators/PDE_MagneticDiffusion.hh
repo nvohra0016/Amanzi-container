@@ -1,16 +1,14 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
-  provided in the top-level COPYRIGHT file.
-
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
   Operators
 
-  Magnetic diffusion exesices Amanzi's capability to discretize
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
+  provided in the top-level COPYRIGHT file.
+
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
+
+  Magnetic diffusion exesices Amanzi's capability to discretize 
   curl operators.
 */
 
@@ -38,10 +36,11 @@ namespace Operators {
 class PDE_MagneticDiffusion : public PDE_Electromagnetics {
  public:
   PDE_MagneticDiffusion(const Teuchos::RCP<Operator>& global_op)
-    : PDE_Electromagnetics(global_op){};
+    : PDE_Electromagnetics(global_op)
+  {};
 
   PDE_MagneticDiffusion(Teuchos::ParameterList& plist,
-                        const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
+                          const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
     : PDE_Electromagnetics(plist, mesh)
   {
     InitMagneticDiffusion_(plist);
@@ -69,11 +68,13 @@ class PDE_MagneticDiffusion : public PDE_Electromagnetics {
   void InitMagneticDiffusion_(Teuchos::ParameterList& plist);
 
  protected:
-  std::vector<WhetStone::DenseMatrix<>> mass_op_;
-  std::vector<WhetStone::DenseMatrix<>> curl_op_;
+  std::vector<WhetStone::DenseMatrix> mass_op_;
+  std::vector<WhetStone::DenseMatrix> curl_op_;
 };
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
 
 #endif
+
+

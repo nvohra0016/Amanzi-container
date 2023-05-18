@@ -18,29 +18,100 @@
 
 namespace Amanzi {
 
+template<typename T>
 void
-patchToCompositeVector(const Patch& p, const std::string& component, CompositeVector& cv);
+patchToCompositeVector(const Patch<T>& p, const std::string& component, CompositeVector_<T>& cv)
+{
+  auto cv_c = cv.viewComponent(component, p.space.ghosted);
 
+  const auto& mesh = cv.getMesh();
+  auto ids = mesh->getSetEntities(p.space.region,
+          p.space.entity_kind,
+          p.space.ghosted ? AmanziMesh::Parallel_kind::ALL : AmanziMesh::Parallel_kind::OWNED);
+
+  if (component != "boundary_face") {
+    Kokkos::MDRangePolicy<Kokkos::Rank<2>> range({ 0, 0 }, { p.data.extent(0), p.data.extent(1) });
+    Kokkos::parallel_for(
+      "patchToCompositeVector", range, KOKKOS_LAMBDA(const int& i, const int& j) {
+        cv_c(ids[i], j) = p.data(i, j);
+      });
+  } else {
+    AMANZI_ASSERT(false && "Not yet implemented: patchToCompositeVector with boundary_face");
+    // have to do some dancing here... this is not correct because p.data is
+    // based on faces, but component is based on boundary faces.  Need to
+    // either create temporary space, then import, or more likely, unpack the
+    // mapping to make sure we only access cv_c on boundary faces.
+    Kokkos::MDRangePolicy<Kokkos::Rank<2>> range({ 0, 0 }, { p.data.extent(0), p.data.extent(1) });
+    Kokkos::parallel_for(
+      "patchToCompositeVector boundary_face", range, KOKKOS_LAMBDA(const int& i, const int& j) {
+        cv_c(ids[i], j) = p.data(i, j);
+      });
+  }
+}
+
+template<typename T>
 void
-patchToCompositeVector(const Patch& p,
+patchToCompositeVector(const Patch<T>& p,
                        const std::string& component,
-                       CompositeVector& cv,
-                       CompositeVector_<int>& flag_cv);
+                       CompositeVector_<T>& cv,
+                       CompositeVector_<int>& flag_cv)
+{
+  auto ids = cv.getMesh()->getSetEntities(p.space.region,
+          p.space.entity_kind,
+          p.space.ghosted ? AmanziMesh::Parallel_kind::ALL :
+          AmanziMesh::Parallel_kind::OWNED);
+
+  if (component != "boundary_face") {
+    // AMANZI_ASSERT(ids.extent(0) == p.data.extent(0));
+    auto flag_type = p.space.flag_type;
+
+    auto cv_c = cv.viewComponent(component, p.space.ghosted);
+    auto flag_c = flag_cv.viewComponent(component, p.space.ghosted);
+
+    Kokkos::parallel_for(
+      "patchToCompositeVector", p.data.extent(0), KOKKOS_LAMBDA(const int& i) {
+        cv_c(ids[i], 0) = p.data(i, 0);
+        flag_c(ids[i], 0) = flag_type;
+      });
+  } else {
+    AMANZI_ASSERT(false && "Not yet implemented: patchToCompositeVector with boundary_face");
+    // have to do some dancing here... this is not correct because p.data is
+    // based on faces, but component is based on boundary faces.  Need to
+    // either create temporary space, then import, or more likely, unpack the
+    // mapping to make sure we only access cv_c on boundary faces.
+    // Kokkos::parallel_for(
+    //     "patchToCompositeVector boundary_face",
+    //     p.data.extent(0),
+    //     KOKKOS_LAMBDA(const int& i) {
+    //       cv_c(ids(i),0) = p.data(i,0);
+    //       flag_c(ids(i), 0) = p.space.flag_type;
+    //     });
+  }
+}
+
 
 //
 // Copies values from a set of patches into a vector.
 //
+template<typename T>
 void
-multiPatchToCompositeVector(const MultiPatch& mp, const std::string& component, CompositeVector& cv);
+multiPatchToCompositeVector(const MultiPatch<T>& mp, const std::string& component, CompositeVector_<T>& cv)
+{
+  for (const auto& p : mp) { patchToCompositeVector<T>(p, component, cv); }
+}
 
 //
 // Copies values and flag from a set of patches into a vector and a flag vector.
 //
+template<typename T>
 void
-multiPatchToCompositeVector(const MultiPatch& mp,
-        const std::string& component,
-        CompositeVector& cv,
-        CompositeVector_<int>& flag);
+multiPatchToCompositeVector(const MultiPatch<T>& mp,
+                                        const std::string& component,
+                                        CompositeVector_<T>& cv,
+                                        CompositeVector_<int>& flag)
+{
+  for (const auto& p : mp) { patchToCompositeVector<T>(p, component, cv, flag); }
+}
 
 
 void
@@ -112,6 +183,14 @@ getNumTreeVectorLeaves(const T& tv)
   return collectTreeVectorLeaves_const(tv).size();
 }
 
+
+void
+copyMeshCoordinatesToVector(const AmanziMesh::Mesh& mesh,
+                            AmanziMesh::Entity_kind kind,
+                            CompositeVector& vec);
+void
+copyVectorToMeshCoordinates(const CompositeVector& vec,
+                            AmanziMesh::Mesh& mesh);
 
 } // namespace Amanzi
 

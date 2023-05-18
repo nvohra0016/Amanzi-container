@@ -112,7 +112,6 @@ CompositeVectorFunction::readSpec_(Teuchos::ParameterList& list,
     entity_kinds.resize(components.size(), entity_kind_);
   }
 
-      
   Teuchos::ParameterList f_list = list.sublist(function_name, true);
 
   // Make the function.
@@ -144,7 +143,7 @@ CompositeVectorFunction::Compute(double time, CompositeVector& vec)
 {
   for (auto [compname, ps, functor, marker] : *this) {
     if (vec.hasComponent(compname)) {
-      Patch p(ps);
+      Patch<double> p(ps);
       Impl::computeFunction(*functor, time, p);
       patchToCompositeVector(p, compname, vec);
     }

@@ -1,5 +1,5 @@
 #set -x
-SED=sed
+SED=gsed
 SED_ARGS="-i "
 
 echo "Running sed on $1"
@@ -9,14 +9,15 @@ ${SED} ${SED_ARGS} -E 's|AmanziMesh::FACE|AmanziMesh::Entity_kind::FACE|g' "$1"
 ${SED} ${SED_ARGS} -E 's|AmanziMesh::NODE|AmanziMesh::Entity_kind::NODE|g' "$1"
 ${SED} ${SED_ARGS} -E 's|AmanziMesh::EDGE|AmanziMesh::Entity_kind::EDGE|g' "$1"
 ${SED} ${SED_ARGS} -E 's|AmanziMesh::BOUNDARY_FACE|AmanziMesh::Entity_kind::BOUNDARY_FACE|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::PRISM|AmanziMesh::Cell_type::PRISM|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::POLYHED|AmanziMesh::Cell_type::POLYHED|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::HEX|AmanziMesh::Cell_type::HEX|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::PYRAMID|AmanziMesh::Cell_type::PYRAMID|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::QUAD|AmanziMesh::Cell_type::QUAD|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::POLYGON|AmanziMesh::Cell_type::POLYGON|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::TET|AmanziMesh::Cell_type::TET|g' "$1"
-${SED} ${SED_ARGS} -E 's|AmanziMesh::TRI|AmanziMesh::Cell_type::TRI|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::PRISM|AmanziMesh::Cell_kind::PRISM|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::POLYHED|AmanziMesh::Cell_kind::POLYHED|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::HEX|AmanziMesh::Cell_kind::HEX|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::PYRAMID|AmanziMesh::Cell_kind::PYRAMID|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::QUAD|AmanziMesh::Cell_kind::QUAD|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::POLYGON|AmanziMesh::Cell_kind::POLYGON|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::TET|AmanziMesh::Cell_kind::TET|g' "$1"
+${SED} ${SED_ARGS} -E 's|AmanziMesh::TRI|AmanziMesh::Cell_kind::TRI|g' "$1"
+${SED} ${SED_ARGS} -E 's|Entity_type|Entity_kind|g' "$1"
 
 ${SED} ${SED_ARGS} -E 's|(^[ \t]*)(.*)face_get_cells\(([^,\)]*),([^,\)]*),[ ]*&([^,\)]*)\)|\1\5 = \2getFaceCells\(\3,\4\)|g' "$1" # Need change for type 
 ${SED} ${SED_ARGS} -E 's|(^.*) (\S*)cell_get_faces\(([^,\)]*),[ ]*&([^,\)]*)\)|\1 \4 = \2getCellFaces\(\3\)|g' "$1" # Need change for type 
@@ -93,6 +94,10 @@ ${SED} ${SED_ARGS} -E 's|cell_get_type\(|getCellType\(|g' "$1"
 ${SED} ${SED_ARGS} -E 's|is_logical\(|isLogical\(|g' "$1"
 ${SED} ${SED_ARGS} -E 's|vis_mesh\(|getVisMesh\(|g' "$1"
 
+${SED} ${SED_ARGS} -E 's|parallel_type_string\(|to_string\(|g' "$1"
+${SED} ${SED_ARGS} -E 's|parallel_type\(|createParallelKind\(|g' "$1"
+${SED} ${SED_ARGS} -E 's|Parallel_type|Parallel_kind|g' "$1"
+
 ${SED} ${SED_ARGS} -E 's|get_referencing_parent\(|getReferencingParent\(|g' "$1"
 ${SED} ${SED_ARGS} -E 's|entity_kind\(|createEntityKind\(|g' "$1"
 ${SED} ${SED_ARGS} -E 's|DoImport\(|doImport\(|g' "$1"
@@ -108,5 +113,4 @@ ${SED} ${SED_ARGS} -E 's|parent\(|getParentMesh\(|g' "$1"
 ${SED} ${SED_ARGS} -E 's|cell_get_face_adj_cells\(|AmanziMesh::MeshAlgorithms::getCellFaceAdjacentCells\(|g' "$1"
 ${SED} ${SED_ARGS} -E 's|get_indexing_parent\(|getIndexingParent\(|g' "$1"
 
-
-git -P diff --shortstat $1
+#git -P diff --shortstat $1

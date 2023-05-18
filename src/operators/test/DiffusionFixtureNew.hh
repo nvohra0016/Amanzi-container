@@ -1,15 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
   Amanzi is released under the three-clause BSD License.
   The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
-  Authors: Ethan Coon (coonet@ornl.gov)
-*/
-
-/*
-  Operators
-
+  Author: Ethan Coon (coonet@ornl.gov)
 */
 
 #ifndef AMANZI_DIFFUSION_FIXTURE_HH_
@@ -46,9 +43,10 @@ using namespace Amanzi;
 
 struct DiffusionFixture {
   DiffusionFixture(Teuchos::RCP<Teuchos::ParameterList> plist_)
-    : plist(plist_), comm(Amanzi::getDefaultComm()){};
+    : plist(plist_),
+      comm(Amanzi::getDefaultComm()) {};
 
-  template <class PDE_Diffusion_type>
+  template<class PDE_Diffusion_type>
   void Discretize(const std::string& name, AmanziMesh::Entity_kind kind);
 
   // set up the problem
@@ -58,18 +56,17 @@ struct DiffusionFixture {
   void Setup(const std::string& prec_solver_, bool symmetric_);
 
   // -- coefficients
-  void
-  SetScalarCoefficient(Operators::PDE_DiffusionFactory& opfactory, AmanziMesh::Entity_kind kind);
+  void SetScalarCoefficient(Operators::PDE_DiffusionFactory& opfactory,
+                            AmanziMesh::Entity_kind kind);
 
   // -- boundary conditions
   void SetBCsDirichlet();
-  void SetBCsDirichletNeumann(){};
-  void SetBCsDirichletNeumannRobin(){};
+  void SetBCsDirichletNeumann() {};
+  void SetBCsDirichletNeumannRobin() {};
 
   // main loop:
   //   tolerance of a Krylov solver
-  //   if initial_guess=true, solution from last iteration is used as the
-  //   initial guess
+  //   if initial_guess=true, solution from last iteration is used as the initial guess
   void Go(double tol = 1.0e-12, bool initial_guess = true);
   void MatVec(int nloops);
 
@@ -80,6 +77,7 @@ struct DiffusionFixture {
   Comm_ptr_type comm;
   Teuchos::RCP<Teuchos::ParameterList> plist;
   Teuchos::RCP<const AmanziMesh::Mesh> mesh;
+  Teuchos::RCP<const AmanziMesh::MeshHost> mesh_host;
 
   Teuchos::RCP<AnalyticBase> ana;
 
@@ -94,10 +92,9 @@ struct DiffusionFixture {
 
 
 /* ******************************************************************
- * Initialization
- ****************************************************************** */
-void
-DiffusionFixture::Init(int d, int nx, const std::string& mesh_file)
+* Initialization
+****************************************************************** */
+void DiffusionFixture::Init(int d, int nx, const std::string& mesh_file)
 {
   nvtxRangePush("DiffusionFixture::Init");
   if (!plist.get())
@@ -116,15 +113,16 @@ DiffusionFixture::Init(int d, int nx, const std::string& mesh_file)
     mesh = meshfactory.create(mesh_file);
   }
   nvtxRangePop();
+  mesh_host = AmanziMesh::onMemSpace<MemSpace_kind::HOST>(mesh);
 }
 
 
 /* ******************************************************************
- * Create operator
- ****************************************************************** */
-template <class PDE_Diffusion_type>
-void
-DiffusionFixture::Discretize(const std::string& name, AmanziMesh::Entity_kind scalar_coef)
+* Create operator
+****************************************************************** */
+template<class PDE_Diffusion_type>
+void DiffusionFixture::Discretize(const std::string& name,
+                                  AmanziMesh::Entity_kind scalar_coef)
 {
   nvtxRangePush("DiffusionFixture::Discretize");
   op = Teuchos::rcp(new PDE_Diffusion_type(plist->sublist("PK operator").sublist(name), mesh));
@@ -132,16 +130,17 @@ DiffusionFixture::Discretize(const std::string& name, AmanziMesh::Entity_kind sc
   // modify diffusion coefficient
   CompositeVectorSpace K_map;
   K_map.SetMesh(mesh);
-  K_map.AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1);
+  K_map.AddComponent("cell", AmanziMesh::CELL, 1);
   auto K = Teuchos::rcp(new TensorVector(K_map));
-  const Amanzi::AmanziMesh::Mesh* m = mesh.get();
   const AnalyticBase* a = ana.get();
-  K->Init(K->size(),
-          // size function: size of element c
-          [&](int c) -> const Amanzi::WhetStone::Tensor<Kokkos::HostSpace>& {
-            const AmanziGeometry::Point& xc = m->cell_centroid_host(c);
-            return a->TensorDiffusivity_host(xc, 0.0);
-          });
+  K->Init(
+    K->size(),
+    //size function: size of element c
+    [&] (int c) -> const Amanzi::WhetStone::Tensor<Kokkos::HostSpace>& {
+      const AmanziGeometry::Point& xc = mesh_host->getCellCentroid(c);
+      return a->TensorDiffusivity_host(xc,0.0);
+    }
+  );
 
   op->SetTensorCoefficient(K);
 
@@ -149,27 +148,26 @@ DiffusionFixture::Discretize(const std::string& name, AmanziMesh::Entity_kind sc
     int nents = mesh->getNumEntities(scalar_coef, AmanziMesh::Parallel_kind::ALL);
 
     CompositeVectorSpace cvs;
-    cvs.SetMesh(mesh)->SetGhosted()->SetComponent("face", AmanziMesh::Entity_kind::FACE, 1);
+    cvs.SetMesh(mesh)->SetGhosted()->SetComponent("face", AmanziMesh::FACE, 1);
     Teuchos::RCP<CompositeVector> kr = cvs.Create();
-    auto vec = kr->ViewComponent<MirrorHost>("face", true);
+    auto vec = kr->viewComponent<MirrorHost>("face", true);
     for (int f = 0; f != nents; ++f) {
-      vec(f, 0) = ana->ScalarDiffusivity(mesh->face_centroid_host(f), 0.0);
+      vec(f, 0) = ana->ScalarDiffusivity(mesh_host->getFaceCentroid(f), 0.0);
     }
     op->SetScalarCoefficient(kr, Teuchos::null);
   }
 
   // boundary condition
-  bc = Teuchos::rcp(new Operators::BCs(mesh, AmanziMesh::Entity_kind::FACE, WhetStone::DOF_Type::SCALAR));
-  op->SetBCs(bc, bc);
+  bc = Teuchos::rcp(new Operators::BCs(mesh, AmanziMesh::FACE, WhetStone::DOF_Type::SCALAR));
+  op->SetBCs(bc,bc);
   nvtxRangePop();
 }
 
 
 /* ******************************************************************
- * Set coefficients
- ****************************************************************** */
-void
-DiffusionFixture::Setup(const std::string& prec_solver_, bool symmetric_)
+* Set coefficients
+****************************************************************** */
+void DiffusionFixture::Setup(const std::string& prec_solver_, bool symmetric_)
 {
   nvtxRangePush("DiffusionFixture::Setup");
   symmetric = symmetric_;
@@ -183,29 +181,28 @@ DiffusionFixture::Setup(const std::string& prec_solver_, bool symmetric_)
     global_op->set_inverse_parameters(prec_solver, plist->sublist("solvers"));
   } else {
     if (symmetric) {
-      global_op->set_inverse_parameters(
-        prec_solver, plist->sublist("preconditioners"), "AztecOO CG", plist->sublist("solvers"));
+      global_op->set_inverse_parameters(prec_solver, plist->sublist("preconditioners"),
+                                        "AztecOO CG", plist->sublist("solvers"));
     } else {
-      global_op->set_inverse_parameters(
-        prec_solver, plist->sublist("preconditioners"), "GMRES", plist->sublist("solvers"));
+      global_op->set_inverse_parameters(prec_solver, plist->sublist("preconditioners"),
+                                      "GMRES", plist->sublist("solvers"));
     }
   }
   global_op->initializeInverse();
 
   CompositeVectorSpace flux_space;
-  flux_space.SetMesh(mesh)->SetGhosted(true)->SetComponent(
-    "face", AmanziMesh::Entity_kind::FACE, 1);
+  flux_space.SetMesh(mesh)->SetGhosted(true)->SetComponent("face", AmanziMesh::Entity_kind::FACE, 1);
   flux = flux_space.Create();
   nvtxRangePop();
 }
 
 
 /* ******************************************************************
- * Set coefficients
- ****************************************************************** */
-void
-DiffusionFixture::SetScalarCoefficient(Operators::PDE_DiffusionFactory& opfactory,
-                                       AmanziMesh::Entity_kind kind)
+* Set coefficients
+****************************************************************** */
+void DiffusionFixture::SetScalarCoefficient(
+    Operators::PDE_DiffusionFactory& opfactory,
+    AmanziMesh::Entity_kind kind)
 {
   nvtxRangePush("DiffusionFixture::SetScalarCoefficient");
   if (kind == AmanziMesh::Entity_kind::UNKNOWN) return;
@@ -215,20 +212,20 @@ DiffusionFixture::SetScalarCoefficient(Operators::PDE_DiffusionFactory& opfactor
   cvs.SetMesh(mesh)->SetGhosted();
   Teuchos::RCP<CompositeVector> kr;
 
-  if (kind == AmanziMesh::Entity_kind::CELL) {
-    cvs.SetComponent("cell", AmanziMesh::Entity_kind::CELL, 1);
+  if (kind == AmanziMesh::CELL) {
+    cvs.SetComponent("cell", AmanziMesh::CELL, 1);
     kr = cvs.Create();
-    auto vec = kr->ViewComponent<MirrorHost>("cell", true);
+    auto vec = kr->viewComponent<MirrorHost>("cell", true);
     for (int c = 0; c != nents; ++c) {
-      vec(c, 0) = ana->ScalarDiffusivity(mesh->cell_centroid_host(c), 0.0);
+      vec(c, 0) = ana->ScalarDiffusivity(mesh_host->getCellCentroid(c), 0.0);
     }
 
-  } else if (kind == AmanziMesh::Entity_kind::FACE) {
-    cvs.SetComponent("face", AmanziMesh::Entity_kind::FACE, 1);
+  } else if (kind == AmanziMesh::FACE) {
+    cvs.SetComponent("face", AmanziMesh::FACE, 1);
     kr = cvs.Create();
-    auto vec = kr->ViewComponent<MirrorHost>("face", true);
+    auto vec = kr->viewComponent<MirrorHost>("face", true);
     for (int f = 0; f != nents; ++f) {
-      vec(f, 0) = ana->ScalarDiffusivity(mesh->face_centroid_host(f), 0.0);
+      vec(f, 0) = ana->ScalarDiffusivity(mesh_host->getFaceCentroid(f), 0.0);
     }
   }
   op->SetScalarCoefficient(kr, Teuchos::null);
@@ -237,22 +234,22 @@ DiffusionFixture::SetScalarCoefficient(Operators::PDE_DiffusionFactory& opfactor
 
 
 /* ******************************************************************
- * Set boundary conditions
- ****************************************************************** */
-void
-DiffusionFixture::SetBCsDirichlet()
+* Set boundary conditions
+****************************************************************** */
+void DiffusionFixture::SetBCsDirichlet()
 {
+
   auto bc_value = bc->bc_value_host();
   auto bc_model = bc->bc_model_host();
 
-  if (bc->kind() == AmanziMesh::Entity_kind::FACE) {
-    const auto& bf_map = *mesh->map(AmanziMesh::Entity_kind::BOUNDARY_FACE, false);
-    const auto& f_map = *mesh->map(AmanziMesh::Entity_kind::FACE, false);
+  if (bc->kind() == AmanziMesh::FACE) {
+    const auto& bf_map = *mesh->getMap(AmanziMesh::BOUNDARY_FACE, false);
+    const auto& f_map = *mesh->getMap(AmanziMesh::FACE, false);
 
     for (int bf = 0; bf != bf_map.getLocalNumElements(); ++bf) {
       auto f = f_map.getLocalElement(bf_map.getGlobalElement(bf));
       bc_model[f] = Operators::OPERATOR_BC_DIRICHLET;
-      bc_value[f] = ana->pressure_exact(mesh->face_centroid_host(f), 0.0);
+      bc_value[f] = ana->pressure_exact(mesh_host->getFaceCentroid(f), 0.0);
     }
   } else {
     Exceptions::amanzi_throw("OperatorDiffusion test harness not implemented for this kind.");
@@ -261,10 +258,9 @@ DiffusionFixture::SetBCsDirichlet()
 
 
 /* ******************************************************************
- * Run the solvers
- ****************************************************************** */
-void
-DiffusionFixture::Go(double tol, bool initial_guess)
+* Run the solvers
+****************************************************************** */
+void DiffusionFixture::Go(double tol, bool initial_guess)
 {
   nvtxRangePush("DiffusionFixture::Go");
   global_op->Zero();
@@ -275,15 +271,15 @@ DiffusionFixture::Go(double tol, bool initial_guess)
   // The view on host needs to be scoped to be released
   // This would prevent the vector to be copied later (in apply inverse)
   {
-    auto rhs_c = rhs.ViewComponent<MirrorHost>("cell", false);
+    auto rhs_c = rhs.viewComponent<MirrorHost>("cell", false);
     for (int c = 0; c != ncells; ++c) {
-      const auto& xc = mesh->cell_centroid_host(c);
-      rhs_c(c, 0) += ana->source_exact(xc, 0.0) * mesh->cell_volume_host(c);
+      const auto& xc = mesh_host->getCellCentroid(c);
+      rhs_c(c, 0) += ana->source_exact(xc, 0.0) * mesh->getCellVolume(c);
     }
   }
 
 
-  auto rhs_c = rhs.ViewComponent("cell", false);
+  auto rhs_c = rhs.viewComponent("cell", false);
 
 
   op->ApplyBCs(true, true, true);
@@ -295,16 +291,17 @@ DiffusionFixture::Go(double tol, bool initial_guess)
   auto stop = std::chrono::high_resolution_clock::now();
 
   if (tol > 0.0) {
+
     // compute pressure error
     double pnorm(0.0), pl2_err(0.0), pinf_err(0.0);
-    ComputeCellError(*ana, mesh, *solution, 0.0, pnorm, pl2_err, pinf_err);
+    ComputeCellError(*ana, mesh_host, *solution, 0.0, pnorm, pl2_err, pinf_err);
 
     // calculate flux error
     op->UpdateMatrices(Teuchos::null, solution.ptr());
     op->UpdateFlux(solution.ptr(), flux.ptr());
 
     double unorm, ul2_err, uinf_err;
-    ComputeFaceError(*ana, mesh, *flux, 0.0, unorm, ul2_err, uinf_err);
+    ComputeFaceError(*ana, mesh_host, *flux, 0.0, unorm, ul2_err, uinf_err);
 
     auto MyPID = comm->getRank();
     if (MyPID == 0) {
@@ -313,17 +310,12 @@ DiffusionFixture::Go(double tol, bool initial_guess)
 
       pl2_err /= pnorm;
       ul2_err /= unorm;
-      printf("L2(p)=%9.6f  Inf(p)=%9.6f  L2(u)=%9.6g  Inf(u)=%9.6f\ndofs=    "
-             "itr=%d  ||r||=%10.5f\n",
-             pl2_err,
-             pinf_err,
-             ul2_err,
-             uinf_err,
-             global_op->num_itrs(),
-             global_op->residual());
+      printf("L2(p)=%9.6f  Inf(p)=%9.6f  L2(u)=%9.6g  Inf(u)=%9.6f\ndofs=    itr=%d  ||r||=%10.5f\n",
+             pl2_err, pinf_err, ul2_err, uinf_err,
+             global_op->num_itrs(), global_op->residual());
 
-      CHECK(pl2_err < 10 * tol);
-      CHECK(ul2_err < 100 * tol);
+      CHECK(pl2_err < 10*tol);
+      CHECK(ul2_err < 100*tol);
     }
     // if (symmetric) {
     //   VerificationCV ver(global_op);
@@ -335,10 +327,9 @@ DiffusionFixture::Go(double tol, bool initial_guess)
 
 
 /* ******************************************************************
- * Run the mat-vec
- ****************************************************************** */
-void
-DiffusionFixture::MatVec(int nloops)
+* Run the mat-vec
+****************************************************************** */
+void DiffusionFixture::MatVec(int nloops)
 {
   nvtxRangePush("DiffusionFixture::MatVec");
   global_op->Zero();
@@ -351,7 +342,9 @@ DiffusionFixture::MatVec(int nloops)
   auto sol(*solution);
 
   auto start = std::chrono::high_resolution_clock::now();
-  for (int i = 0; i < nloops; ++i) { global_op->apply(sol, *solution); }
+  for (int i = 0; i < nloops; ++i) {
+    global_op->apply(sol, *solution);
+  }
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 

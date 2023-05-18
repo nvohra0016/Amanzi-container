@@ -14,6 +14,7 @@
 namespace Amanzi {
 namespace AmanziMesh {
 
+
 struct MeshFactory : public MeshFrameworkFactory {
   using MeshFrameworkFactory::MeshFrameworkFactory;
 
@@ -71,7 +72,9 @@ struct MeshFactory : public MeshFrameworkFactory {
   // Create a 1D Column Mesh from a columnar structured volume mesh.
   //
   Teuchos::RCP<Mesh>
-  createColumn(const Teuchos::RCP<Mesh>& parent, int col_id);
+  createColumn(const Teuchos::RCP<Mesh>& parent, int col_id,
+               const Teuchos::RCP<Teuchos::ParameterList>& plist);
+
 
   // Create a MeshSurfaceCell from a MeshFrameworkColumn
   Teuchos::RCP<Mesh>

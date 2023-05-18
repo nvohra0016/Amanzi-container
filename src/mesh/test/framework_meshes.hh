@@ -46,7 +46,7 @@ Teuchos::RCP<AmanziMesh::Mesh>  createStructuredUnitQuad(
   const Teuchos::RCP<const AmanziGeometry::GeometricModel>& gm=Teuchos::null,
   const Teuchos::RCP<Teuchos::ParameterList>& plist=Teuchos::null,
   double dx=1.0, double dy=1.0)
-{
+ {
   auto mesh_fw = createFrameworkStructuredUnitQuad(pref, nx, ny, comm, gm, plist, dx, dy);
   auto mesh = Teuchos::rcp(new AmanziMesh::Mesh(mesh_fw, Teuchos::rcp(new AmanziMesh::MeshAlgorithms()), Teuchos::null));
   return mesh;

@@ -87,7 +87,7 @@ class FunctionBilinearAndTime : public Function {
   }
 
   double operator()(const Kokkos::View<double*, Kokkos::HostSpace>& x) const;
-  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const;
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out, const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* ids = nullptr) const;
 
  private:
   std::unique_ptr<FunctionBilinear> Load_(const int i) const;

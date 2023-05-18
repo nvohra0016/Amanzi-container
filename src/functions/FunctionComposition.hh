@@ -62,23 +62,23 @@ class FunctionComposition : public Function {
     return (*f1_)(y);
   }
 
-  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out, const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* ids) const
   {
-    Kokkos::View<double*> out_1("out", out.extent(0));
+    Kokkos::View<double*> out_1("out", in.extent(1));
     Kokkos::View<double**> tmpin("tmpin", in.extent(0), in.extent(1));
     Kokkos::deep_copy(tmpin, in);
     f2_->apply(tmpin, out_1);
+
     // Change all first value
     Kokkos::parallel_for(
       "FunctionComposition::apply", in.extent(1), KOKKOS_LAMBDA(const int& j) {
         for (int i = 0; i < in.extent(0); ++i) tmpin(i, j) = out_1(i);
       });
-    f1_->apply(tmpin, out);
+    f1_->apply(tmpin, out, ids);
   }
 
  private:
   std::unique_ptr<Function> f1_, f2_;
-  // Function *f1_, *f2_;
 };
 
 } // namespace Amanzi

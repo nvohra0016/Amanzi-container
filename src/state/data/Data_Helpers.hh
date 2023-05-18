@@ -66,10 +66,10 @@ namespace Amanzi {
 // namespace Functions {
 // class BoundaryFunction;
 // }
-//struct TensorVector;
+struct TensorVector;
 class TreeVector;
 class TreeVectorSpace;
-class Patch;
+template<typename T> struct Patch;
 
 namespace Helpers {
 
@@ -249,44 +249,38 @@ Initialize<AmanziGeometry::Point>(Teuchos::ParameterList& plist,
 // ======================================================================
 // Specializations for WhetStone::Tensor
 // ======================================================================
-// template <>
-// inline bool
-// Initialize<TensorVector>(Teuchos::ParameterList& plist,
-//                          TensorVector& tensor)
-// {
-//   return true;
-// }
-
-
-// ======================================================================
-// Specializations for Functions::BoundaryFunction
-// ======================================================================
-// template <>
-// inline bool
-// Initialize<Functions::BoundaryFunction>(Teuchos::ParameterList& plist,
-//                                         Functions::BoundaryFunction& bc)
-// {
-//   return true;
-// }
-
-// template <>
-// inline void
-// Assign<Functions::BoundaryFunction>(Functions::BoundaryFunction& dest,
-//                                     const Functions::BoundaryFunction& source)
-// {
-//   Errors::Message msg("Functions::BoundaryFunction: assignment operator not supported.");
-//   Exceptions::amanzi_throw(msg);
-// }
-
-
-
-// ======================================================================
-// Specializations for Patch
-// ======================================================================
+// no support for checkpoint tensors yet... they should be functions only
+// anyway at this point and therefore need not be checkpointed.
 template <>
-bool
-Initialize<Patch>(Teuchos::ParameterList& plist,
-                  Patch& t);
+inline bool
+Initialize<TensorVector>(Teuchos::ParameterList& plist,
+                         TensorVector& tensor)
+{
+  return false;
+}
+
+// no support for vis of tensors
+template <>
+inline void
+WriteVis<TensorVector>(const Visualization& vis,
+                       Teuchos::ParameterList& attrs,
+                       const TensorVector& vec) {}
+
+// no support for checkpoint tensors yet... they should be functions only
+// anyway at this point and therefore need not be checkpointed.
+template<>
+inline void
+WriteCheckpoint<TensorVector>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        const TensorVector& vec) {}
+
+// no support for checkpoint tensors yet... they should be functions only
+// anyway at this point and therefore need not be checkpointed.
+template<>
+inline void
+ReadCheckpoint<TensorVector>(const Checkpoint& chkp,
+                             Teuchos::ParameterList& attrs,
+                             TensorVector& vec) {}
 
 
 } // namespace Helpers

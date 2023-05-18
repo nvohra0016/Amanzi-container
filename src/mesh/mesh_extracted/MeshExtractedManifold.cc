@@ -294,6 +294,9 @@ void MeshExtractedManifold::InitParentMaps(const std::string& setname)
     }
 
     auto marked_ents = EnforceOneLayerOfGhosts_(setname, kind_p, &setents);
+    std::cout << "Marked Ents" << std::endl;
+    for (auto ent : marked_ents)
+      std::cout << ent.first << "," << ent.second << std::endl;
 
     // extract owned ids
     auto& ids_p = entid_to_parent_[kind_d];
@@ -311,6 +314,7 @@ void MeshExtractedManifold::InitParentMaps(const std::string& setname)
     for (auto it = marked_ents.begin(); it != marked_ents.end(); ++it) {
       if (it->second == GHOST) ids_p[ids_p_s++] = it->first;
     }
+    AMANZI_ASSERT(ids_p_s == marked_ents.size());
 
     Kokkos::resize(ids_p, ids_p_s);
     // create reverse ordered map
@@ -373,9 +377,8 @@ void MeshExtractedManifold::TryExtension_(
 /* ******************************************************************
 * Limits the set of parent objects to only one layer of ghosts.
 ****************************************************************** */
-template<class Entity_ID_View_Type>
 std::map<Entity_ID, int> MeshExtractedManifold::EnforceOneLayerOfGhosts_(
-    const std::string& setname, Entity_kind kind, Entity_ID_View_Type* setents) const
+    const std::string& setname, Entity_kind kind, cEntity_ID_View* setents) const
 {
   // base set is the set of master cells
   cEntity_ID_View fullset;

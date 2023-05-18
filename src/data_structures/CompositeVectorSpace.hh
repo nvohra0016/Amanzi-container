@@ -21,6 +21,7 @@
 #include "dbc.hh"
 #include "AmanziTypes.hh"
 #include "MeshDefs.hh"
+#include "Mesh.hh"
 
 namespace Amanzi {
 

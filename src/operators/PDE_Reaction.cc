@@ -1,15 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators 
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
-
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 */
 
 #include <vector>
@@ -26,10 +23,9 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
- * Initialize operator from parameter list.
- ****************************************************************** */
-void
-PDE_Reaction::InitReaction_(Teuchos::ParameterList& plist)
+* Initialize operator from parameter list.
+****************************************************************** */
+void PDE_Reaction::InitReaction_(Teuchos::ParameterList& plist)
 {
   Teuchos::ParameterList& schema_list = plist.sublist("schema");
 
@@ -58,8 +54,7 @@ PDE_Reaction::InitReaction_(Teuchos::ParameterList& plist)
       cvs->AddComponent(name, kind, maps.first, maps.second, num);
     }
 
-    global_op_ =
-      Teuchos::rcp(new Operator_Schema(cvs, cvs, plist, global_schema_row_, global_schema_col_));
+    global_op_ = Teuchos::rcp(new Operator_Schema(cvs, cvs, plist, global_schema_row_, global_schema_col_));
     local_op_ = Teuchos::rcp(new Op_Cell_Schema(global_schema_row_, global_schema_col_, mesh_));
 
   } else {
@@ -67,7 +62,7 @@ PDE_Reaction::InitReaction_(Teuchos::ParameterList& plist)
     global_schema_row_ = global_op_->schema_row();
     global_schema_col_ = global_op_->schema_col();
 
-    mesh_ = global_op_->DomainMap().getMesh();
+    mesh_ = global_op_->DomainMap().Mesh();
     local_schema_row_.Init(mfd_, mesh_, base);
     local_schema_col_ = local_schema_row_;
 
@@ -80,19 +75,18 @@ PDE_Reaction::InitReaction_(Teuchos::ParameterList& plist)
 
 
 /* ******************************************************************
- * Collection of local matrices.
- ****************************************************************** */
-void
-PDE_Reaction::UpdateMatrices()
+* Collection of local matrices.
+****************************************************************** */
+void PDE_Reaction::UpdateMatrices()
 {
-  std::vector<WhetStone::DenseMatrix<>>& matrix = local_op_->matrices;
-  std::vector<WhetStone::DenseMatrix<>>& matrix_shadow = local_op_->matrices_shadow;
+  std::vector<WhetStone::DenseMatrix>& matrix = local_op_->matrices;
+  std::vector<WhetStone::DenseMatrix>& matrix_shadow = local_op_->matrices_shadow;
 
-  AmanziMesh::Entity_ID_View nodes;
-  int d = mesh_->getSpaceDimension();
+  AmanziMesh::Entity_ID_List nodes;
+  int d = mesh_->space_dimension();
 
-  WhetStone::DenseMatrix<> Mcell;
-  WhetStone:Tensor<> Kc(d, 1);
+  WhetStone::DenseMatrix Mcell;
+  WhetStone::Tensor Kc(d, 1);
 
   for (int c = 0; c < ncells_owned; ++c) {
     if (Kpoly_.get()) {
@@ -108,15 +102,14 @@ PDE_Reaction::UpdateMatrices()
 
 
 /* ******************************************************************
- * Populate containers of elemental matrices using MFD factory.
- ****************************************************************** */
-void
-PDE_Reaction::UpdateMatrices(double t)
+* Populate containers of elemental matrices using MFD factory.
+****************************************************************** */
+void PDE_Reaction::UpdateMatrices(double t) 
 {
   // verify type of coefficient
   AMANZI_ASSERT(Kpoly_st_.get());
 
-  std::vector<WhetStone::DenseMatrix<>>& matrix = local_op_->matrices;
+  std::vector<WhetStone::DenseMatrix>& matrix = local_op_->matrices;
 
   for (int c = 0; c < ncells_owned; ++c) {
     double tmp(t);
@@ -124,7 +117,7 @@ PDE_Reaction::UpdateMatrices(double t)
 
     matrix[c] = static_matrices_[c][0];
     for (int i = 1; i < size; ++i) {
-      matrix[c] += tmp * static_matrices_[c][i];
+      matrix[c] += tmp * static_matrices_[c][i]; 
       tmp *= t;
     }
   }
@@ -132,30 +125,29 @@ PDE_Reaction::UpdateMatrices(double t)
 
 
 /* *******************************************************************
- * Apply boundary condition to the local matrices
- ******************************************************************* */
-void
-PDE_Reaction::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
+* Apply boundary condition to the local matrices
+******************************************************************* */
+void PDE_Reaction::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
 {
-  for (auto bc = bcs_trial_.begin(); bc != bcs_trial_.end(); ++bc) {}
+  for (auto bc = bcs_trial_.begin(); bc != bcs_trial_.end(); ++bc) {
+  }
 }
 
 
 /* *******************************************************************
- * Space-time coefficients can be pre-processed.
- ******************************************************************* */
-void
-PDE_Reaction::CreateStaticMatrices_()
+* Space-time coefficients can be pre-processed.
+******************************************************************* */
+void PDE_Reaction::CreateStaticMatrices_()
 {
-  int d(mesh_->getSpaceDimension());
-  WhetStone::DenseMatrix<> Mcell;
+  int d(mesh_->space_dimension());
+  WhetStone::DenseMatrix Mcell;
 
   static_matrices_.resize(ncells_owned);
 
   for (int c = 0; c < ncells_owned; ++c) {
     int size = (*Kpoly_st_)[c].size();
     static_matrices_[c].clear();
-
+ 
     for (int i = 0; i < size; ++i) {
       mfd_->MassMatrix(c, (*Kpoly_st_)[c][i], Mcell);
       static_matrices_[c].push_back(Mcell);
@@ -165,5 +157,5 @@ PDE_Reaction::CreateStaticMatrices_()
   static_matrices_initialized_ = true;
 }
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi

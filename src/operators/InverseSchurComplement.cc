@@ -117,7 +117,7 @@ InverseSchurComplement::ApplyInverse(const CompositeVector& X, CompositeVector& 
         }
       }
 
-      T.GatherGhostedToMaster("face", Add);
+      T.gatherGhostedToMaster("face", Add);
 
       // Solve the Schur complement system Sff * Yf = Tf.
       {
@@ -127,7 +127,7 @@ InverseSchurComplement::ApplyInverse(const CompositeVector& X, CompositeVector& 
         AMANZI_ASSERT(ierr >= 0);
       }
 
-      Y.ScatterMasterToGhosted("face");
+      Y.scatterMasterToGhosted("face");
 
       {
         const Epetra_MultiVector& Yf = *Y.viewComponent("face", true);

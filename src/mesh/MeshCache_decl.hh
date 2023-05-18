@@ -732,10 +732,10 @@ struct MeshCache : public MeshCacheBase {
   void getCellEdges(const Entity_ID c,
                     cEntity_ID_View& edges) const;
 
-  // // Get nodes of a cell.
-  // template<AccessPattern_kind = AccessPattern_kind::DEFAULT>
-  // KOKKOS_INLINE_FUNCTION
-  // size_type getCellNumNodes(const Entity_ID c) const;
+  // Get nodes of a cell.
+  template<AccessPattern_kind = AccessPattern_kind::DEFAULT>
+  KOKKOS_INLINE_FUNCTION
+  size_type getCellNumNodes(const Entity_ID c) const;
 
   KOKKOS_INLINE_FUNCTION
   cEntity_ID_View getCellNodes(const Entity_ID c) const;

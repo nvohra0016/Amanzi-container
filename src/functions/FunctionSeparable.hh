@@ -66,19 +66,28 @@ class FunctionSeparable : public Function {
   }
 
 
-  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out, const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* ids) const
   {
     Kokkos::View<double**> y =
       Kokkos::subview(in,
                       Kokkos::make_pair(static_cast<size_t>(1), static_cast<size_t>(in.extent(0))),
                       Kokkos::ALL);
-    Kokkos::View<double*> out_1("out_1", out.extent(0));
+    Kokkos::View<double*> out_1("out_1", in.extent(1));
     f1_->apply(in, out_1);
-    f2_->apply(y, out);
-    Kokkos::parallel_for(
-      "FunctionSeparable::apply", out.extent(0), KOKKOS_LAMBDA(const int& i) {
-        out(i) *= out_1(i);
-      });
+    f2_->apply(y, out, ids);
+
+    if (ids) {
+      auto ids_loc = *ids;
+      Kokkos::parallel_for(
+        "FunctionSeparable::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(ids_loc(i)) *= out_1(i);
+        });
+    } else {
+      Kokkos::parallel_for(
+        "FunctionSeparable::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(i) *= out_1(i);
+        });
+    }
   }
 
  private:

@@ -177,8 +177,8 @@ ReconstructionCellPolynomial::Compute(const AmanziMesh::Entity_ID_View& ids,
     for (int i = 0; i < npoly; i++) poly[i][c] = rhs(i);
   }
 
-  poly_->ScatterMasterToGhosted();
-  ortho_->ScatterMasterToGhosted();
+  poly_->scatterMasterToGhosted();
+  ortho_->scatterMasterToGhosted();
 }
 
 

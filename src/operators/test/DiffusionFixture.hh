@@ -224,7 +224,7 @@ DiffusionFixture::SetScalarCoefficient(Operators::PDE_DiffusionFactory& opfactor
   if (kind == AmanziMesh::Entity_kind::CELL) {
     cvs.SetComponent("cell", AmanziMesh::Entity_kind::CELL, 1);
     kr = cvs.Create();
-    auto& kr_c = *kr->ViewComponent("cell", true);
+    auto& kr_c = *kr->viewComponent("cell", true);
     for (int c = 0; c != nents; ++c) {
       kr_c[0][c] = ana->ScalarDiffusivity(mesh->getCellCentroid(c), 0.0);
     }
@@ -232,7 +232,7 @@ DiffusionFixture::SetScalarCoefficient(Operators::PDE_DiffusionFactory& opfactor
   } else if (kind == AmanziMesh::Entity_kind::FACE) {
     cvs.SetComponent("face", AmanziMesh::Entity_kind::FACE, 1);
     kr = cvs.Create();
-    auto& kr_f = *kr->ViewComponent("face", true);
+    auto& kr_f = *kr->viewComponent("face", true);
     for (int f = 0; f != nents; ++f) {
       kr_f[0][f] = ana->ScalarDiffusivity(mesh->getFaceCentroid(f), 0.0);
     }
@@ -347,7 +347,7 @@ DiffusionFixture::Go(double tol)
   int ncells = mesh->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   CompositeVector& rhs = *global_op->rhs();
 
-  auto& rhs_c = *rhs.ViewComponent("cell", false);
+  auto& rhs_c = *rhs.viewComponent("cell", false);
   for (int c = 0; c != ncells; ++c) {
     const auto& xc = mesh->getCellCentroid(c);
     rhs_c[0][c] += ana->source_exact(xc, 0.0) * mesh->getCellVolume(c);
@@ -362,7 +362,7 @@ DiffusionFixture::Go(double tol)
 
   if (tol > 0.0) {
     // compute pressure error
-    Epetra_MultiVector& p = *solution->ViewComponent("cell", false);
+    Epetra_MultiVector& p = *solution->viewComponent("cell", false);
     double pnorm(0.0), pl2_err(0.0), pinf_err(0.0);
     ana->ComputeCellError(p, 0.0, pnorm, pl2_err, pinf_err);
 
@@ -372,7 +372,7 @@ DiffusionFixture::Go(double tol)
     op->UpdateMatrices(Teuchos::null, solution.ptr());
     op->UpdateFlux(solution.ptr(), flux.ptr());
 
-    Epetra_MultiVector& flx = *flux->ViewComponent("face", true);
+    Epetra_MultiVector& flx = *flux->viewComponent("face", true);
     ana->ComputeFaceError(flx, 0.0, unorm, ul2_err, uinf_err);
 
     auto MyPID = comm->getRank();

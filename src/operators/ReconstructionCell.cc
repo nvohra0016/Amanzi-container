@@ -1,15 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
-  provided in the top-level COPYRIGHT file.
-
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
   Operators
 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
+  provided in the top-level COPYRIGHT file.
+
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 */
 
 #include <algorithm>
@@ -19,7 +16,7 @@
 
 #include "DenseMatrix.hh"
 #include "lapack.hh"
-#include "MeshFramework.hh"
+#include "Mesh.hh"
 #include "OperatorDefs.hh"
 #include "Point.hh"
 #include "ReconstructionCell.hh"
@@ -28,23 +25,22 @@ namespace Amanzi {
 namespace Operators {
 
 /* ******************************************************************
- * Initialization of basic parameters.
- * NOTE: we assume that ghost values of field were already populated.
- ****************************************************************** */
-void
-ReconstructionCell::Init(Teuchos::RCP<const Epetra_MultiVector> field,
-                         Teuchos::ParameterList& plist,
-                         int component)
+* Initialization of basic parameters.
+* NOTE: we assume that ghost values of field were already populated.
+****************************************************************** */
+void ReconstructionCell::Init(Teuchos::RCP<const Epetra_MultiVector> field, 
+                              Teuchos::ParameterList& plist,
+                              int component)
 {
   field_ = field;
   component_ = component;
 
-  dim = mesh_->getSpaceDimension();
+  dim = mesh_->space_dimension();
 
   CompositeVectorSpace cv_space;
   cv_space.SetMesh(mesh_);
   cv_space.SetGhosted(true);
-  cv_space.SetComponent("cell", AmanziMesh::Entity_kind::CELL, dim);
+  cv_space.SetComponent("cell", AmanziMesh::CELL, dim);
 
   gradient_ = Teuchos::RCP<CompositeVector>(new CompositeVector(cv_space, true));
 
@@ -54,34 +50,32 @@ ReconstructionCell::Init(Teuchos::RCP<const Epetra_MultiVector> field,
 
 
 /* ******************************************************************
- * Gradient of linear reconstruction is based on stabilized
- * least-square fit.
- ****************************************************************** */
-void
-ReconstructionCell::ComputeGradient(const AmanziMesh::Entity_ID_List& ids)
+* Gradient of linear reconstruction is based on stabilized 
+* least-square fit.
+****************************************************************** */
+void ReconstructionCell::ComputeGradient(const AmanziMesh::Entity_ID_List& ids)
 {
   Epetra_MultiVector& grad = *gradient_->viewComponent("cell", false);
   AmanziMesh::Entity_ID_List cells;
   AmanziGeometry::Point xcc(dim);
 
-  WhetStone::DenseMatrix<> matrix(dim, dim);
-  WhetStone::DenseVector<> rhs(dim);
+  WhetStone::DenseMatrix matrix(dim, dim);
+  WhetStone::DenseVector rhs(dim);
 
-  int ncells_owned = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
+  int ncells_owned = mesh_->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::OWNED);
 
   for (int c = 0; c < ncells_owned; c++) {
-    const AmanziGeometry::Point& xc = mesh_->getCellCentroid(c)
+    const AmanziGeometry::Point& xc = mesh_->getCellCentroid(c);
 
-    // mesh_->cell_get_face_adj_cells(c, AmanziMesh::Parallel_kind::ALL,
-    // &cells);
+    // mesh_->cell_get_face_adj_cells(c, AmanziMesh::Parallel_kind::ALL, &cells);
     CellFaceAdjCellsNonManifold_(c, AmanziMesh::Parallel_kind::ALL, cells);
     int ncells = cells.size();
 
-    matrix.putScalar(0.0);
-    rhs.putScalar(0.0);
+    matrix.PutScalar(0.0);
+    rhs.PutScalar(0.0);
 
     for (int n = 0; n < ncells; n++) {
-      const AmanziGeometry::Point& xc2 = mesh_->getCellCentroid(cells[n])
+      const AmanziGeometry::Point& xc2 = mesh_->getCellCentroid(cells[n]);
       for (int i = 0; i < dim; i++) xcc[i] = xc2[i] - xc[i];
 
       double value = (*field_)[component_][cells[n]] - (*field_)[component_][c];
@@ -90,16 +84,16 @@ ReconstructionCell::ComputeGradient(const AmanziMesh::Entity_ID_List& ids)
 
     // improve robustness w.r.t degenerate matrices
     double det = matrix.Det();
-    double norm = matrix.normInf();
+    double norm = matrix.NormInf();
 
-    if (det < pow(norm, 1.0 / dim)) {
+    if (det < pow(norm, 1.0/dim)) {
       norm *= OPERATOR_RECONSTRUCTION_MATRIX_CORRECTION;
       for (int i = 0; i < dim; i++) matrix(i, i) += norm;
     }
 
     int info, nrhs = 1;
     WhetStone::DPOSV_F77("U", &dim, &nrhs, matrix.Values(), &dim, rhs.Values(), &dim, &info);
-    if (info) { // reduce reconstruction order
+    if (info) {  // reduce reconstruction order
       for (int i = 0; i < dim; i++) rhs(i) = 0.0;
     }
 
@@ -107,18 +101,16 @@ ReconstructionCell::ComputeGradient(const AmanziMesh::Entity_ID_List& ids)
     for (int i = 0; i < dim; i++) grad[i][c] = rhs(i);
   }
 
-  gradient_->ScatterMasterToGhosted("cell");
+  gradient_->scatterMasterToGhosted("cell");
 }
 
 
 /* ******************************************************************
- * Assemble a SPD least square matrix
- ****************************************************************** */
-void
-ReconstructionCell::PopulateLeastSquareSystem_(AmanziGeometry::Point& centroid,
-                                               double field_value,
-                                               WhetStone::DenseMatrix<>& matrix,
-                                               WhetStone::DenseVector<>& rhs)
+* Assemble a SPD least square matrix
+****************************************************************** */
+void ReconstructionCell::PopulateLeastSquareSystem_(
+    AmanziGeometry::Point& centroid, double field_value,
+    WhetStone::DenseMatrix& matrix, WhetStone::DenseVector& rhs)
 {
   for (int i = 0; i < dim; i++) {
     double xyz = centroid[i];
@@ -132,24 +124,23 @@ ReconstructionCell::PopulateLeastSquareSystem_(AmanziGeometry::Point& centroid,
 
 
 /* ******************************************************************
- * On intersecting manifolds, we extract neighboors living in the same
- * manifold using a smoothness criterion.
- ****************************************************************** */
-void
-ReconstructionCell::CellFaceAdjCellsNonManifold_(AmanziMesh::Entity_ID c,
-                                                 AmanziMesh::Parallel_kind ptype,
-                                                 std::vector<AmanziMesh::Entity_ID>& cells) const
+* On intersecting manifolds, we extract neighboors living in the same 
+* manifold using a smoothness criterion.
+****************************************************************** */
+void ReconstructionCell::CellFaceAdjCellsNonManifold_(
+    AmanziMesh::Entity_ID c, AmanziMesh::Parallel_kind ptype,
+    std::vector<AmanziMesh::Entity_ID>& cells) const
 {
   AmanziMesh::Entity_ID_List faces, fcells;
 
-  mesh_->getCellFaces(c, faces);
+  mesh_->cell_get_faces(c, &faces);
   int nfaces = faces.size();
 
   cells.clear();
 
   for (int n = 0; n < nfaces; ++n) {
     AmanziMesh::Entity_ID f = faces[n];
-    mesh_->getFaceCells(f, ptype, fcells);
+    mesh_->face_get_cells(f, ptype, &fcells);
     int ncells = fcells.size();
 
     if (ncells == 2) {
@@ -167,10 +158,10 @@ ReconstructionCell::CellFaceAdjCellsNonManifold_(AmanziMesh::Entity_ID c,
           double d = fabs(normal0 * normal1) / norm(normal1);
           if (d > dmax) {
             dmax = d;
-            cmax = c1;
+            cmax = c1; 
           }
         }
-      }
+      } 
 
       cells.push_back(cmax);
     }
@@ -179,13 +170,12 @@ ReconstructionCell::CellFaceAdjCellsNonManifold_(AmanziMesh::Entity_ID c,
 
 
 /* ******************************************************************
- * Calculates reconstructed value at point p.
- ****************************************************************** */
-double
-ReconstructionCell::getValue(int c, const AmanziGeometry::Point& p)
+* Calculates reconstructed value at point p.
+****************************************************************** */
+double ReconstructionCell::getValue(int c, const AmanziGeometry::Point& p)
 {
   Teuchos::RCP<Epetra_MultiVector> grad = gradient_->viewComponent("cell", false);
-  const auto& xc = mesh_->getCellCentroid(c)
+  const auto& xc = mesh_->getCellCentroid(c);
 
   double value = (*field_)[component_][c];
   for (int i = 0; i < dim; i++) value += (*grad)[i][c] * (p[i] - xc[i]);
@@ -194,16 +184,15 @@ ReconstructionCell::getValue(int c, const AmanziGeometry::Point& p)
 
 
 /* ******************************************************************
- * Calculates reconstructed value at point p using external gradient.
- ****************************************************************** */
-double
-ReconstructionCell::getValue(const AmanziGeometry::Point& gradient,
-                             int c,
-                             const AmanziGeometry::Point& p)
+* Calculates reconstructed value at point p using external gradient.
+****************************************************************** */
+double ReconstructionCell::getValue(
+    const AmanziGeometry::Point& gradient, int c, const AmanziGeometry::Point& p)
 {
-  const auto& xc = mesh_->getCellCentroid(c)
+  const auto& xc = mesh_->getCellCentroid(c);
   return (*field_)[component_][c] + gradient * (p - xc);
 }
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operator
+}  // namespace Amanzi
+

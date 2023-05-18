@@ -1,14 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 
   Collection of mesh deformation tools.
 */
@@ -16,65 +14,51 @@
 #ifndef AMANZI_OPERATOR_DEFORM_MESH_HH_
 #define AMANZI_OPERATOR_DEFORM_MESH_HH_
 
-#include "MeshFramework.hh"
+#include "Mesh.hh"
 #include "MeshCurved.hh"
 #include "CompositeVector.hh"
 
 #include "OperatorDefs.hh"
 
-namespace Amanzi {
+namespace Amanzi{
 
 // collection of routines for mesh deformation
-void
-DeformMesh(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
-           int deform,
-           double t,
-           const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0 = Teuchos::null);
+void DeformMesh(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1, int deform, double t,
+                const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0 = Teuchos::null);
 
-void
-DeformMeshCurved(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
-                 int deform,
-                 double t,
-                 const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0,
-                 int order);
+void DeformMeshCurved(
+    const Teuchos::RCP<AmanziMesh::Mesh>& mesh1, int deform, double t,
+    const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0, int order);
 
-AmanziGeometry::Point
-MovePoint(double t, const AmanziGeometry::Point& xv, int deform);
+AmanziGeometry::Point MovePoint(double t, const AmanziGeometry::Point& xv, int deform);
 
-AmanziGeometry::Point
-TaylorGreenVortex(double t, const AmanziGeometry::Point& xv);
-AmanziGeometry::Point
-Rotation2D(double t, const AmanziGeometry::Point& xv);
-AmanziGeometry::Point
-CompressionExpansion(double t, const AmanziGeometry::Point& xv);
-AmanziGeometry::Point
-BubbleFace3D(double t, const AmanziGeometry::Point& xv);
-AmanziGeometry::Point
-Unused(double t, const AmanziGeometry::Point& xv);
+AmanziGeometry::Point TaylorGreenVortex(double t, const AmanziGeometry::Point& xv);
+AmanziGeometry::Point Rotation2D(double t, const AmanziGeometry::Point& xv);
+AmanziGeometry::Point CompressionExpansion(double t, const AmanziGeometry::Point& xv);
+AmanziGeometry::Point BubbleFace3D(double t, const AmanziGeometry::Point& xv);
+AmanziGeometry::Point Unused(double t, const AmanziGeometry::Point& xv);
 
 
 /* *****************************************************************
- * Deform mesh1 using coordinates given by mesh0
- ***************************************************************** */
-inline void
-DeformMesh(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
-           int deform,
-           double t,
-           const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0)
+* Deform mesh1 using coordinates given by mesh0
+***************************************************************** */
+inline
+void DeformMesh(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1, int deform, double t,
+                const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0)
 {
-  if (mesh1->get_comm()->getRank() == 0) std::cout << "Deforming mesh...\n";
+  if (mesh1->get_comm()->MyPID() == 0) std::cout << "Deforming mesh...\n";
 
   // create distributed random vector
-  int d = mesh1->get_space_dimension();
+  int d = mesh1->space_dimension();
 
   // consistent parallel data are needed for the random mesh deformation
   AmanziMesh::Entity_ID_List bnd_ids;
   CompositeVectorSpace cvs;
-  cvs.SetMesh(mesh1)->SetGhosted(true)->AddComponent("node", AmanziMesh::Entity_kind::NODE, d);
+  cvs.SetMesh(mesh1)->SetGhosted(true)->AddComponent("node", AmanziMesh::NODE, d);
   CompositeVector random(cvs);
-  Epetra_MultiVector& random_n = *random.ViewComponent("node", true);
+  Epetra_MultiVector& random_n = *random.viewComponent("node", true);
 
-  int gid = mesh1->getMap(AmanziMesh::Entity_kind::NODE,false).MaxAllGID();
+  int gid = mesh1->node_map(false).MaxAllGID();
   double scale = 0.2 * std::pow(gid, -2.0 / d);
 
   if (deform == 7) {
@@ -83,8 +67,7 @@ DeformMesh(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
     random.ScatterMasterToGhosted();
 
     std::vector<double> vofs;
-    mesh1->get_set_entities_and_vofs(
-      "Boundary", AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL, &bnd_ids, &vofs);
+    mesh1->get_set_entities_and_vofs("Boundary", AmanziMesh::NODE, AmanziMesh::Parallel_kind::ALL, &bnd_ids, &vofs);
   }
 
   // relocate mesh nodes
@@ -92,21 +75,21 @@ DeformMesh(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
   AmanziMesh::Entity_ID_List nodeids;
   AmanziGeometry::Point_List new_positions, final_positions;
 
-  int nnodes = mesh1->getNumEntities(AmanziMesh::Entity_kind::NODE, AmanziMesh::Parallel_kind::ALL);
+  int nnodes = mesh1->getNumEntities(AmanziMesh::NODE, AmanziMesh::Parallel_kind::ALL);
 
   for (int v = 0; v < nnodes; ++v) {
-    if (mesh0.get())
-      xv = mesh0->getNodeCoordinate(v);
+    if (mesh0.get()) 
+      mesh0->node_get_coordinates(v, &xv);
     else
-      xv = mesh1->getNodeCoordinate(v);
-
+      mesh1->node_get_coordinates(v, &xv);
+      
     nodeids.push_back(v);
 
     if (deform == 7) {
       yv = xv;
-      if (std::find(bnd_ids.begin(), bnd_ids.end(), v) == bnd_ids.end()) {
+      if (std::find(bnd_ids.begin(), bnd_ids.end(), v) == bnd_ids.end()) { 
         for (int i = 0; i < d; ++i) yv[i] += random_n[i][v];
-      }
+      } 
     } else {
       yv = MovePoint(t, xv, deform);
     }
@@ -118,25 +101,23 @@ DeformMesh(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
 
 
 /* *****************************************************************
- * Deform high-order (curved) mesh1
- ***************************************************************** */
-inline void
-DeformMeshCurved(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
-                 int deform,
-                 double t,
-                 const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0,
-                 int order)
+* Deform high-order (curved) mesh1
+***************************************************************** */
+inline
+void DeformMeshCurved(
+    const Teuchos::RCP<AmanziMesh::Mesh>& mesh1, int deform, double t,
+    const Teuchos::RCP<const AmanziMesh::Mesh>& mesh0, int order)
 {
   DeformMesh(mesh1, deform, t, mesh0);
 
-  int dim = mesh1->get_space_dimension();
+  int dim = mesh1->space_dimension();
   if (order > 1) {
-    int nfaces = mesh0->getNumEntities(AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
-    auto ho_nodes0f = std::make_shared<std::vector<AmanziGeometry::Point_List>>(nfaces);
-    auto ho_nodes1f = std::make_shared<std::vector<AmanziGeometry::Point_List>>(nfaces);
+    int nfaces = mesh0->getNumEntities(AmanziMesh::FACE, AmanziMesh::Parallel_kind::ALL);
+    auto ho_nodes0f = std::make_shared<std::vector<AmanziGeometry::Point_List> >(nfaces);
+    auto ho_nodes1f = std::make_shared<std::vector<AmanziGeometry::Point_List> >(nfaces);
 
     for (int f = 0; f < nfaces; ++f) {
-      const AmanziGeometry::Point& xf = mesh0->getFaceCentroid(f)
+      const AmanziGeometry::Point& xf = mesh0->getFaceCentroid(f);
       (*ho_nodes0f)[f].push_back(xf);
 
       auto yv = MovePoint(t, xf, deform);
@@ -147,12 +128,12 @@ DeformMeshCurved(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
     Teuchos::rcp_static_cast<AmanziMesh::MeshCurved>(mesh1)->set_face_ho_nodes(ho_nodes1f);
 
     if (dim == 3) {
-      int nedges = mesh0->getNumEntities(AmanziMesh::Entity_kind::EDGE, AmanziMesh::Parallel_kind::ALL);
-      auto ho_nodes0e = std::make_shared<std::vector<AmanziGeometry::Point_List>>(nedges);
-      auto ho_nodes1e = std::make_shared<std::vector<AmanziGeometry::Point_List>>(nedges);
+      int nedges = mesh0->getNumEntities(AmanziMesh::EDGE, AmanziMesh::Parallel_kind::ALL);
+      auto ho_nodes0e = std::make_shared<std::vector<AmanziGeometry::Point_List> >(nedges);
+      auto ho_nodes1e = std::make_shared<std::vector<AmanziGeometry::Point_List> >(nedges);
 
       for (int e = 0; e < nedges; ++e) {
-        const AmanziGeometry::Point& xe = mesh0.getEdgeCentroid(e);
+        const AmanziGeometry::Point& xe = mesh0->edge_centroid(e);
         (*ho_nodes0e)[e].push_back(xe);
 
         auto yv = MovePoint(t, xe, deform);
@@ -166,18 +147,18 @@ DeformMeshCurved(const Teuchos::RCP<AmanziMesh::Mesh>& mesh1,
 
 
 /* *****************************************************************
- * Factory of point relocation methods
- ***************************************************************** */
-inline AmanziGeometry::Point
-MovePoint(double t, const AmanziGeometry::Point& xv, int deform)
+* Factory of point relocation methods
+***************************************************************** */
+inline
+AmanziGeometry::Point MovePoint(double t, const AmanziGeometry::Point& xv, int deform)
 {
   AmanziGeometry::Point yv(xv);
 
   switch (deform) {
-  case 1:
+  case 1: 
     yv = TaylorGreenVortex(t, xv);
     break;
-  case 2:
+  case 2: 
     yv = Unused(t, xv);
     break;
   case 4:
@@ -194,17 +175,17 @@ MovePoint(double t, const AmanziGeometry::Point& xv, int deform)
     break;
   default:
     break;
-  }
+ }
 
-  return yv;
+ return yv;
 }
 
 
 /* *****************************************************************
- * Taylor-Green vortex
- ***************************************************************** */
-inline AmanziGeometry::Point
-TaylorGreenVortex(double t, const AmanziGeometry::Point& xv)
+* Taylor-Green vortex
+***************************************************************** */
+inline
+AmanziGeometry::Point TaylorGreenVortex(double t, const AmanziGeometry::Point& xv)
 {
   int d = xv.dim();
   AmanziGeometry::Point uv(d), yv(xv);
@@ -214,10 +195,10 @@ TaylorGreenVortex(double t, const AmanziGeometry::Point& xv)
   for (int i = 0; i < n; ++i) {
     if (d == 2) {
       uv[0] = 0.2 * std::sin(M_PI * yv[0]) * std::cos(M_PI * yv[1]);
-      uv[1] = -0.2 * std::cos(M_PI * yv[0]) * std::sin(M_PI * yv[1]);
+      uv[1] =-0.2 * std::cos(M_PI * yv[0]) * std::sin(M_PI * yv[1]);
     } else {
       uv[0] = 0.2 * std::sin(M_PI * yv[0]) * std::cos(M_PI * yv[1]) * std::sin(M_PI * yv[2] / 2);
-      uv[1] = -0.2 * std::cos(M_PI * yv[0]) * std::sin(M_PI * yv[1]) * std::sin(M_PI * yv[2] / 2);
+      uv[1] =-0.2 * std::cos(M_PI * yv[0]) * std::sin(M_PI * yv[1]) * std::sin(M_PI * yv[2] / 2);
       uv[2] = 0.0;
     }
     yv += uv * ds;
@@ -228,10 +209,10 @@ TaylorGreenVortex(double t, const AmanziGeometry::Point& xv)
 
 
 /* *****************************************************************
- * Rotation
- ***************************************************************** */
-inline AmanziGeometry::Point
-Rotation2D(double t, const AmanziGeometry::Point& xv)
+* Rotation
+***************************************************************** */
+inline
+AmanziGeometry::Point Rotation2D(double t, const AmanziGeometry::Point& xv)
 {
   double phi = t * 2 * M_PI;
   double cs(std::cos(phi)), sn(std::sin(phi));
@@ -244,10 +225,10 @@ Rotation2D(double t, const AmanziGeometry::Point& xv)
 
 
 /* *****************************************************************
- * Compression/Expansion
- ***************************************************************** */
-inline AmanziGeometry::Point
-CompressionExpansion(double t, const AmanziGeometry::Point& xv)
+* Compression/Expansion
+***************************************************************** */
+inline
+AmanziGeometry::Point CompressionExpansion(double t, const AmanziGeometry::Point& xv)
 {
   AmanziGeometry::Point yv(xv);
   int d = xv.dim();
@@ -261,10 +242,10 @@ CompressionExpansion(double t, const AmanziGeometry::Point& xv)
 
 
 /* *****************************************************************
- * Bubble face in Z-direction
- ***************************************************************** */
-inline AmanziGeometry::Point
-BubbleFace3D(double t, const AmanziGeometry::Point& xv)
+* Bubble face in Z-direction
+***************************************************************** */
+inline
+AmanziGeometry::Point BubbleFace3D(double t, const AmanziGeometry::Point& xv)
 {
   AmanziGeometry::Point yv(xv);
   yv[2] += 8 * xv[0] * xv[1] * xv[2] * (1.0 - xv[0]) * (1.0 - xv[1]) * (1.0 - xv[2]);
@@ -273,10 +254,10 @@ BubbleFace3D(double t, const AmanziGeometry::Point& xv)
 
 
 /* *****************************************************************
- * Unused deformations
- ***************************************************************** */
-inline AmanziGeometry::Point
-Unused(double t, const AmanziGeometry::Point& xv)
+* Unused deformations
+***************************************************************** */
+inline
+AmanziGeometry::Point Unused(double t, const AmanziGeometry::Point& xv)
 {
   AmanziGeometry::Point yv(2);
   yv[0] = xv[0] * xv[1] + (1.0 - xv[1]) * std::pow(xv[0], 0.8);
@@ -284,6 +265,6 @@ Unused(double t, const AmanziGeometry::Point& xv)
   return yv;
 }
 
-} // namespace Amanzi
+}  // namespace Amanzi
 
 #endif

@@ -11,13 +11,24 @@
 
 #include "Kokkos_Core.hpp"
 #include "Kokkos_DualView.hpp"
-
 #include "Iterators.hh"
 
+enum class MemSpace_kind {
+  HOST,
+  DEVICE
+};
+
+
+//
+// NOTE: begin/end must live in Kokkos namespace to work!
+//
+// This simply allows ranged-based for loops on Kokkos Views that are on host.
+// We use this a lot...
+//
 namespace Kokkos {
 
 template<class DataType, class... Properties>
-struct MeshView: public Kokkos::View<DataType, Properties...>{
+struct MeshView: public Kokkos::View<DataType, Properties...> {
 
   using baseView = Kokkos::View<DataType, Properties...>;
   using baseView::baseView;
@@ -62,7 +73,7 @@ struct MeshView: public Kokkos::View<DataType, Properties...>{
     return const_iterator(*this, this->size());
   }
 
-  void insert(iterator v0_e, iterator v1_b, iterator v1_e) {
+  void insert(iterator v0_e, const_iterator v1_b, const_iterator v1_e) {
     //assert(v0_e - *this->end() != 0 && "Only insert at end supported for MeshViews");
     std::size_t size = v1_e-v1_b;
     std::size_t csize = this->size();
@@ -79,7 +90,7 @@ struct MeshView: public Kokkos::View<DataType, Properties...>{
 };
 
 template<class SubDataType, class... SubProperties, class... Args>
-MeshView<SubDataType, SubProperties...> subview(Kokkos::MeshView<SubDataType, SubProperties...> v, Args... args){
+MeshView<SubDataType, SubProperties...> subview(Kokkos::MeshView<SubDataType, SubProperties...> v, Args... args) {
   MeshView ret(Kokkos::subview((typename Kokkos::MeshView<SubDataType, SubProperties...>::baseView)v, std::forward<Args>(args)...));
   return ret;
 }
@@ -152,6 +163,3 @@ struct MeshDualView: public Kokkos::ViewTraits<DataType, Arg1Type, Arg2Type, Arg
 };
 
 } // namespace Kokkos
-
-
-

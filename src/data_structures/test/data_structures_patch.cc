@@ -53,7 +53,7 @@ SUITE(PATCH)
 
     space.addPatch("box1", CELL, 2);
     space.addPatch("box2", CELL, 2);
-    auto mp = space.Create();
+    auto mp = space.Create<double>();
 
     auto p1 = (*mp)[0];
     CHECK_EQUAL(2, p1.data.extent(0));

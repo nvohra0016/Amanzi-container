@@ -1,13 +1,15 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
+  Copyright 2010-201x held jointly by participating institutions.
   Amanzi is released under the three-clause BSD License.
   The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
+  Authors:
+      Konstantin Lipnikov (lipnikov@lanl.gov)
 */
 
 //! Simple struct of views for BCs with first-touch initialization.
+
 #ifndef AMANZI_OPERATORS_BC_HH_
 #define AMANZI_OPERATORS_BC_HH_
 
@@ -16,7 +18,7 @@
 #include "Teuchos_RCP.hpp"
 
 #include "WhetStoneDefs.hh"
-#include "MeshFrameworkTraits.hh"
+#include "Mesh.hh"
 #include "OperatorDefs.hh"
 #include "CompositeVectorSpace.hh"
 #include "CompositeVector.hh"
@@ -116,7 +118,7 @@ class BCs {
   BCs(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
       AmanziMesh::Entity_kind kind,
       WhetStone::DOF_Type type)
-    : kind_(kind), type_(type), kind_str_(AmanziMesh::to_string(kind))
+      : kind_(kind), type_(type), kind_str_(AmanziMesh::to_string(kind))
   {
     cvs_.SetMesh(mesh);
     cvs_.SetGhosted(true);
@@ -134,37 +136,33 @@ class BCs {
 
   Teuchos::RCP<CompositeVector_<int>> model() { return model_; };
   Teuchos::RCP<CompositeVector> value() { return value_; }
-  Teuchos::RCP<CompositeVector> mixed()
-  {
+  Teuchos::RCP<CompositeVector> mixed() {
     if (!mixed_.get()) mixed_ = cvs_.Create();
     return mixed_;
   }
 
 
-  Kokkos::View<int*, Amanzi::HostSpaceSpecial> bc_model_host(bool ghosted = true)
+  Kokkos::View<int*,Amanzi::HostSpaceSpecial> bc_model_host(bool ghosted=true)
   {
-    return Kokkos::subview(
-      model_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
+    return Kokkos::subview(model_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
   }
 
 
-  Kokkos::View<double*, Amanzi::HostSpaceSpecial> bc_value_host(bool ghosted = true)
+  Kokkos::View<double*, Amanzi::HostSpaceSpecial> bc_value_host(bool ghosted=true)
   {
-    return Kokkos::subview(
-      value_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
+    return Kokkos::subview(value_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
   }
 
-  Kokkos::View<double*, Amanzi::HostSpaceSpecial> bc_mixed_host(bool ghosted = true)
+  Kokkos::View<double*,Amanzi::HostSpaceSpecial> bc_mixed_host(bool ghosted=true)
   {
     if (!mixed_.get()) mixed_ = cvs_.Create();
-    return Kokkos::subview(
-      mixed_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
+    return Kokkos::subview(mixed_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
   }
 
   // Kokkos::View<AmanziGeometry::Point*> bc_value_point()
   // {
   //   if (bc_value_point_.size() == 0) {
-  //     AmanziGeometry::Point p(mesh_->get_getSpaceDimension());
+  //     AmanziGeometry::Point p(mesh_->space_dimension());
   //     int nent = mesh_->getNumEntities(kind_, AmanziMesh::Parallel_kind::ALL);
   //     Kokkos::resize(bc_value_point_, nent);
   //   }
@@ -180,16 +178,13 @@ class BCs {
   //   return bc_value_vector_;
   // }
 
-  Kokkos::View<int*> bc_model(bool ghosted = true) const
-  {
+  Kokkos::View<int*> bc_model(bool ghosted=true) const {
     return Kokkos::subview(model_->viewComponent(kind_str_, ghosted), Kokkos::ALL, 0);
   }
-  Kokkos::View<double*> bc_value(bool ghosted = true) const
-  {
+  Kokkos::View<double*> bc_value(bool ghosted=true) const {
     return Kokkos::subview(value_->viewComponent(kind_str_, ghosted), Kokkos::ALL, 0);
   }
-  Kokkos::View<double*> bc_mixed(bool ghosted = true) const
-  {
+  Kokkos::View<double*> bc_mixed(bool ghosted=true) const {
     if (!mixed_.get()) mixed_ = cvs_.Create();
     return Kokkos::subview(mixed_->viewComponent(kind_str_, ghosted), Kokkos::ALL, 0);
   }
@@ -212,22 +207,25 @@ class BCs {
   Teuchos::RCP<CompositeVector_<int>> model_;
   Teuchos::RCP<CompositeVector> value_;
   mutable Teuchos::RCP<CompositeVector> mixed_;
+
 };
 
 class BCs_Factory {
  public:
-  BCs_Factory() {}
+  BCs_Factory () {}
 
   void set_mesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) { mesh_ = mesh; }
   void set_type(WhetStone::DOF_Type type) { type_ = type; }
-  void set_entity_kind(AmanziMesh::Entity_kind kind) { kind_ = kind; }
+  void set_createEntityKind(AmanziMesh::Entity_kind kind) { kind_ = kind; }
   void set_parameterlist(Teuchos::ParameterList& plist) { plist_ = plist; }
 
   Teuchos::RCP<const AmanziMesh::Mesh> mesh() const { return mesh_; }
-  AmanziMesh::Entity_kind entity_kind() const { return kind_; }
+  AmanziMesh::Entity_kind createEntityKind() const { return kind_; }
   WhetStone::DOF_Type type() const { return type_; }
 
-  Teuchos::RCP<BCs> Create() const { return Teuchos::rcp(new BCs(mesh_, kind_, type_)); }
+  Teuchos::RCP<BCs> Create() const {
+    return Teuchos::rcp(new BCs(mesh_, kind_, type_));
+  }
 
  private:
   Teuchos::RCP<const AmanziMesh::Mesh> mesh_;

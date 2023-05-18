@@ -55,23 +55,23 @@ MeshFactory::create(const Teuchos::RCP<const Mesh>& parent_mesh,
 // Create a 1D Column Mesh from a columnar structured volume mesh.
 //
 Teuchos::RCP<Mesh>
-MeshFactory::createColumn(const Teuchos::RCP<Mesh>& parent, int col_id)
+MeshFactory::createColumn(const Teuchos::RCP<Mesh>& parent,
+                          int col_id,
+                          const Teuchos::RCP<Teuchos::ParameterList>& plist)
 {
+  AMANZI_ASSERT(col_id >= 0);
+  AMANZI_ASSERT(col_id < parent->columns.num_columns_owned);
+
   // create a framework of the extracted 3D column
   parent->buildColumns();
-  Teuchos::RCP<MeshFramework> column_extracted_3D =
-    MeshFrameworkFactory::create(parent,
-            parent->columns.getCells<MemSpace_kind::HOST>(col_id),
-            Entity_kind::CELL, false);
 
-  // create the MeshFrameworkColumn
-  Teuchos::RCP<MeshFramework> column_1D =
-    Teuchos::rcp(new MeshFrameworkColumn(column_extracted_3D, plist_));
+  // create the extracted mesh of the column of cells
+  MeshFrameworkFactory fac(getCommSelf(), parent->getGeometricModel(), plist);
+  auto col_list = parent->columns.getCells<MemSpace_kind::HOST>(col_id);
+  auto extracted_mesh = fac.create(parent, col_list, Entity_kind::CELL, false);
 
-  // create and return the Mesh
-  auto mesh = Teuchos::rcp(new Mesh(column_1D, Teuchos::rcp(new MeshColumnAlgorithms()), Teuchos::null));
-  mesh->setParentMesh(parent);
-  return mesh;
+  // create the MeshColumn object
+  return Teuchos::rcp(new Mesh(extracted_mesh, Teuchos::rcp(new MeshAlgorithms()), plist));
 }
 
 // Create a MeshSurfaceCell from a MeshFrameworkColumn

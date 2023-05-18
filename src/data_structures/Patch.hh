@@ -70,7 +70,7 @@ struct PatchSpace {
 //
 // A collection of independent patch spaces.  Conceptually these should share
 // the same entity_kind, ghosted, mesh, and num_vectors.
-struct MultiPatch;
+template<typename T> struct MultiPatch;
 
 struct MultiPatchSpace {
   Teuchos::RCP<const AmanziMesh::Mesh> mesh;
@@ -86,7 +86,8 @@ struct MultiPatchSpace {
     : mesh(mesh_), ghosted(ghosted_), flag_type(flag_type_), flag_entity(AmanziMesh::UNKNOWN)
   {}
 
-  Teuchos::RCP<MultiPatch> Create() const;
+  template<typename T>
+  Teuchos::RCP<MultiPatch<T>> Create() const;
 
   const PatchSpace& operator[](const int& i) const { return subspaces_[i]; }
 
@@ -120,8 +121,9 @@ struct MultiPatchSpace {
 //
 // A set of entity IDs and data on those entities.
 //
+template<typename T>
 struct Patch {
-  using ViewType = Kokkos::View<double**, Kokkos::LayoutLeft>;
+  using ViewType = Kokkos::View<T**, Kokkos::LayoutLeft>;
 
   Patch(const PatchSpace& space_) : space(space_)
   {
@@ -143,36 +145,38 @@ struct Patch {
 //
 // A collection of Patches that share contiguous memory.
 //
+template<typename T>
 struct MultiPatch {
   explicit MultiPatch(const MultiPatchSpace& space_) : space(space_)
   {
-    for (const auto& subspace : space) patches_.emplace_back(Patch{ subspace });
+    for (const auto& subspace : space) patches_.emplace_back(Patch<T>{ subspace });
   }
 
-  using iterator = typename std::vector<Patch>::iterator;
+  using iterator = typename std::vector<Patch<T>>::iterator;
   iterator begin() { return patches_.begin(); }
   iterator end() { return patches_.end(); }
   std::size_t size() const { return patches_.size(); }
 
-  using const_iterator = typename std::vector<Patch>::const_iterator;
+  using const_iterator = typename std::vector<Patch<T>>::const_iterator;
   const_iterator begin() const { return patches_.begin(); }
   const_iterator end() const { return patches_.end(); }
 
-  Patch& operator[](const int& i) { return patches_[i]; }
+  Patch<T>& operator[](const int& i) { return patches_[i]; }
 
-  const Patch& operator[](const int& i) const { return patches_[i]; }
+  const Patch<T>& operator[](const int& i) const { return patches_[i]; }
 
   MultiPatchSpace space;
 
  protected:
-  std::vector<Patch> patches_;
+  std::vector<Patch<T>> patches_;
 };
 
 
-inline Teuchos::RCP<MultiPatch>
+template<typename T>
+Teuchos::RCP<MultiPatch<T>>
 MultiPatchSpace::Create() const
 {
-  return Teuchos::rcp(new MultiPatch(*this));
+  return Teuchos::rcp(new MultiPatch<T>(*this));
 }
 
 } // namespace Amanzi

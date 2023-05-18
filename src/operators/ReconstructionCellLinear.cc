@@ -107,7 +107,7 @@ ReconstructionCellLinear::Compute(const AmanziMesh::Entity_ID_View& ids,
     for (int i = 0; i < dim; i++) grad[i][c] = rhs(i);
   }
 
-  gradient_->ScatterMasterToGhosted("cell");
+  gradient_->scatterMasterToGhosted("cell");
 }
 
 

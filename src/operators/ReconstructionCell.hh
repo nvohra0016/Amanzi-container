@@ -1,17 +1,15 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
-  provided in the top-level COPYRIGHT file.
-
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
   Operators
 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
+  provided in the top-level COPYRIGHT file.
+
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
+
   At the moment, we require the input field to have valid values
-  in ghost cells.
+  in ghost cells. 
 */
 
 #ifndef AMANZI_RECONSTRUCTION_CELL_HH_
@@ -24,7 +22,7 @@
 #include "CompositeVector.hh"
 #include "DenseMatrix.hh"
 #include "DenseVector.hh"
-#include "MeshFramework.hh"
+#include "Mesh.hh"
 #include "Point.hh"
 
 #include "Reconstruction.hh"
@@ -33,22 +31,20 @@
 namespace Amanzi {
 namespace Operators {
 
-class ReconstructionCell : public Reconstruction {
+class ReconstructionCell : public Reconstruction {  
  public:
-  ReconstructionCell(){};
-  ReconstructionCell(Teuchos::RCP<const Amanzi::AmanziMesh::Mesh> mesh) : Reconstruction(mesh){};
-  ~ReconstructionCell(){};
+  ReconstructionCell() {};
+  ReconstructionCell(Teuchos::RCP<const Amanzi::AmanziMesh::Mesh> mesh) : Reconstruction(mesh) {};
+  ~ReconstructionCell() {};
 
   // save pointer to the already distributed field.
   virtual void Init(Teuchos::RCP<const Epetra_MultiVector> field,
-                    Teuchos::ParameterList& plist,
-                    int component = 0) override;
+                    Teuchos::ParameterList& plist, int component = 0) override;
 
   // unlimited gradient
   // -- compute gradient and keep it internally
-  virtual void ComputeGradient() override
-  {
-    int ncells_wghost = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
+  virtual void ComputeGradient() override {
+    int ncells_wghost = mesh_->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::ALL);
     AmanziMesh::Entity_ID_List ids(ncells_wghost);
     for (int c = 0; c < ncells_wghost; ++c) ids[c] = c;
     ComputeGradient(ids);
@@ -67,21 +63,20 @@ class ReconstructionCell : public Reconstruction {
  private:
   void PopulateLeastSquareSystem_(AmanziGeometry::Point& centroid,
                                   double field_value,
-                                  WhetStone::DenseMatrix<>& matrix,
-                                  WhetStone::DenseVector<>& rhs);
+                                  WhetStone::DenseMatrix& matrix,
+                                  WhetStone::DenseVector& rhs);
 
-  // On intersecting manifolds, we extract neighboors living in the same
-  // manifold using a smoothness criterion.
+  // On intersecting manifolds, we extract neighboors living in the same manifold
+  // using a smoothness criterion.
   void CellFaceAdjCellsNonManifold_(AmanziMesh::Entity_ID c,
                                     AmanziMesh::Parallel_kind ptype,
                                     std::vector<AmanziMesh::Entity_ID>& cells) const;
-
  private:
   int dim, poly_order_;
   Teuchos::RCP<CompositeVector> gradient_;
 };
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
 
 #endif

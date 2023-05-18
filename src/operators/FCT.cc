@@ -68,9 +68,9 @@ FCT::Compute(const CompositeVector& flux_lo,
     }
   }
 
-  dlo.GatherGhostedToMaster();
-  pos.GatherGhostedToMaster();
-  neg.GatherGhostedToMaster();
+  dlo.gatherGhostedToMaster();
+  pos.gatherGhostedToMaster();
+  neg.gatherGhostedToMaster();
 
   // collect cell-limiters for positive and negative fluxes
   const auto& bc_model = bc.bc_model();
@@ -107,8 +107,8 @@ FCT::Compute(const CompositeVector& flux_lo,
     pos_c[0][c] = std::fabs(Qmax);
   }
 
-  pos.ScatterMasterToGhosted();
-  neg.ScatterMasterToGhosted();
+  pos.scatterMasterToGhosted();
+  neg.scatterMasterToGhosted();
 
   // move cell-limiters to face limiters
   for (int f = 0; f < nfaces_owned; ++f) {

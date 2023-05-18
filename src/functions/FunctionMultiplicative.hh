@@ -60,16 +60,26 @@ class FunctionMultiplicative : public Function {
     return (*f1_)(x) * (*f2_)(x);
   }
 
-  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out, const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* ids) const
   {
-    Kokkos::View<double*> out_1("out_1", in.extent(1));
-    Kokkos::View<double*> out_2("out_2", in.extent(1));
+    Kokkos::View<double*> out_1("result", in.extent(1));
+    Kokkos::View<double*> out_2("result", in.extent(1));
     f1_->apply(in, out_1);
     f2_->apply(in, out_2);
-    Kokkos::parallel_for(
-      "FunctionMultiplication::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
-        out(i) = out_1(i) * out_2(i);
-      });
+
+    // Sum result
+    if (ids) {
+      auto ids_loc = *ids;
+      Kokkos::parallel_for(
+        "FunctionAdditive::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(ids_loc(i)) = out_1(i) * out_2(i);
+        });
+    } else {
+      Kokkos::parallel_for(
+        "FunctionAdditive::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(i) = out_1(i) * out_2(i);
+        });
+    }
   }
 
  private:

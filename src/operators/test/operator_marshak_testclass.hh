@@ -1,12 +1,3 @@
-/*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
-  provided in the top-level COPYRIGHT file.
-
-  Authors:
-*/
-
 #ifndef OPERATOR_MARSHAK_TESTCLASS_HH_
 #define OPERATOR_MARSHAK_TESTCLASS_HH_
 
@@ -18,64 +9,65 @@
 
 #include "Teuchos_RCP.hpp"
 
-namespace Amanzi {
+namespace Amanzi{
 
 class HeatConduction {
  public:
   HeatConduction(Teuchos::RCP<const AmanziMesh::Mesh> mesh, double T0)
-    : mesh_(mesh), TemperatureFloor(T0), TemperatureSource(100.0)
-  {
+    : mesh_(mesh),
+      TemperatureFloor(T0),
+      TemperatureSource(100.0) { 
     auto cvs = Teuchos::rcp(new CompositeVectorSpace());
-    cvs->SetMesh(mesh_)
-      ->SetGhosted(true)
-      ->AddComponent("cell", AmanziMesh::Entity_kind::CELL, 1)
-      ->AddComponent("face", AmanziMesh::Entity_kind::FACE, 1)
-      ->AddComponent("dirichlet_faces", AmanziMesh::Entity_kind::BOUNDARY_FACE, 1);
+    cvs->SetMesh(mesh_)->SetGhosted(true)
+        ->AddComponent("cell", AmanziMesh::CELL, 1)
+        ->AddComponent("face", AmanziMesh::FACE, 1)
+        ->AddComponent("dirichlet_faces", AmanziMesh::BOUNDARY_FACE, 1);
 
     values_ = cvs->Create();
     derivatives_ = cvs->Create();
   }
-  ~HeatConduction(){};
+  ~HeatConduction() {};
 
   // main members
-  void UpdateValues(const CompositeVector& u, Operators::BCs& bcs)
-  {
-    const auto uc = u.ViewComponent<Amanzi::MirrorHost>("cell", true);
-    auto values_c = values_->ViewComponent<Amanzi::MirrorHost>("cell", true);
-    auto derivs_c = derivatives_->ViewComponent<Amanzi::MirrorHost>("cell", true);
+  void UpdateValues(const CompositeVector& u,
+                    Operators::BCs& bcs) {
+    const auto uc = u.viewComponent<Amanzi::MirrorHost>("cell", true); 
+    auto values_c = values_->viewComponent<Amanzi::MirrorHost>("cell", true);
+    auto derivs_c = derivatives_->viewComponent<Amanzi::MirrorHost>("cell", true);
     auto bc_value = bcs.bc_value();
     auto bc_model = bcs.bc_model();
 
-    int ncells = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::ALL);
+    int ncells = mesh_->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::ALL);
     for (int c = 0; c < ncells; c++) {
-      values_c(c, 0) = std::pow(uc(c, 0), 3.0);
-      derivs_c(c, 0) = 3.0 * std::pow(uc(c, 0), 2.0);
+      values_c(c,0) = std::pow(uc(c,0), 3.0);
+      derivs_c(c,0) = 3.0 * std::pow(uc(c,0), 2.0);
     }
 
     // add boundary face component
-    auto vbf = values_->ViewComponent<Amanzi::MirrorHost>("dirichlet_faces", true);
-    auto dbf = derivatives_->ViewComponent<Amanzi::MirrorHost>("dirichlet_faces", true);
+    auto vbf = values_->viewComponent<Amanzi::MirrorHost>("dirichlet_faces", true);
+    auto dbf = derivatives_->viewComponent<Amanzi::MirrorHost>("dirichlet_faces", true);
     auto ext_face_map = mesh_->exterior_face_map(true);
-    auto face_map = mesh_->getMap(AmanziMesh::Entity_kind::FACE,true);
-    for (int f = 0; f != face_map->getLocalNumElements(); ++f) {
+    auto face_map = mesh_->face_map(true);
+    for (int f=0; f!=face_map->getLocalNumElements(); ++f) {
       if (bc_model[f] == Operators::OPERATOR_BC_DIRICHLET) {
         AmanziMesh::Entity_ID_View cells;
         mesh_->face_get_cells(f, AmanziMesh::Parallel_kind::ALL, cells);
         AMANZI_ASSERT(cells.size() == 1);
         int bf = ext_face_map->getLocalElement(face_map->getGlobalElement(f));
-        vbf(bf, 0) = std::pow(bc_value[f], 3.0);
-        dbf(bf, 0) = 3.0 * std::pow(bc_value[f], 2.0);
+        vbf(bf,0) = std::pow(bc_value[f], 3.0);
+        dbf(bf,0) = 3.0 * std::pow(bc_value[f], 2.0);
       }
     }
+    
+
   }
 
   double Conduction(int c, double T) const { return T * T * T; }
 
   Teuchos::RCP<CompositeVector> values() { return values_; }
   Teuchos::RCP<CompositeVector> derivatives() { return derivatives_; }
-
-  double exact(double t, const Amanzi::AmanziGeometry::Point& p)
-  {
+ 
+  double exact(double t, const Amanzi::AmanziGeometry::Point& p) {
     double x = p[0], c = 0.4;
     double xi = c * t - x;
     return (xi > 0.0) ? std::pow(3 * c * (c * t - x), 1.0 / 3) : TemperatureFloor;
@@ -90,6 +82,6 @@ class HeatConduction {
   Teuchos::RCP<CompositeVector> values_, derivatives_;
 };
 
-} // namespace Amanzi
+}  // namespace Amanzi
 
 #endif

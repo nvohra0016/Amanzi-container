@@ -1,13 +1,15 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
+  Copyright 2010-201x held jointly by participating institutions.
   Amanzi is released under the three-clause BSD License.
   The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
-  Authors: Daniil Svyatsky(dasvyat@lanl.gov)
+  Authors:
+      Daniil Svyatsky(dasvyat@lanl.gov)
 */
 
 //! <MISSING_ONELINE_DOCSTRING>
+
 #ifndef AMANZI_OPERATOR_WITH_CELLBND_HH_
 #define AMANZI_OPERATOR_WITH_CELLBND_HH_
 
@@ -22,18 +24,17 @@ class Operator_CellBndFace : public Operator_Cell {
   // main constructor
   //   The CVS is the domain and range of the operator
   Operator_CellBndFace(const Teuchos::RCP<const CompositeSpace>& cvs,
-                       Teuchos::ParameterList& plist,
-                       int schema)
+                       Teuchos::ParameterList& plist, int schema)
     : Operator_Cell(cvs, plist, schema)
   {
     set_schema_string("CELLBNDFACE");
   }
 
   // visit methods for apply
-  virtual int ApplyMatrixFreeOp(const Op_Face_CellBndFace& op,
-                                const CompositeVector& X,
-                                CompositeVector& Y) const;
-
+  virtual int
+  ApplyMatrixFreeOp(const Op_Face_CellBndFace& op, const CompositeVector& X,
+                    CompositeVector& Y) const;
+  
   virtual void getLocalDiagCopy(CompositeVector& X) const;
 
   // virtual int
@@ -45,8 +46,7 @@ class Operator_CellBndFace : public Operator_Cell {
 
   // // visit methods for symbolic assemble
   // virtual void
-  // SymbolicAssembleMatrixOp(const Op_Face_CellBndFace& op, const SuperMap&
-  // map,
+  // SymbolicAssembleMatrixOp(const Op_Face_CellBndFace& op, const SuperMap& map,
   //                          GraphFE& graph, int my_block_row,
   //                          int my_block_col) const;
 

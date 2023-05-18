@@ -63,7 +63,7 @@ class BIndependent : public EvaluatorIndependent<CompositeVector, CompositeVecto
   {
     double cv = s.GetMesh()->getCellVolume(0);
     auto& b = s.GetW<CompositeVector>(my_key_, my_tag_, my_key_);
-    b.ViewComponent("cell", false)->putScalar(-4. * cv);
+    b.viewComponent("cell", false)->putScalar(-4. * cv);
   }
 };
 
@@ -80,14 +80,14 @@ class XIndependent : public EvaluatorIndependent<CompositeVector, CompositeVecto
   virtual void Update_(State& s) override
   {
     auto& x = s.GetW<CompositeVector>(my_key_, my_tag_, my_key_);
-    auto& x_c = *x.ViewComponent("cell");
+    auto& x_c = *x.viewComponent("cell");
     for (int c = 0; c != x_c.getLocalLength(); ++c) {
       AmanziGeometry::Point cc = x.getMesh()->getCellCentroid(c);
       x_c[0][c] = cc[0] * cc[0] + cc[1] * cc[1]; // x^2 + y^2
     }
 
     if (x.hasComponent("face")) {
-      auto& x_f = *x.ViewComponent("face");
+      auto& x_f = *x.viewComponent("face");
       for (int f = 0; f != x_f.getLocalLength(); ++f) {
         AmanziGeometry::Point fc = x.getMesh()->getFaceCentroid(f);
         x_f[0][f] = fc[0] * fc[0] + fc[1] * fc[1]; // x^2 + y^2

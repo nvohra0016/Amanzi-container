@@ -829,6 +829,27 @@ MeshCache<MEM>::getCellCentroid(const Entity_ID c) const
                              c);
 }
 
+
+
+template<MemSpace_kind MEM>
+template<AccessPattern_kind AP>
+KOKKOS_INLINE_FUNCTION
+size_type
+MeshCache<MEM>::getCellNumNodes(const Entity_ID c) const
+{
+  static_assert(AP != AccessPattern_kind::COMPUTE);
+  static_assert(AP != AccessPattern_kind::FRAMEWORK);
+  // this is where a generic function would probably help?
+  if constexpr(AP == AccessPattern_kind::CACHE) {
+    assert(data_.cell_nodes_cached);
+    return data_.cell_nodes.size<MEM>(c);
+  } else {
+    if (data_.cell_nodes_cached) return getCellNumNodes<AccessPattern_kind::CACHE>(c);
+    return getCellNodes(c).size();
+  }
+}
+
+
 template<MemSpace_kind MEM>
 KOKKOS_INLINE_FUNCTION
 typename MeshCache<MEM>::cEntity_ID_View
@@ -1038,8 +1059,20 @@ void MeshCache<MEM>::setNodeCoordinates(const cEntity_ID_View& nodes,
   }
 
   if (framework_mesh_.get()) {
+    View_type<Entity_ID, MemSpace_kind::HOST> nodes_on_host;
+    View_type<AmanziGeometry::Point, MemSpace_kind::HOST> coords_on_host;
+    if constexpr(MEM == MemSpace_kind::HOST) {
+      nodes_on_host = nodes;
+      coords_on_host = new_coords;
+    } else {
+      Kokkos::resize(nodes_on_host, nodes.size());
+      Kokkos::deep_copy(nodes_on_host, nodes);
+      Kokkos::resize(coords_on_host, nodes.size());
+      Kokkos::deep_copy(coords_on_host, new_coords);
+    }
+
     for (int i=0; i!=nodes.size(); ++i) {
-      framework_mesh_->setNodeCoordinate(nodes(i), new_coords(i));
+      framework_mesh_->setNodeCoordinate(nodes_on_host(i), coords_on_host(i));
     }
   }
   recacheGeometry();

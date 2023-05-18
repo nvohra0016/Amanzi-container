@@ -126,7 +126,7 @@ Evaluator_OperatorApply::Evaluator_OperatorApply(Teuchos::ParameterList& plist)
   //
   // All of x, residual, and rhs must have this entity.
   primary_entity_ = plist_.get<std::string>("primary entity", "cell");
-  primary_entity_kind_ = AmanziMesh::createEntityKind(primary_entity_);
+  primary_createEntityKind_ = AmanziMesh::createEntityKind(primary_entity_);
 }
 
 void
@@ -161,7 +161,7 @@ Evaluator_OperatorApply::EnsureCompatibility(State& S)
   bool has_derivs = S.HasDerivativeSet(my_keys_[0].first, my_keys_[0].second);
   if (my_fac.getMesh() != Teuchos::null && my_fac.size() == 0) {
     // add the primary
-    my_fac.AddComponent(primary_entity_, primary_entity_kind_, 1);
+    my_fac.AddComponent(primary_entity_, primary_createEntityKind_, 1);
     CompositeVectorSpace my_fac_mesh_only(my_fac);
 
     // -- set the rhss' mesh, need for primary entity
@@ -267,7 +267,7 @@ Evaluator_OperatorApply::Update_(State& S)
   auto& result = S.GetW<CompositeVector>(my_keys_[0].first, my_keys_[0].second, my_keys_[0].first);
 
   const auto& x = S.Get<CompositeVector>(x0_key_, my_keys_[0].second);
-  x.ScatterMasterToGhosted();
+  x.scatterMasterToGhosted();
   result.PutScalarMasterAndGhosted(0.);
 
   int i = 0;
@@ -293,7 +293,7 @@ Evaluator_OperatorApply::Update_(State& S)
   int j = 0;
   for (const auto& op_list : op_keys_) {
     const auto& xj = S.Get<CompositeVector>(x_keys_[j], my_keys_[0].second);
-    xj.ScatterMasterToGhosted();
+    xj.scatterMasterToGhosted();
 
     int k = 0;
     for (const auto& op_key : op_list) {

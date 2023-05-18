@@ -74,7 +74,7 @@ class XIndependent : public EvaluatorIndependent<CompositeVector, CompositeVecto
   virtual void Update_(State& s) override
   {
     auto& x = s.GetW<CompositeVector>(my_key_, my_tag_, my_key_);
-    auto& x_c = *x.ViewComponent("cell", false);
+    auto& x_c = *x.viewComponent("cell", false);
     for (int c = 0; c != x_c.getLocalLength(); ++c) {
       AmanziGeometry::Point cc = x.getMesh()->getCellCentroid(c);
       x_c[0][c] = cc[0] * cc[0] + cc[1] * cc[1]; // x^2 + y^2
@@ -168,7 +168,7 @@ class Evaluator_PDE_Diagonal : public EvaluatorSecondary {
     AMANZI_ASSERT(my_keys_.size() == 1);
     auto& op = S.GetW<Operators::Op>(my_keys_[0].first, my_keys_[0].second, my_keys_[0].first);
     *op.diag = *S.Get<CompositeVector>(dependencies_.begin()->first, dependencies_.begin()->second)
-                  .ViewComponent("cell", false);
+                  .viewComponent("cell", false);
   }
 
   virtual void EnsureCompatibility(State& S) override
@@ -403,7 +403,7 @@ SUITE(EVALUATOR_ON_OP)
     // Ax - b
     CHECK_CLOSE(
       33.0,
-      (*S.Get<CompositeVector>("residual", Tags::DEFAULT).ViewComponent("cell", false))[0][0],
+      (*S.Get<CompositeVector>("residual", Tags::DEFAULT).viewComponent("cell", false))[0][0],
       1.e-10);
   }
 
@@ -526,7 +526,7 @@ SUITE(EVALUATOR_ON_OP)
 
     // Ax - b
     double error(0.);
-    auto& r = *S.Get<CompositeVector>("residual", Tags::DEFAULT).ViewComponent("cell");
+    auto& r = *S.Get<CompositeVector>("residual", Tags::DEFAULT).viewComponent("cell");
     r.normInf(&error);
     CHECK_CLOSE(0.0, error, 1.e-3);
   }

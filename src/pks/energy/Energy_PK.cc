@@ -523,7 +523,7 @@ Energy_PK::ModifyCorrection(double dt,
 * Return a pointer to a local operator
 ****************************************************************** */
 Teuchos::RCP<Operators::Operator>
-Energy_PK::my_operator(const Operators::OperatorType& type)
+Energy_PK::my_operator(const Operators::Operator_kind& type)
 {
   if (type == Operators::OPERATOR_MATRIX)
     return op_matrix_;

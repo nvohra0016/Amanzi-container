@@ -157,9 +157,9 @@ class MeshExtractedManifold : public MeshFramework {
  private:
   void TryExtension_(const std::string& setname,
                      Entity_kind kind_p, Entity_kind kind_d, cEntity_ID_View* setents) const;
-  template<class Entity_ID_View_Type>
+
   std::map<Entity_ID, int> EnforceOneLayerOfGhosts_(const std::string& setname, Entity_kind kind,
-                                                    Entity_ID_View_Type* setents) const;
+                                                    cEntity_ID_View* setents) const;
 
  private:
   Teuchos::RCP<const MeshHost> parent_mesh_;

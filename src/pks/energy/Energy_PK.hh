@@ -154,10 +154,10 @@ class Energy_PK : public PK_PhysicalBDF {
 
   // access
   virtual Teuchos::RCP<Operators::Operator>
-  my_operator(const Operators::OperatorType& type) override;
+  my_operator(const Operators::Operator_kind& type) override;
 
   virtual Teuchos::RCP<Operators::PDE_HelperDiscretization>
-  my_pde(const Operators::PDEType& type) override
+  my_pde(const Operators::PDE_kind& type) override
   {
     return op_matrix_diff_;
   }

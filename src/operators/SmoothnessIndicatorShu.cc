@@ -43,7 +43,7 @@ SmoothnessIndicatorShu::Compute(const Teuchos::RCP<Reconstruction>& lifting)
   int ncells_owned = mesh_->getNumEntities(AmanziMesh::Entity_kind::CELL, AmanziMesh::Parallel_kind::OWNED);
   measure_.resize(ncells_owned);
 
-  lifting->data()->ScatterMasterToGhosted();
+  lifting->data()->scatterMasterToGhosted();
 
   AmanziMesh::Entity_ID_View cells;
 

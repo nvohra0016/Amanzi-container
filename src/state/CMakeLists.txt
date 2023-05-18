@@ -73,7 +73,7 @@ set(state_inc_files
   evaluators/EvaluatorIndependentFromFile.hh
   evaluators/EvaluatorIndependentFunction.hh
   evaluators/EvaluatorIndependentConstant.hh
-  evaluators/EvaluatorMultiplicativeReciprocal.hh
+  evaluators/EvaluatorIndependentTensorFunction.hh
   evaluators/EvaluatorPrimary.hh
   evaluators/EvaluatorSecondary.hh
   evaluators/EvaluatorSecondaryMonotype.hh
@@ -81,6 +81,9 @@ set(state_inc_files
   evaluators/EvaluatorSecondaryMonotypeMultiplicative.hh
   evaluators/EvaluatorSecondaryMonotypeFromFunction.hh
   evaluators/EvaluatorSecondaryMeshedQuantity.hh
+  evaluators/EvaluatorModelLauncher.hh
+  evaluators/EvaluatorModelCV.hh
+  evaluators/EvaluatorModelCVByMaterial.hh
   State.hh
   IO.hh
   Observable.hh
@@ -102,6 +105,7 @@ set(state_src_files
   evaluators/EvaluatorIndependentFromFile.cc
   evaluators/EvaluatorIndependentFunction.cc
   evaluators/EvaluatorIndependentConstant.cc
+  evaluators/EvaluatorIndependentTensorFunction.cc
   evaluators/EvaluatorPrimary.cc
   evaluators/EvaluatorSecondary.cc
   evaluators/EvaluatorSecondaryMonotype.cc
@@ -197,20 +201,25 @@ if (BUILD_TESTS)
                     SOURCE test/Main.cc test/state_copy.cc
                     LINK_LIBS ${state_test_link_libs})
 
-    add_amanzi_test(state_observations state_observations
+    # tests observations, observation evaluators, and parallel observations
+   add_amanzi_test(state_observations state_observations
                     KIND int
                     SOURCE test/Main.cc
          		   test/state_observations.cc
                     LINK_LIBS ${state_test_link_libs})
-    add_amanzi_test(state_observations_np2 state_observations NPROCS 2 KIND unit)
 
+    if(ENABLE_MESH_MSTK)
+      add_amanzi_test(state_observations_np2 state_observations NPROCS 2 KIND unit)
+    endif()
 
+    # tests the creation and writing of vis files
     add_amanzi_test(state_vis state_vis
                     KIND int
                     SOURCE test/Main.cc
                            test/state_vis.cc
                     LINK_LIBS ${state_test_link_libs})
                          
+    # tests the creation, writing, and reading of checkpoint files on MPI_COMM_WORLD
     add_amanzi_test(state_restart state_restart
                     KIND int
                     SOURCE
@@ -219,6 +228,7 @@ if (BUILD_TESTS)
                     LINK_LIBS ${state_test_link_libs})
 
     if(ENABLE_MESH_MSTK)
+      # tests the creation, writing, and reading of checkpoint files on other comms
       add_amanzi_test(state_restart2 state_restart2
                     KIND int
                     SOURCE
@@ -228,35 +238,51 @@ if (BUILD_TESTS)
                     LINK_LIBS ${state_test_link_libs})
     endif() 
 
-    # # full test of state extensibility, showing how to insert a new datatype with vis and checkpoint
-    # add_amanzi_test(state_extensibility state_extensibility
-    #                 KIND int
-    #                 SOURCE test/Main.cc
-    #                        test/state_extensibility.cc
-    #                 LINK_LIBS ${state_test_link_libs})
-    
-    # add_amanzi_test(state_dag state_dag
-    #                 KIND int
-    #                 SOURCE test/Main.cc test/state_dag.cc
-    #                 LINK_LIBS ${state_test_link_libs})
+    # tests basic functionality of independent, primary, and secondary var evals
+    add_amanzi_test(state_evaluators state_evaluators
+                    KIND int
+                    SOURCE test/Main.cc
+                           test/state_evaluators.cc
+                    LINK_LIBS ${state_test_link_libs})
 
-    # add_amanzi_test(state_evaluators state_evaluators
-    #                 KIND int
-    #                 SOURCE test/Main.cc
-    #                        test/state_evaluators.cc
-    #                 LINK_LIBS ${state_test_link_libs})
+    # same as the above, with CompositeVectors and additional vector functionality
+    add_amanzi_test(state_evaluators_cv state_evaluators_cv
+                    KIND int
+                    SOURCE test/Main.cc
+                           test/state_evaluators_cv.cc
+                    LINK_LIBS ${state_test_link_libs})
 
-    # add_amanzi_test(state_evaluators_cv state_evaluators_cv
-    #                 KIND int
-    #                 SOURCE test/Main.cc
-    #                        test/state_evaluators_cv.cc
-    #                 LINK_LIBS ${state_test_link_libs})
+    # tests Evaluators IndependentFromFunction and SecondaryFromFunction
+    add_amanzi_test(state_functional_evaluators state_functional_evaluators
+                    KIND int
+                    SOURCE test/Main.cc
+         	           test/state_functional_evaluators.cc
+                    LINK_LIBS ${state_test_link_libs})
 
-    # add_amanzi_test(state_functional_evaluators state_functional_evaluators
-    #                 KIND int
-    #                 SOURCE test/Main.cc
-    #      		   test/state_functional_evaluators.cc
-    #                 LINK_LIBS ${state_test_link_libs})
+    # tests basic construction of and use of dag
+    add_amanzi_test(state_dag state_dag
+                    KIND int
+                    SOURCE test/Main.cc test/state_dag.cc
+                    LINK_LIBS ${state_test_link_libs})
+
+    # tests Evaluators SecondaryMonotype<CV> in a dag
+    add_amanzi_test(state_dag_cv state_dag_cv
+                    KIND int
+                    SOURCE test/Main.cc
+         	           test/state_dag_cv.cc
+                    LINK_LIBS ${state_test_link_libs})
+
+    # tests Evaluators Model, ModelByMaterial in a dag
+    add_amanzi_test(state_dag_models state_dag_models
+                    KIND int
+                    SOURCE test/Main.cc
+         	           test/state_dag_models.cc
+                    LINK_LIBS ${state_test_link_libs})
+
+                  
+                  
+                  
+                         
 
 endif()
 

@@ -1,15 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators 
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
-
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 */
 
 #ifndef AMANZI_SCHEMA_HH_
@@ -20,9 +17,9 @@
 #include <vector>
 
 #include "WhetStoneDefs.hh"
-// #include "BilinearForm.hh"
+//#include "BilinearForm.hh"
 #include "CompositeVectorSpace.hh"
-#include "MeshFramework.hh"
+#include "Mesh.hh"
 #include "MeshDefs.hh"
 
 #include "OperatorDefs.hh"
@@ -33,29 +30,27 @@ namespace Operators {
 class Schema {
  public:
   // default and code compatibility constructors
-  Schema(){};
+  Schema() {};
   Schema(AmanziMesh::Entity_kind kind, int nvec) { Init(kind, nvec); }
-  Schema(int schema_old) { Init(schema_old); } // old schema must go away FIXME
+  Schema(int schema_old) { Init(schema_old); }  // old schema must go away FIXME
 
-  KOKKOS_INLINE_FUNCTION ~Schema(){};
+  KOKKOS_INLINE_FUNCTION ~Schema() {};
 
   // member functions
   void Init(int schema_old);
   void Init(AmanziMesh::Entity_kind kind, int nvec);
-  // void Init(Teuchos::RCP<const WhetStone::BilinearForm> form,
+  // void Init(Teuchos::RCP<const WhetStone::BilinearForm> form, 
   //           Teuchos::RCP<const AmanziMesh::Mesh> mesh,
   //           AmanziMesh::Entity_kind base);
 
-  void AddItem(AmanziMesh::Entity_kind kind, WhetStone::DOF_Type type, int num)
-  {
+  void AddItem(AmanziMesh::Entity_kind kind, WhetStone::DOF_Type type, int num) {
     WhetStone::SchemaItem item(kind, type, num);
     items_.push_back(item);
   }
-
+ 
   void Finalize(Teuchos::RCP<const AmanziMesh::Mesh> mesh);
 
-  void
-  ComputeOffset(int c, Teuchos::RCP<const AmanziMesh::Mesh> mesh, std::vector<int>& offset) const;
+  void ComputeOffset(int c, Teuchos::RCP<const AmanziMesh::Mesh> mesh, std::vector<int>& offset) const;
 
   // local converters operators/strings/mesh
   int OldSchema() const;
@@ -75,21 +70,20 @@ class Schema {
   std::vector<WhetStone::SchemaItem>::const_iterator end() const { return items_.end(); }
   int size() const { return items_.size(); }
 
-  // output
-  friend std::ostream& operator<<(std::ostream& os, const Schema& s)
-  {
+  // output 
+  friend std::ostream& operator << (std::ostream& os, const Schema& s) {
     os << "base=" << s.KindToString(s.base()) << "\n";
     for (auto it = s.begin(); it != s.end(); ++it) {
-      os << " item: kind=" << s.KindToString(std::get<0>(*it)) << ", num=" << std::get<2>(*it)
-         << ", type=" << (int)std::get<1>(*it) << "\n";
+      os << " item: kind=" << s.KindToString(std::get<0>(*it)) 
+         << ", num=" << std::get<2>(*it) << ", type=" << (int)std::get<1>(*it) << "\n";
     }
     return os;
   }
 
  private:
   AmanziMesh::Entity_kind base_;
-  std::vector<WhetStone::SchemaItem> items_;
-  std::vector<int> offset_; // starting position of DOF ids
+  std::vector<WhetStone::SchemaItem> items_; 
+  std::vector<int> offset_;  // starting position of DOF ids
 
  private:
   explicit Schema(AmanziMesh::Entity_kind kind);
@@ -98,29 +92,25 @@ class Schema {
 
 // non-member functions
 // -- comparison operators
-inline bool
-operator==(const Schema& s1, const Schema& s2)
-{
+inline bool operator==(const Schema& s1, const Schema& s2) {
   if (s1.base() != s2.base()) return false;
   if (s1.size() != s2.size()) return false;
 
   for (auto it1 = s1.begin(), it2 = s2.begin(); it1 != s1.end(); ++it1, ++it2) {
-    if (std::get<0>(*it1) != std::get<0>(*it2)) return false;
-    if (std::get<1>(*it1) != std::get<1>(*it2)) return false;
-    if (std::get<2>(*it1) != std::get<2>(*it2)) return false;
+    if (std::get<0>(*it1) != std::get<0>(*it2)) return false; 
+    if (std::get<1>(*it1) != std::get<1>(*it2)) return false; 
+    if (std::get<2>(*it1) != std::get<2>(*it2)) return false; 
   }
   return true;
 }
 
-inline bool
-operator!=(const Schema& s1, const Schema& s2)
-{
+inline bool operator!=(const Schema& s1, const Schema& s2) {
   return !(s1 == s2);
 }
 
-inline CompositeVectorSpace
-cvsFromSchema(const Schema& schema, const Teuchos::RCP<const AmanziMesh::Mesh>& mesh, bool ghosted)
-{
+inline CompositeVectorSpace cvsFromSchema(
+    const Schema& schema, const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
+    bool ghosted) {
   CompositeVectorSpace cvs;
   cvs.SetMesh(mesh);
   cvs.SetGhosted(ghosted);
@@ -133,7 +123,8 @@ cvsFromSchema(const Schema& schema, const Teuchos::RCP<const AmanziMesh::Mesh>& 
   return cvs;
 }
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
 
 #endif
+

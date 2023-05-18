@@ -1,14 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 
   Linear solution for problem with constant tensorial coefficient
   working in 2D and 3D
@@ -26,8 +24,10 @@
 
 class Analytic02 : public AnalyticBase {
  public:
-  Analytic02(int dim) : AnalyticBase(dim), g_(0.0), v_(dim)
-  {
+  Analytic02(int dim) :
+      AnalyticBase(dim),
+      g_(0.0), v_(dim)
+  { 
     v_[0] = 1.0, v_[1] = 2.0;
     K_.Init(d_, 2);
     K_(0, 0) = 1.0;
@@ -36,8 +36,10 @@ class Analytic02 : public AnalyticBase {
     K_(1, 0) = 0.1;
     if (d_ == 3) K_(2, 2) = 1.0;
   }
-  Analytic02(int dim, double g) : AnalyticBase(dim), g_(g), v_(d_)
-  {
+  Analytic02(int dim, double g) :
+      AnalyticBase(dim),
+      g_(g), v_(d_)
+  { 
     v_[0] = 1.0, v_[1] = 2.0;
     K_.Init(d_, 2);
     K_(0, 0) = 1.0;
@@ -46,49 +48,45 @@ class Analytic02 : public AnalyticBase {
     K_(1, 0) = 0.1;
     if (d_ == 3) K_(2, 2) = 1.0;
   }
-  Analytic02(const Amanzi::AmanziGeometry::Point& v,
-             double g,
-             const Amanzi::WhetStone::Tensor<Kokkos::HostSpace>& K)
-    : AnalyticBase(v.dim()), g_(g), v_(v)
-  {
-    K_ = K;
-  };
-  ~Analytic02(){};
+  Analytic02(const Amanzi::AmanziGeometry::Point& v, double g, const Amanzi::WhetStone::Tensor<Kokkos::HostSpace>& K) :
+      AnalyticBase(v.dim()),
+      g_(g),
+      v_(v)
+      {
+        K_.assign(K);
+      };
+  ~Analytic02() {};
 
   virtual std::string name() const override { return "Analytic02"; }
-
-  const KOKKOS_INLINE_FUNCTION Amanzi::WhetStone::Tensor<DefaultExecutionSpace>&
-  TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t) const override
-  {
+  
+ const KOKKOS_INLINE_FUNCTION Amanzi::WhetStone::Tensor<DefaultExecutionSpace>&
+  TensorDiffusivity(const Amanzi::AmanziGeometry::Point& p, double t) const override {
     return K_device_;
   }
 
-  const Amanzi::WhetStone::Tensor<Kokkos::HostSpace>&
-  TensorDiffusivity_host(const Amanzi::AmanziGeometry::Point& p, double t) const override
-  {
+  const Amanzi::WhetStone::Tensor<Kokkos::HostSpace>& 
+  TensorDiffusivity_host(const Amanzi::AmanziGeometry::Point& p, double t) const override {
     return K_;
   }
 
-  double pressure_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override
-  {
+  double
+  pressure_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override { 
     return p * v_ - g_ * p[d_ - 1];
   }
 
-  // Gradient of potential, since the base class does not handle gravity.
+  // Gradient of potential, since the base class does not handle gravity. 
   Amanzi::AmanziGeometry::Point
-  gradient_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override
-  {
+  gradient_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override { 
     return v_;
   }
 
   Amanzi::AmanziGeometry::Point
-  advection_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override
-  {
+  advection_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override {
     return Amanzi::AmanziGeometry::Point(d_);
   }
 
-  double source_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override
-  {
+  double
+  source_exact(const Amanzi::AmanziGeometry::Point& p, double t) const override {
     return 0.0;
   }
 
@@ -98,3 +96,4 @@ class Analytic02 : public AnalyticBase {
 };
 
 #endif
+

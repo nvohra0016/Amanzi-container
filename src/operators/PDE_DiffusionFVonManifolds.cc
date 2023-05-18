@@ -98,11 +98,11 @@ PDE_DiffusionFVonManifolds::SetScalarCoefficient(const Teuchos::RCP<const Compos
   // we can use only one component, either cell of face
   if (k_ != Teuchos::null) {
     beta_initialized_ = false;
-    AMANZI_ASSERT(k_->HasComponent("face"));
+    AMANZI_ASSERT(k_->hasComponent("face"));
     AMANZI_ASSERT(k_->Map().Ghosted());
 
     if (dkdp_ != Teuchos::null) {
-      AMANZI_ASSERT(dkdp_->HasComponent("face"));
+      AMANZI_ASSERT(dkdp_->hasComponent("face"));
       AMANZI_ASSERT(dkdp_->Map().Ghosted());
     }
   }
@@ -118,20 +118,20 @@ PDE_DiffusionFVonManifolds::UpdateMatrices(const Teuchos::Ptr<const CompositeVec
 {
   if (!beta_initialized_) ComputeBeta_();
 
-  const auto& beta_f = *beta_->ViewComponent("face", true);
+  const auto& beta_f = *beta_->viewComponent("face", true);
   const auto& fmap = *beta_->Map().Map("face", true);
 
   const std::vector<int>& bc_model = bcs_trial_[0]->bc_model();
 
   int d = mesh_->getSpaceDimension();
-  auto& rhs_c = *global_op_->rhs()->ViewComponent("cell");
+  auto& rhs_c = *global_op_->rhs()->viewComponent("cell");
   global_op_->rhs()->PutScalarGhosted(0.0);
 
   // preparing upwind data
   Teuchos::RCP<const Epetra_MultiVector> k_f = Teuchos::null;
   if (k_ != Teuchos::null) {
-    k_->ScatterMasterToGhosted("face");
-    k_f = k_->ViewComponent("face", true);
+    k_->scatterMasterToGhosted("face");
+    k_f = k_->viewComponent("face", true);
   }
 
   // updating matrix blocks
@@ -197,7 +197,7 @@ PDE_DiffusionFVonManifolds::UpdateMatrices(const Teuchos::Ptr<const CompositeVec
     }
   }
 
-  global_op_->rhs()->GatherGhostedToMaster("cell", Add);
+  global_op_->rhs()->gatherGhostedToMaster("cell", Add);
 }
 
 
@@ -207,7 +207,7 @@ PDE_DiffusionFVonManifolds::UpdateMatrices(const Teuchos::Ptr<const CompositeVec
 void
 PDE_DiffusionFVonManifolds::ApplyBCs(bool primary, bool eliminate, bool essential_eqn)
 {
-  const auto& beta_f = *beta_->ViewComponent("face", true);
+  const auto& beta_f = *beta_->viewComponent("face", true);
   const auto& fmap = *beta_->Map().Map("face", true);
 
   AMANZI_ASSERT(bcs_trial_.size() > 0);
@@ -215,9 +215,9 @@ PDE_DiffusionFVonManifolds::ApplyBCs(bool primary, bool eliminate, bool essentia
   const std::vector<double>& bc_value = bcs_trial_[0]->bc_value();
 
   Teuchos::RCP<const Epetra_MultiVector> k_f = Teuchos::null;
-  if (k_ != Teuchos::null) k_f = k_->ViewComponent("face", true);
+  if (k_ != Teuchos::null) k_f = k_->viewComponent("face", true);
 
-  auto& rhs_c = *global_op_->rhs()->ViewComponent("cell", true);
+  auto& rhs_c = *global_op_->rhs()->viewComponent("cell", true);
 
   for (int f = 0; f < nfaces_owned; f++) {
     if (bc_model[f] != OPERATOR_BC_NONE) {
@@ -245,23 +245,23 @@ void
 PDE_DiffusionFVonManifolds::UpdateFlux(const Teuchos::Ptr<const CompositeVector>& solution,
                                        const Teuchos::Ptr<CompositeVector>& mass_flux)
 {
-  const auto& beta_f = *beta_->ViewComponent("face", true);
+  const auto& beta_f = *beta_->viewComponent("face", true);
   const auto& fmap = *beta_->Map().Map("face", true);
 
   const std::vector<int>& bc_model = bcs_trial_[0]->bc_model();
   const std::vector<double>& bc_value = bcs_trial_[0]->bc_value();
 
-  solution->ScatterMasterToGhosted("cell");
+  solution->scatterMasterToGhosted("cell");
 
   Teuchos::RCP<const Epetra_MultiVector> k_f = Teuchos::null;
   if (k_ != Teuchos::null) {
-    k_->ScatterMasterToGhosted("face");
-    k_f = k_->ViewComponent("face", true);
+    k_->scatterMasterToGhosted("face");
+    k_f = k_->viewComponent("face", true);
   }
 
-  solution->ScatterMasterToGhosted("cell");
-  const auto& p = *solution->ViewComponent("cell", true);
-  auto& flux = *mass_flux->ViewComponent("face", false);
+  solution->scatterMasterToGhosted("cell");
+  const auto& p = *solution->viewComponent("cell", true);
+  auto& flux = *mass_flux->viewComponent("face", false);
 
   int dir, d(mesh_->getSpaceDimension());
   WhetStone::DenseVector ti(2), pi(2);
@@ -322,13 +322,13 @@ PDE_DiffusionFVonManifolds::UpdateFlux(const Teuchos::Ptr<const CompositeVector>
 void
 PDE_DiffusionFVonManifolds::ComputeBeta_()
 {
-  auto& beta_f = *beta_->ViewComponent("face", true);
+  auto& beta_f = *beta_->viewComponent("face", true);
   const auto& fmap = *beta_->Map().Map("face", true);
 
   int d = mesh_->getSpaceDimension();
   AmanziGeometry::Point a(d);
 
-  auto k_f = (k_.get()) ? k_->ViewComponent("face") : Teuchos::null;
+  auto k_f = (k_.get()) ? k_->viewComponent("face") : Teuchos::null;
   ;
   WhetStone::Tensor Kc(mesh_->getSpaceDimension(), 1);
   Kc(0, 0) = 1.0;

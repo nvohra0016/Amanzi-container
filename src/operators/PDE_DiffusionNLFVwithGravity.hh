@@ -1,16 +1,13 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
   Authors: Daniil Svyatskiy (dasvyat@lanl.gov)
            Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
-
 */
 
 #ifndef AMANZI_OPERATOR_PDE_DIFFUSION_NLFV_WITH_GRAVITY_HH_
@@ -19,7 +16,7 @@
 #include <strings.h>
 
 // TPLs
-#include "Ifpack.h"
+#include "Ifpack.h" 
 #include "Teuchos_RCP.hpp"
 
 // Amanzi
@@ -39,21 +36,20 @@ class BCs;
 class PDE_DiffusionNLFVwithGravity : public PDE_DiffusionNLFV {
  public:
   PDE_DiffusionNLFVwithGravity(Teuchos::ParameterList& plist,
-                               const Teuchos::RCP<Operator>& global_op)
-    : PDE_DiffusionNLFV(plist, global_op)
+          const Teuchos::RCP<Operator>& global_op) :
+      PDE_DiffusionNLFV(plist, global_op)
   {}
 
   PDE_DiffusionNLFVwithGravity(Teuchos::ParameterList& plist,
-                               const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : PDE_DiffusionNLFV(plist, mesh)
+                               const Teuchos::RCP<const AmanziMesh::Mesh>& mesh):
+      PDE_DiffusionNLFV(plist, mesh)
   {}
 
 
-  virtual void SetDensity(const Teuchos::RCP<const CompositeVector>& rho) override
-  {
+  virtual void SetDensity(const Teuchos::RCP<const CompositeVector>& rho) override {
     Exceptions::amanzi_throw("PDE_DiffusionNLFVwithGravity does not support vector density.");
   }
-
+  
   // -- create an operator
   virtual void UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& flux,
                               const Teuchos::Ptr<const CompositeVector>& u) override;
@@ -64,8 +60,7 @@ class PDE_DiffusionNLFVwithGravity : public PDE_DiffusionNLFV {
 
   // Developments
   // -- interface to solvers for treating nonlinear BCs.
-  virtual double ComputeGravityFlux(int f) const override
-  {
+  virtual double ComputeGravityFlux(int f) const override {
     Exceptions::amanzi_throw("PDE_DiffusionNLFVwithGravity::ComputeGravityFlux not implemented.");
     return 0.;
   };
@@ -76,7 +71,7 @@ class PDE_DiffusionNLFVwithGravity : public PDE_DiffusionNLFV {
   virtual double MapBoundaryValue_(int f, double u) override;
 };
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
 
 #endif

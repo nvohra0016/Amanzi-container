@@ -111,7 +111,7 @@ RunTestDarcySource(const std::string& xmlFileName)
     // verification
     double vmin, vmax;
     auto rhs =
-      *DPK->my_operator(Operators::OperatorType::OPERATOR_MATRIX)->rhs()->ViewComponent("cell");
+      *DPK->my_operator(Operators::Operator_kind::OPERATOR_MATRIX)->rhs()->ViewComponent("cell");
     rhs.MinValue(&vmin);
     rhs.MaxValue(&vmax);
     CHECK_CLOSE(vmin, vmax, 1e-12);

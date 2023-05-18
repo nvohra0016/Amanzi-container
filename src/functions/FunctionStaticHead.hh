@@ -65,13 +65,21 @@ class FunctionStaticHead : public Function {
     return patm_ + rho_g_ * ((*h_)(x)-x(dim_));
   }
 
-  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out, const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* ids) const
   {
-    h_->apply(in, out);
-    Kokkos::parallel_for(
-      "FunctionStaticHead::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
-        out(i) = patm_ + rho_g_ * (out(i) - in(dim_, i));
-      });
+    h_->apply(in, out, ids);
+    if (ids) {
+      auto ids_loc = *ids;
+      Kokkos::parallel_for(
+        "FunctionStaticHead::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(ids_loc(i)) = patm_ + rho_g_ * (out(ids_loc(i)) - in(dim_, i));
+        });
+    } else {
+      Kokkos::parallel_for(
+        "FunctionStaticHead::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(i) = patm_ + rho_g_ * (out(i) - in(dim_, i));
+        });
+    }
   }
 
  private:

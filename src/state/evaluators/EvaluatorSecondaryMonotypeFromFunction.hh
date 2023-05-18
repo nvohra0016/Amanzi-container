@@ -78,6 +78,10 @@ class EvaluatorSecondaryMonotypeFromFunction
   EvaluatorSecondaryMonotypeFromFunction(const EvaluatorSecondaryMonotypeFromFunction& other);
   virtual Teuchos::RCP<Evaluator> Clone() const override;
 
+  virtual std::string getName() const override {
+    return "secondary from function";
+  }
+
  protected:
   // These do the actual work
   virtual void Evaluate_(const State& S, const std::vector<CompositeVector*>& results) override;

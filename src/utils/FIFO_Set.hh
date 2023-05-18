@@ -50,6 +50,9 @@ class FIFO_Set {
 
   std::size_t size() const { return store_.size(); }
 
+  const T& operator[](const int& i) const { return store_[i]; }
+  T& operator[](const int& i) { return store_[i]; }
+
  protected:
   Container_type store_;
 };

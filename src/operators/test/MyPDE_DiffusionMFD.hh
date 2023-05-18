@@ -56,10 +56,10 @@ MyPDE_DiffusionMFD::UpdateMatrices(const Teuchos::Ptr<const CompositeVector>& fl
   Teuchos::RCP<const Epetra_MultiVector> k_grad = Teuchos::null;
   Teuchos::RCP<const Epetra_MultiVector> k_twin = Teuchos::null;
   if (k_ != Teuchos::null) {
-    k_cell = k_->ViewComponent("cell");
-    k_face = k_->ViewComponent("face", true);
-    k_grad = k_->ViewComponent("grad");
-    if (k_->hasComponent("twin")) k_twin = k_->ViewComponent("twin", true);
+    k_cell = k_->viewComponent("cell");
+    k_face = k_->viewComponent("face", true);
+    k_grad = k_->viewComponent("grad");
+    if (k_->hasComponent("twin")) k_twin = k_->viewComponent("twin", true);
   }
 
   // update matrix blocks

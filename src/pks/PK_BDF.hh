@@ -41,12 +41,12 @@ class PK_BDF : virtual public PK, public BDFFnBase<TreeVector> {
     : PK(pk_tree, glist, S, soln), BDFFnBase<TreeVector>(){};
 
   // access to operators and PDEs in sub-PKs
-  virtual Teuchos::RCP<Operators::Operator> my_operator(const Operators::OperatorType& type)
+  virtual Teuchos::RCP<Operators::Operator> my_operator(const Operators::Operator_kind& type)
   {
     return Teuchos::null;
   }
 
-  virtual Teuchos::RCP<Operators::PDE_HelperDiscretization> my_pde(const Operators::PDEType& type)
+  virtual Teuchos::RCP<Operators::PDE_HelperDiscretization> my_pde(const Operators::PDE_kind& type)
   {
     return Teuchos::null;
   }

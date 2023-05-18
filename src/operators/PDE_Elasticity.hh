@@ -1,41 +1,15 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 
-/*!
-
-Elasticity operator is used for describing soil deformation or fluid flow (Stokes 
-and Navier-Stokes).
-
-* `"method`" [string] defines a discretization method. The available
-  options are `"BernardiRaugel`".
-
-* `"schema`" [list] defines a discretization schema.
-
-  * `"location`" [Array(string)] defines geometric location of degrees of freedom.
-
-  * `"type`" [Array(string)] defines type of degrees of freedom. The available options 
-    are `"scalar`" and `"normal component`".
-
-  * `"number`" [Array(int)] indicates how many time this degree of freedom is repeated.
-
-.. code-block:: xml
-
-  <ParameterList name="elasticity operator">
-    <Parameter name="method" type="string" value="BernardiRaugel"/>
-    <ParameterList name="schema">
-      <Parameter name="base" type="string" value="cell"/>
-      <Parameter name="location" type="Array(string)" value="{node, face}"/>
-      <Parameter name="type" type="Array(string)" value="{scalar, normal component}"/>
-      <Parameter name="number" type="Array(int)" value="{2, 1}"/>
-    </ParameterList>
-  </ParameterList>
-
+  Examples of usage this operator are in test/operators_elasticity.cc
+  and test/operators_stokes.cc
 */
 
 #ifndef AMANZI_OPERATOR_PDE_ELASTICITY_HH_
@@ -62,16 +36,19 @@ namespace Operators {
 
 class PDE_Elasticity : public PDE_HelperDiscretization {
  public:
-  PDE_Elasticity(Teuchos::ParameterList& plist, const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : PDE_HelperDiscretization(mesh), K_(Teuchos::null), K_default_(1.0)
+  PDE_Elasticity(Teuchos::ParameterList& plist,
+                 const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) :
+      PDE_HelperDiscretization(mesh),
+      K_(Teuchos::null),
+      K_default_(1.0)
   {
     global_op_ = Teuchos::null;
     Init_(plist);
   }
 
   // main virtual members
-  // -- setup
-  void SetTensorCoefficient(const Teuchos::RCP<std::vector<WhetStone:Tensor<>>>& K);
+  // -- setup 
+  void SetTensorCoefficient(const Teuchos::RCP<std::vector<WhetStone::Tensor> >& K);
   void SetTensorCoefficient(double K);
 
   // -- creation of an operator
@@ -97,7 +74,7 @@ class PDE_Elasticity : public PDE_HelperDiscretization {
   void Init_(Teuchos::ParameterList& plist);
 
  protected:
-  Teuchos::RCP<std::vector<WhetStone:Tensor<>>> K_;
+  Teuchos::RCP<std::vector<WhetStone::Tensor> > K_;
   double K_default_;
 
   Teuchos::RCP<WhetStone::BilinearForm> mfd_;
@@ -108,7 +85,9 @@ class PDE_Elasticity : public PDE_HelperDiscretization {
   Schema local_schema_col_, local_schema_row_;
 };
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
 
 #endif
+
+

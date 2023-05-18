@@ -49,8 +49,8 @@ UpwindFlux::Compute(const CompositeVector& flux,
   AMANZI_ASSERT(field.hasComponent("cell"));
   AMANZI_ASSERT(field.hasComponent(face_comp_));
 
-  flux.ScatterMasterToGhosted("face");
-  field.ScatterMasterToGhosted("cell");
+  flux.scatterMasterToGhosted("face");
+  field.scatterMasterToGhosted("cell");
 
   const Epetra_MultiVector& flux_f = *flux.viewComponent("face", true);
 

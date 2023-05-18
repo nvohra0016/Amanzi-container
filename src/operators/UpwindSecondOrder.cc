@@ -55,8 +55,8 @@ UpwindSecondOrder::Compute(const CompositeVector& flux,
   AMANZI_ASSERT(field.hasComponent("grad"));
   AMANZI_ASSERT(field.hasComponent(face_comp_));
 
-  field.ScatterMasterToGhosted("cell");
-  flux.ScatterMasterToGhosted("face");
+  field.scatterMasterToGhosted("cell");
+  flux.scatterMasterToGhosted("face");
 
   const Epetra_MultiVector& flx_face = *flux.viewComponent("face", true);
   // const Epetra_MultiVector& sol_face = *solution.viewComponent("face", true);

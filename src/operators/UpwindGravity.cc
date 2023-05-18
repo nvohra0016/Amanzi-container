@@ -60,7 +60,7 @@ UpwindGravity::Compute(const CompositeVector& flux,
   AMANZI_ASSERT(field.hasComponent("cell"));
   AMANZI_ASSERT(field.hasComponent(face_comp_));
 
-  field.ScatterMasterToGhosted("cell");
+  field.scatterMasterToGhosted("cell");
   const Epetra_MultiVector& field_c = *field.viewComponent("cell", true);
   const Epetra_MultiVector& field_bf = *field.viewComponent("boundary_face", true);
   Epetra_MultiVector& field_f = *field.viewComponent(face_comp_, true);

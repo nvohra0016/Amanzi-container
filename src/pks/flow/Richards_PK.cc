@@ -1254,7 +1254,7 @@ Richards_PK::CalculateDiagnostics(const Tag& tag)
 * Return a pointer to a local operator
 ****************************************************************** */
 Teuchos::RCP<Operators::Operator>
-Richards_PK::my_operator(const Operators::OperatorType& type)
+Richards_PK::my_operator(const Operators::Operator_kind& type)
 {
   if (type == Operators::OPERATOR_MATRIX)
     return op_matrix_;

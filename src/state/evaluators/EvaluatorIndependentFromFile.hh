@@ -103,6 +103,9 @@ class EvaluatorIndependentFromFile
   EvaluatorIndependentFromFile& operator=(const EvaluatorIndependentFromFile& other);
 
   virtual void EnsureCompatibility(State& S) override;
+  virtual std::string getName() const override {
+    return "independent from file";
+  }
 
  protected:
   // ---------------------------------------------------------------------------

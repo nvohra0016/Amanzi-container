@@ -1,14 +1,12 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
-  Authors: Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
+  Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 
   Linear vector field and constant tensor.
 */
@@ -42,17 +40,17 @@ class AnalyticElasticity01 : public AnalyticElasticityBase {
     }
   }
 
-  Amanzi::AmanziGeometry::Point velocity_exact(const Amanzi::AmanziGeometry::Point& p, double t)
-  {
+  Amanzi::AmanziGeometry::Point velocity_exact(const Amanzi::AmanziGeometry::Point& p, double t) { 
     double x = p[0];
     double y = p[1];
     return Amanzi::AmanziGeometry::Point(x + y, x - 2 * y);
   }
 
-  double pressure_exact(const Amanzi::AmanziGeometry::Point& p, double t) { return 0.0; }
+  double pressure_exact(const Amanzi::AmanziGeometry::Point& p, double t) { 
+    return 0.0;
+  }
 
-  Amanzi::AmanziGeometry::Point source_exact(const Amanzi::AmanziGeometry::Point& p, double t)
-  {
+  Amanzi::AmanziGeometry::Point source_exact(const Amanzi::AmanziGeometry::Point& p, double t) { 
     return Amanzi::AmanziGeometry::Point(0.0, 0.0);
   }
 

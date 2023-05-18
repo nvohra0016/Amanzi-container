@@ -91,15 +91,26 @@ public:
 
 
 namespace Impl {
+
+//
+// helper function to get coordinates, txyz
+//
+Kokkos::View<double**> getMeshFunctionCoordinates(double time, const PatchSpace& ps);
+
 //
 // Computes function on a patch.
 //
-//template<class Device=DefaultDevice>
 void
-computeFunction(const MultiFunction& f, double time, Patch& p);
+computeFunction(const MultiFunction& f, double time, Patch<double>& p);
+
+//
+// Computes function on a patch space, sticking the answer directly into a vector
+//
+void
+computeFunction(const MultiFunction& f, double time, const PatchSpace& p, CompositeVector& cv);
 
 void
-computeFunctionDepthCoordinate(const MultiFunction& f, double time, Patch& p);
+computeFunctionDepthCoordinate(const MultiFunction& f, double time, Patch<double>& p);
 
 
 } // namespace Impl

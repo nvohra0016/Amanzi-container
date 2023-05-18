@@ -437,9 +437,6 @@ template<MemSpace_kind MEM>
 void cacheAll(MeshCache<MEM>& mesh)
 {
   std::cout<<"############# CacheAll"<<std::endl;
-  // caches everything, likely just for testing
-  cacheDefault(mesh);
-
   mesh.cacheCellNodes();
   mesh.cacheCellCoordinates();
   mesh.cacheFaceCoordinates();

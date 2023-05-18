@@ -94,7 +94,8 @@ class EvaluatorPrimary_ : public Evaluator {
   // ---------------------------------------------------------------------------
   void SetChanged();
 
-  virtual std::string WriteToString() const override;
+  std::string getName() const override { return "primary"; }
+  virtual std::ostream& writeInfo(std::ostream& os) const override;
 
  protected:
   virtual void UpdateDerivative_(State& S) = 0;

@@ -1,16 +1,13 @@
 /*
-  Copyright 2010-202x held jointly by participating institutions.
-  Amanzi is released under the three-clause BSD License.
-  The terms of use and "as is" disclaimer for this license are
+  Operators
+
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
+  Amanzi is released under the three-clause BSD License. 
+  The terms of use and "as is" disclaimer for this license are 
   provided in the top-level COPYRIGHT file.
 
   Authors: Daniil Svyatskiy (dasvyat@lanl.gov)
            Konstantin Lipnikov (lipnikov@lanl.gov)
-*/
-
-/*
-  Operators
-
 */
 
 #ifndef AMANZI_OPERATOR_PDE_DIFFUSION_FV_WITH_GRAVITY_HH_
@@ -36,15 +33,16 @@ class BCs;
 
 class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV {
  public:
-  PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist, const Teuchos::RCP<Operator>& global_op)
-    : PDE_DiffusionFV(plist, global_op)
+  PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
+                             const Teuchos::RCP<Operator>& global_op) :
+      PDE_DiffusionFV(plist, global_op)
   {}
 
   PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
-                             const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : PDE_DiffusionFV(plist, mesh)
+                             const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) :
+      PDE_DiffusionFV(plist, mesh)
   {}
-
+  
   virtual void Init() override;
 
   // main virtual members
@@ -60,9 +58,8 @@ class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV {
 
   // -- modify an operator
   virtual void ApplyBCs(bool primary, bool eliminate, bool essential_eqn) override;
-  virtual void ModifyMatrices(const CompositeVector& u) override{};
-  virtual void ScaleMassMatrices(double s) override
-  {
+  virtual void ModifyMatrices(const CompositeVector& u) override {};
+  virtual void ScaleMassMatrices(double s) override {
     ComputeTransmissibility_(gravity_term_);
     transmissibility_->scale(s);
   };
@@ -76,18 +73,18 @@ class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV {
 
   // access
   const CompositeVector& gravity_terms() { return *gravity_term_; }
+  
 
-
- public:
-  // Neeed to be public for kokkos
+public: 
+  // Neeed to be public for kokkos 
   void ComputeTransmissibility_(Teuchos::RCP<CompositeVector> g_cv);
 
  protected:
   Teuchos::RCP<CompositeVector> gravity_term_;
 };
 
-} // namespace Operators
-} // namespace Amanzi
+}  // namespace Operators
+}  // namespace Amanzi
 
 
 #endif

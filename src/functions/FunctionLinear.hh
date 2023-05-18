@@ -76,12 +76,21 @@ class FunctionLinear : public Function {
     return y;
   }
 
-  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out) const
+  void apply(const Kokkos::View<double**>& in, Kokkos::View<double*>& out, const Kokkos::MeshView<const int*, Amanzi::DefaultMemorySpace>* ids) const
   {
-    Kokkos::parallel_for(
-      "FunctionLinear::apply", in.extent(1), KOKKOS_LAMBDA(const int& i) {
-        out(i) = apply_gpu(in, i);
-      });
+    if (ids) {
+      auto ids_loc = *ids;
+      Kokkos::parallel_for(
+        "FunctionBilinear::apply1", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(ids_loc(i)) = apply_gpu(in, i);
+        });
+    } else {
+      assert(in.extent(1) == out.extent(0));
+      Kokkos::parallel_for(
+        "FunctionBilinear::apply2", in.extent(1), KOKKOS_LAMBDA(const int& i) {
+          out(i) = apply_gpu(in, i);
+        });
+    }
   }
 
  private:
