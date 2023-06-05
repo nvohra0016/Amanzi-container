@@ -10,6 +10,7 @@
 //!
 #include "UnitTest++.h"
 
+#include "Teuchos_SerialDenseMatrix.h"
 
 #include "AmanziTypes.hh"
 #include "AmanziComm.hh"

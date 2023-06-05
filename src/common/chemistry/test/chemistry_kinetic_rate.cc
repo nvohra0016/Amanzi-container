@@ -127,7 +127,7 @@ SUITE(GeochemistryTestsKineticRate)
 
     void Display(const Teuchos::Ptr<Amanzi::VerboseObject> vo) const
     {
-      std::cout << this->name() << std::endl;
+      std::cout << this->getName() << std::endl;
     }; // end Display()
   };   // end MockKineticRate
 
@@ -143,7 +143,7 @@ SUITE(GeochemistryTestsKineticRate)
   TEST_FIXTURE(KineticRateTest, MockKineticRate_set_name)
   {
     MockKineticRate rate;
-    CHECK_EQUAL(rate.name(), "abc123");
+    CHECK_EQUAL(rate.getName(), "abc123");
   }
 
   // does SetSpeciesIds function work?

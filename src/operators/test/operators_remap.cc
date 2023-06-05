@@ -52,7 +52,7 @@ class MyRemapDG : public Operators::RemapDG<CompositeVector> {
   // -- stability condition
   double StabilityCondition();
   // -- time
-  void set_dt_output(double dt) { dt_output_ = dt; }
+  void setDt_output(double dt) { dt_output_ = dt; }
 
   // tools
   // -- mass on mesh0

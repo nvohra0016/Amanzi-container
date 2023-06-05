@@ -148,7 +148,7 @@ class make_state {
       S.RequireDerivative<CompositeVector, CompositeVectorSpace>(
         name, Tags::DEFAULT, deriv, Tags::DEFAULT);
 
-    auto f_eval = Teuchos::rcp(new EvaluatorModelByMaterial<Model>(es_list));
+    auto f_eval = Teuchos::rcp(new EvaluatorModelCVByMaterial<Model>(es_list));
     S.SetEvaluator(name, Tags::DEFAULT, f_eval);
     return f_eval;
   }

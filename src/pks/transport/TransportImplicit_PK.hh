@@ -71,7 +71,7 @@ class TransportImplicit_PK : public Transport_PK, public PK_BDF {
   virtual void Initialize() override;
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false) override;
 
-  virtual double get_dt() override { return dt_; }
+  virtual double getDt() override { return dt_; }
 
   // methods required for time integration interface
   // -- computes the non-linear functional f = f(t,u,udot) and related norm.

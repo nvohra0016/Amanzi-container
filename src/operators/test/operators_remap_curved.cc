@@ -62,7 +62,7 @@ class MyRemapDGc : public Operators::RemapDG<CompositeVector> {
 
   // time control
   double global_time(double t) { return tini_ + t * T1_; }
-  void set_dt_output(double dt) { dt_output_ = dt; }
+  void setDt_output(double dt) { dt_output_ = dt; }
 
   // tools
   // -- mass on mesh0
@@ -405,7 +405,7 @@ void RemapTestsCurved(std::string file_name,
   MyRemapDGc remap(mesh0, mesh1, plist, T1);
   DeformMeshCurved(mesh1, deform, T1, mesh0, order);
   remap.Init(dg);
-  remap.set_dt_output(0.1);
+  remap.setDt_output(0.1);
 
   // initial mass
   double mass0 = remap.InitialMass(*p1, order);

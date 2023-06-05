@@ -202,7 +202,10 @@ class CSR {
   }
 
   KOKKOS_INLINE_FUNCTION
-  int size() const { return row_map_.view_device().extent(0) - 1; }
+  int size() const {
+    int view_size = row_map_.view_device().extent(0);
+    return view_size > 0 ? view_size - 1 : 0;
+  }
   KOKKOS_INLINE_FUNCTION
   int size(int idx, int d) const { return sizes_.view_device()(idx, d); }
   KOKKOS_INLINE_FUNCTION

@@ -16,16 +16,13 @@
 #include "SolverFnBase.hh"
 #include "BDFFnBase.hh"
 
-#include "AmanziDebug.hh"
-
 
 namespace Amanzi {
 
 template <class Vector>
 class BDF1_SolverFnBase : public AmanziSolvers::SolverFnBase<Vector> {
  public:
-  BDF1_SolverFnBase(const Teuchos::RCP<Teuchos::ParameterList>& plist,
-                    const Teuchos::RCP<BDFFnBase<Vector>>& bdf_fn)
+  BDF1_SolverFnBase(const Teuchos::RCP<Teuchos::ParameterList>& plist, const Teuchos::RCP<BDFFnBase<Vector>>& bdf_fn)
     : plist_(plist), bdf_fn_(bdf_fn){};
 
   // SolverFnBase interface
@@ -87,11 +84,7 @@ template <class Vector>
 void
 BDF1_SolverFnBase<Vector>::Residual(const Teuchos::RCP<Vector>& u, const Teuchos::RCP<Vector>& r)
 {
-  // std::cout << "BDF1_SolverFnBase::Residual u = " << Debug::get0(*u) <<
-  // std::endl;
   bdf_fn_->FunctionalResidual(t_old_, t_new_, u_old_, u, r);
-  // std::cout << "BDF1_SolverFnBase::Residual r = " << Debug::get0(*r) <<
-  // std::endl;
 }
 
 // preconditioner application

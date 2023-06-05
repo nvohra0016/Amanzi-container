@@ -52,12 +52,12 @@ class Darcy_PK : public Flow_PK {
   virtual void Setup() final;
   virtual void Initialize() final;
 
-  virtual void set_dt(double dt) override
+  virtual void setDt(double dt) override
   {
     dt_ = dt;
     dt_desirable_ = dt;
   }
-  virtual double get_dt() override { return dt_desirable_; }
+  virtual double getDt() override { return dt_desirable_; }
 
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false) override;
   virtual void CommitStep(double t_old, double t_new, const Tag& tag) override;

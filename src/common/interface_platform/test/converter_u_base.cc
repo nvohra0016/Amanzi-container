@@ -36,7 +36,7 @@ ComparePLists(const Teuchos::ParameterList& plist1,
               std::string& name)
 {
   for (auto it = plist1.begin(); it != plist1.end(); ++it) {
-    name = plist1.name(it);
+    name = plist1.getName(it);
     if (plist1.isSublist(name)) {
       if (!plist2.isSublist(name)) return false;
 

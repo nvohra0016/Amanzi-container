@@ -1697,7 +1697,7 @@ InputConverter::CreateINFile_(std::string& filename, int rank)
   Teuchos::ParameterList& iso = ChemOptions.sublist("isotherms");
 
   for (auto iter = iso.begin(); iter != iso.end(); ++iter) {
-    std::string primary = iso.name(iter);
+    std::string primary = iso.getName(iter);
     Teuchos::ParameterList& curprimary = iso.sublist(primary);
     std::string model = curprimary.get<std::string>("model");
     double kd = curprimary.get<double>("kd");
@@ -1725,7 +1725,7 @@ InputConverter::CreateINFile_(std::string& filename, int rank)
   // create text for chemistry options - ion exchange
   Teuchos::ParameterList& ion = ChemOptions.sublist("ion_exchange");
   for (auto iter = ion.begin(); iter != ion.end(); ++iter) {
-    std::string mineral = ion.name(iter);
+    std::string mineral = ion.getName(iter);
     Teuchos::ParameterList& curmineral = ion.sublist(mineral);
     double cec = curmineral.get<double>("cec");
     Teuchos::Array<std::string> names = curmineral.get<Teuchos::Array<std::string>>("cations");
@@ -1743,7 +1743,7 @@ InputConverter::CreateINFile_(std::string& filename, int rank)
   // create text for chemistry options - surface complexation
   Teuchos::ParameterList& surf = ChemOptions.sublist("surface_complexation");
   for (auto iter = surf.begin(); iter != surf.end(); ++iter) {
-    std::string site = surf.name(iter);
+    std::string site = surf.getName(iter);
     Teuchos::ParameterList& cursite = surf.sublist(site);
     Teuchos::Array<std::string> complexe_names =
       cursite.get<Teuchos::Array<std::string>>("complexes");
@@ -1765,7 +1765,7 @@ InputConverter::CreateINFile_(std::string& filename, int rank)
   std::stringstream mineral;
   Teuchos::ParameterList& mins = ChemOptions.sublist("minerals");
   for (auto iter = mins.begin(); iter != mins.end(); ++iter) {
-    std::string mineral_name = mins.name(iter);
+    std::string mineral_name = mins.getName(iter);
     Teuchos::ParameterList& curmineral = mins.sublist(mineral_name);
     double constvf = curmineral.get<double>("volume_fraction");
     double constsa = curmineral.get<double>("specific_surface_area");

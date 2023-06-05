@@ -59,7 +59,7 @@ class PK_MPC : virtual public PK {
   virtual void Initialize();
 
   // -- set tags for integration period
-  virtual void set_tags(const Tag& current, const Tag& next);
+  virtual void setTags(const Tag& current, const Tag& next);
 
   // -- loops over sub-PKs
   virtual void CommitStep(double t_old, double t_new, const Tag& tag);
@@ -103,7 +103,7 @@ PK_MPC<PK_Base>::PK_MPC(Teuchos::ParameterList& pk_tree,
   solution_ = soln;
 
   // name the PK
-  name_ = pk_tree.name();
+  name_ = pk_tree.getName();
   auto found = name_.rfind("->");
   if (found != std::string::npos) name_.erase(0, found + 2);
 
@@ -176,10 +176,10 @@ PK_MPC<PK_Base>::Initialize()
 // -----------------------------------------------------------------------------
 template <class PK_Base>
 void
-PK_MPC<PK_Base>::set_tags(const Tag& current, const Tag& next)
+PK_MPC<PK_Base>::setTags(const Tag& current, const Tag& next)
 {
-  PK::set_tags(current, next);
-  for (auto& pk : sub_pks_) pk->set_tags(current, next);
+  PK::setTags(current, next);
+  for (auto& pk : sub_pks_) pk->setTags(current, next);
 }
 
 

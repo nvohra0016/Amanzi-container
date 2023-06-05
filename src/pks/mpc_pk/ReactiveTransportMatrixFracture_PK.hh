@@ -43,8 +43,8 @@ class ReactiveTransportMatrixFracture_PK : public PK_MPCSubcycled {
 
   // PK methods
   // -- dt is the minimum of the sub pks
-  virtual double get_dt() override;
-  virtual void set_dt(double dt) override;
+  virtual double getDt() override;
+  virtual void setDt(double dt) override;
 
   virtual void Setup() override;
   virtual void Initialize() override;

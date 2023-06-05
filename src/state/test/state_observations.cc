@@ -89,7 +89,8 @@ struct obs_test {
 
     auto plist = Teuchos::rcp(new Teuchos::ParameterList("mesh factory"));
     plist->set<std::string>("partitioner", "zoltan_rcb");
-    AmanziMesh::MeshFactory meshfactory(comm, gm, plist);
+    plist->set("create subcommunicator", true);
+    meshfactory = Teuchos::rcp(new AmanziMesh::MeshFactory(comm, gm, plist));
 
     AmanziMesh::Preference pref;
     pref.clear();
@@ -100,8 +101,8 @@ struct obs_test {
       pref.push_back(AmanziMesh::Framework::MSTK);
     }
 
-    meshfactory.set_preference(pref);
-    Teuchos::RCP<AmanziMesh::Mesh> mesh = meshfactory.create(-1, -1, -1, 1, 1, 1, 3, 3, 3);
+    meshfactory->set_preference(pref);
+    Teuchos::RCP<AmanziMesh::Mesh> mesh = meshfactory->create(-1, -1, -1, 1, 1, 1, 3, 3, 3);
 
     Teuchos::ParameterList state_list("state");
     state_list.sublist("verbose object").set<std::string>("verbosity level", "extreme");
@@ -169,6 +170,7 @@ struct obs_test {
  public:
   Teuchos::RCP<State> S;
   Comm_ptr_type comm;
+  Teuchos::RCP<AmanziMesh::MeshFactory> meshfactory;
 };
 
 
@@ -177,12 +179,7 @@ struct obs_domain_set_test : public obs_test {
   {
     // create the surface mesh
     auto parent = S->GetMesh("domain");
-
-    auto plist = Teuchos::rcp(new Teuchos::ParameterList("mesh factory"));
-    plist->set<std::string>("partitioner", "zoltan_rcb");
-    plist->set("create subcommunicator", true);
-    AmanziMesh::MeshFactory fac(parent->getComm(), parent->getGeometricModel(), plist);
-    auto surface_mesh = fac.create(parent, { "top face" }, AmanziMesh::Entity_kind::FACE, true);
+    auto surface_mesh = meshfactory->create(parent, { "top face" }, AmanziMesh::Entity_kind::FACE, true);
     S->RegisterMesh("surface", surface_mesh);
 
     // create domain set
@@ -201,7 +198,7 @@ struct obs_domain_set_test : public obs_test {
     int i = 0;
     for (auto& ds : *domain_set) {
       auto parent_list = Teuchos::rcp(new Teuchos::ParameterList(*parent->getParameterList()));
-      auto col_mesh = fac.createColumn(parent, i, parent_list);
+      auto col_mesh = meshfactory->createColumn(parent, i, parent_list);
       S->RegisterMesh(ds, col_mesh);
       i++;
     }

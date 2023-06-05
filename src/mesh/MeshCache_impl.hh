@@ -965,7 +965,6 @@ MeshCache<MEM>::getCellEdges(const Entity_ID c) const
       framework_mesh_->getCellEdges(i, ce);
       return ce; },
     nullptr,
-    nullptr,
     c);
 }
 

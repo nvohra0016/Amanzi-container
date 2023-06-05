@@ -215,7 +215,7 @@ Beaker::Speciate(BeakerState* state)
   double speciation_tolerance = 1.e-12;
   double residual_tolerance = 1.e-12;
   ResetStatus();
-  set_dt(1.0); // NOTE: need dt=1 to avoid divide by zero
+  setDt(1.0); // NOTE: need dt=1 to avoid divide by zero
   CheckChargeBalance_(state->total);
 
   CopyStateToBeaker(*state);
@@ -296,7 +296,7 @@ Beaker::ReactionStep(BeakerState* state, const BeakerParameters& parameters, dou
 {
   // update class parameters
   ResetStatus();
-  set_dt(dt);
+  setDt(dt);
   CheckChargeBalance_(state->total);
 
   CopyStateToBeaker(*state);
@@ -481,7 +481,7 @@ int
 Beaker::GetPrimaryIndex(const std::string& name) const
 {
   for (auto it = primary_species().begin(); it != primary_species().end(); ++it) {
-    if (it->name() == name) return it->identifier();
+    if (it->getName() == name) return it->identifier();
   }
   return -1;
 }
@@ -535,7 +535,7 @@ Beaker::DisplayComponents(const BeakerState& state) const
           // << std::setw(15) << "Free Ion"
           << std::endl;
   for (int i = 0; i < ncomp_; i++) {
-    message << std::setw(15) << primary_species().at(i).name() << std::scientific
+    message << std::setw(15) << primary_species().at(i).getName() << std::scientific
             << std::setprecision(5) << std::setw(15) << state.total.at(i) / water_density_kg_L_
             << std::setw(15)
             << state.total.at(i)
@@ -547,7 +547,7 @@ Beaker::DisplayComponents(const BeakerState& state) const
     message << "---- Mineral Components" << std::endl;
     message << std::setw(15) << "Name" << std::setw(15) << "Vol. frac" << std::endl;
     for (unsigned int m = 0; m < minerals_.size(); m++) {
-      message << std::setw(15) << minerals_.at(m).name() << std::setw(15) << std::fixed
+      message << std::setw(15) << minerals_.at(m).getName() << std::setw(15) << std::fixed
               << std::setprecision(5) << state.mineral_volume_fraction.at(m) << std::endl;
     }
   }
@@ -556,7 +556,7 @@ Beaker::DisplayComponents(const BeakerState& state) const
     message << "---- Sorbed Components" << std::endl;
     message << std::setw(15) << "Name" << std::setw(15) << "Moles / m^3" << std::endl;
     for (int i = 0; i < ncomp_; i++) {
-      message << std::setw(15) << primary_species().at(i).name() << std::scientific
+      message << std::setw(15) << primary_species().at(i).getName() << std::scientific
               << std::setprecision(5) << std::setw(15) << state.total_sorbed.at(i) << std::endl;
     }
   }
@@ -574,7 +574,7 @@ Beaker::DisplayResults() const
           << "---- Components\n"
           << "           Name       Molality       Molarity\n";
   for (int i = 0; i < ncomp_; i++) {
-    message << std::setw(15) << primary_species().at(i).name() << std::scientific
+    message << std::setw(15) << primary_species().at(i).getName() << std::scientific
             << std::setprecision(5) << std::setw(15) << total_.at(i) / water_density_kg_L_
             << std::setw(15) << total_.at(i) << std::endl;
   }
@@ -1412,7 +1412,7 @@ Beaker::ValidateSolution()
     if (minerals_.at(m).volume_fraction() < 0.0) {
       Errors::Message msg;
       msg << "Beaker::ValidateSolution(): \n"
-          << "   mineral " << minerals_.at(m).name()
+          << "   mineral " << minerals_.at(m).getName()
           << " volume_fraction is negative: " << minerals_.at(m).volume_fraction() << "\n";
       Exceptions::amanzi_throw(msg);
     }

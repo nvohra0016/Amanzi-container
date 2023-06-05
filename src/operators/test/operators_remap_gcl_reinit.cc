@@ -61,7 +61,7 @@ class MyRemapDGr : public Operators::RemapDG<TreeVector> {
 
    // time control
   double global_time(double t) { return tini_ + t * T1_; }
-  void set_dt_output(double dt) { dt_output_ = dt; }
+  void setDt_output(double dt) { dt_output_ = dt; }
 
   // tools
   // -- mass on mesh0
@@ -421,7 +421,7 @@ void RemapGCLr(const Amanzi::Explicit_TI::method_t& rk_method,
   MyRemapDGr remap(mesh0, mesh1, plist, T1);
   DeformMeshCurved(mesh1, deform, T1, mesh0, order);
   remap.Init(dg);
-  remap.set_dt_output(0.1);
+  remap.setDt_output(0.1);
 
   // initial mass
   auto& sv1 = *p1->SubVector(0)->Data();

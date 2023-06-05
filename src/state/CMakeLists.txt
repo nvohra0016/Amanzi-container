@@ -75,6 +75,7 @@ set(state_inc_files
   evaluators/EvaluatorIndependentConstant.hh
   evaluators/EvaluatorIndependentTensorFunction.hh
   evaluators/EvaluatorPrimary.hh
+  evaluators/EvaluatorPrimaryStaticMesh.hh
   evaluators/EvaluatorSecondary.hh
   evaluators/EvaluatorSecondaryMonotype.hh
   evaluators/EvaluatorSecondaryMonotypeAdditive.hh
@@ -89,9 +90,10 @@ set(state_inc_files
   Observable.hh
   UnstructuredObservations.hh
   Visualization.hh
+  VisualizationDomainSet.hh
   Checkpoint.hh
   # chemistry_data.hh 
-  # state_evaluators_registration.hh
+  state_evaluators_registration.hh
   )
 
 set(state_src_files
@@ -115,6 +117,7 @@ set(state_src_files
   Observable.cc
   UnstructuredObservations.cc
   Visualization.cc
+  VisualizationDomainSet.cc
   Checkpoint.cc
   # chemistry_data.cc
   )  

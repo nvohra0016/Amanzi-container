@@ -144,8 +144,8 @@ class CycleDriver {
   void WriteCheckpoint(double dt, bool force = false);
   void WriteWalkabout(bool force);
   //  void RegisterOutput();
-  double get_dt(bool after_failuer = false);
-  void set_dt(double dt);
+  double getDt(bool after_failuer = false);
+  void setDt(double dt);
   void ResetDriver(int time_period_id);
   // one stop shopping
   Teuchos::RCP<State> Go();

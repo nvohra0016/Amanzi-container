@@ -13,7 +13,7 @@
 /*
 This is moving toward a function approach, but is horribly non-functional.
 Effectively this just passes all the work the stored class, which includes
-boht data and functions.  Eventually the functions will migrate out of the
+both data and functions.  Eventually the functions will migrate out of the
 data structure into this class...
  */
 
@@ -59,7 +59,7 @@ class Evaluator_BCsFunction
         msg << "Invalid boundary condition type \"" << bc_type << "\" Currently supported are \"Dirichlet\" and \"Neumann\"";
         throw(msg);
       }
-      
+
       // merge the lists -- need only those that match this entity_kind, and
       // on this mesh
       for (int i=0; i!=speclist_funcs.first.size(); ++i) {
@@ -69,9 +69,9 @@ class Evaluator_BCsFunction
           funcs_.push_back(speclist_funcs.second[i]);
         }
       }
-      
+
       inited_ = true;
-    }      
+    }
   }
 
   virtual std::string name() const override { return "boundary condition function"; }
@@ -88,7 +88,6 @@ class Evaluator_BCsFunction
 
  protected:
   std::vector<Teuchos::RCP<const MultiFunction>> funcs_;
-  
 
  private:
   static Utils::RegisteredFactory<Evaluator, Evaluator_BCsFunction> fac_;

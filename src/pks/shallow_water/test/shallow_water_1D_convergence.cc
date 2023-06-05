@@ -218,7 +218,7 @@ TEST(SHALLOW_WATER_1D_CONVERGENCE)
     io.WriteVector(*vx_ex(0), "vx_ex", AmanziMesh::Entity_kind::CELL);
     io.FinalizeCycle();
 
-    dt = SWPK.get_dt();
+    dt = SWPK.getDt();
 
     if (iter < 10) dt = 0.01 * dt;
 

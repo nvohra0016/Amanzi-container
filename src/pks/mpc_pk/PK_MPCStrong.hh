@@ -52,8 +52,8 @@ class PK_MPCStrong : virtual public PK_MPC<PK_Base>, public PK_BDF {
   virtual void Initialize();
 
   // -- dt is the minimum of the sub pks
-  virtual double get_dt() { return dt_; }
-  virtual void set_dt(double dt) { dt_ = dt; }
+  virtual double getDt() { return dt_; }
+  virtual void setDt(double dt) { dt_ = dt; }
 
   // -- advance each sub pk dt.
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false);
@@ -156,7 +156,7 @@ PK_MPCStrong<PK_Base>::Setup()
   PK_MPC<PK_Base>::Setup();
 
   // Set the initial timestep as the min of the sub-pk sizes.
-  dt_ = get_dt();
+  dt_ = getDt();
 }
 
 

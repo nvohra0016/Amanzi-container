@@ -283,6 +283,34 @@ ReadCheckpoint<TensorVector>(const Checkpoint& chkp,
                              TensorVector& vec) {}
 
 
+
+// ======================================================================
+// Specializations for Teuchos::Array<double>
+// ======================================================================
+template <>
+void
+WriteVis<Teuchos::Array<double>>(const Visualization& vis,
+        Teuchos::ParameterList& attrs,
+        const Teuchos::Array<double>& vec);
+
+template <>
+void
+WriteCheckpoint<Teuchos::Array<double>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        const Teuchos::Array<double>& vec);
+
+template <>
+void
+ReadCheckpoint<Teuchos::Array<double>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        Teuchos::Array<double>& vec);
+
+template <>
+bool
+Initialize<Teuchos::Array<double>>(Teuchos::ParameterList& plist,
+        Teuchos::Array<double>& t);
+
+
 } // namespace Helpers
 } // namespace Amanzi
 

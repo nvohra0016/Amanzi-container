@@ -184,7 +184,7 @@ Initialize<CompositeVector>(Teuchos::ParameterList& plist,
       auto vel_vec = cvs.Create();
 
       // Evaluate the velocity function
-      auto func = Functions::createCompositeVectorFunction(func_plist, t.getMesh());
+      auto func = Teuchos::rcp(new Functions::CompositeVectorFunction(func_plist, t.getMesh()));
       func->Compute(t_ini, *vel_vec);
 
       // CV's map may differ from the regular mesh map due to presense of fractures
@@ -222,7 +222,7 @@ Initialize<CompositeVector>(Teuchos::ParameterList& plist,
 
     } else {
       // no map, just evaluate the function
-      auto func = Functions::createCompositeVectorFunction(func_plist, t.getMesh());
+      auto func = Teuchos::rcp(new Functions::CompositeVectorFunction(func_plist, t.getMesh()));
       func->Compute(t_ini, t);
       initialized = true;
     }
@@ -349,6 +349,49 @@ ReadCheckpoint<TreeVector>(const Checkpoint& chkp,
 // ======================================================================
 // Specializations for Teuchos::Array<double>
 // ======================================================================
+template <>
+void
+WriteVis<Teuchos::Array<double>>(const Visualization& vis,
+        Teuchos::ParameterList& attrs,
+        const Teuchos::Array<double>& vec)
+{
+  auto names = OutputUtils::names(attrs, vec.size());
+  for (int i = 0; i != vec.size(); ++i) {
+    Teuchos::ParameterList attrs_i(attrs);
+    attrs_i.setName(names[i]);
+    WriteVis(vis, attrs_i, vec[i]);
+  }
+}
+
+template <>
+void
+WriteCheckpoint<Teuchos::Array<double>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        const Teuchos::Array<double>& vec)
+{
+  auto names = OutputUtils::names(attrs, vec.size());
+  for (int i = 0; i != vec.size(); ++i) {
+    Teuchos::ParameterList attrs_i(attrs);
+    attrs_i.setName(names[i]);
+    WriteCheckpoint(chkp, attrs_i, vec[i]);
+  }
+}
+
+template <>
+void
+ReadCheckpoint<Teuchos::Array<double>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        Teuchos::Array<double>& vec)
+{
+  auto names = OutputUtils::names(attrs, vec.size());
+  for (int i = 0; i != vec.size(); ++i) {
+    Teuchos::ParameterList attrs_i(attrs);
+    attrs_i.setName(names[i]);
+    ReadCheckpoint(chkp, attrs_i, vec[i]);
+  }
+}
+
+
 template <>
 bool
 Initialize<Teuchos::Array<double>>(Teuchos::ParameterList& plist,

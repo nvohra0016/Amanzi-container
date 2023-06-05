@@ -351,7 +351,7 @@ RunTest(int icase)
       IO_Fields(t_out, iter, MyPID, io, *S, nullptr, nullptr);
     }
 
-    dt = SWPK.get_dt();
+    dt = SWPK.getDt();
 
     t_new = t_old + dt;
 

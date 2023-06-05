@@ -32,7 +32,7 @@ PK_MPCSequential::PK_MPCSequential(Teuchos::ParameterList& pk_tree,
                                    const Teuchos::RCP<TreeVector>& soln)
   : PK_MPC<PK>(pk_tree, global_list, S, soln)
 {
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 
@@ -48,11 +48,11 @@ PK_MPCSequential::PK_MPCSequential(Teuchos::ParameterList& pk_tree,
 // Calculate the min of sub PKs timestep sizes.
 // -----------------------------------------------------------------------------
 double
-PK_MPCSequential::get_dt()
+PK_MPCSequential::getDt()
 {
   double dt = 1.0e99;
   for (PK_MPC<PK>::SubPKList::iterator pk = sub_pks_.begin(); pk != sub_pks_.end(); ++pk) {
-    dt = std::min<double>(dt, (*pk)->get_dt());
+    dt = std::min<double>(dt, (*pk)->getDt());
   }
   return dt;
 }

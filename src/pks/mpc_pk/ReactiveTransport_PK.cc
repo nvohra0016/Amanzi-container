@@ -63,10 +63,10 @@ ReactiveTransport_PK::Initialize()
 // Calculate the min of sub PKs timestep sizes.
 // -----------------------------------------------------------------------------
 double
-ReactiveTransport_PK::get_dt()
+ReactiveTransport_PK::getDt()
 {
-  dTtran_ = transport_pk_->get_dt();
-  dTchem_ = chemistry_pk_->get_dt();
+  dTtran_ = transport_pk_->getDt();
+  dTchem_ = chemistry_pk_->getDt();
 
   if (!chem_step_succeeded && (dTchem_ / dTtran_ > 0.99)) { dTchem_ *= 0.5; }
 
@@ -80,15 +80,15 @@ ReactiveTransport_PK::get_dt()
 //
 // -----------------------------------------------------------------------------
 void
-ReactiveTransport_PK::set_dt(double dt)
+ReactiveTransport_PK::setDt(double dt)
 {
   dTtran_ = dt;
   dTchem_ = dt;
-  //dTchem_ = chemistry_pk_->get_dt();
+  //dTchem_ = chemistry_pk_->getDt();
   //if (dTchem_ > dTtran_) dTchem_ = dTtran_;
   //if (dTtran_ > dTchem_) dTtran_= dTchem_;
-  chemistry_pk_->set_dt(dTchem_);
-  transport_pk_->set_dt(dTtran_);
+  chemistry_pk_->setDt(dTchem_);
+  transport_pk_->setDt(dTtran_);
 }
 
 

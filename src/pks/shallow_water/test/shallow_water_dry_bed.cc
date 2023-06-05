@@ -207,7 +207,7 @@ RunTest(int icase)
 
     if (iter % 100 == 0) { IO_Fields(t_out, iter, MyPID, io, *S, nullptr, nullptr); }
 
-    dt = SWPK.get_dt();
+    dt = SWPK.getDt();
 
     t_new = t_old + dt;
 

@@ -41,17 +41,16 @@ class FIFO_Set {
   using const_iterator = typename Container_type::const_iterator;
 
   const_iterator begin() const { return store_.begin(); }
-
   const_iterator end() const { return store_.end(); }
+  std::size_t size() const { return store_.size(); }
 
   const T& front() const { return store_.front(); }
-
   const T& back() const { return store_.back(); }
-
-  std::size_t size() const { return store_.size(); }
 
   const T& operator[](const int& i) const { return store_[i]; }
   T& operator[](const int& i) { return store_[i]; }
+
+  const Container_type& asVector() const { return store_; }
 
  protected:
   Container_type store_;

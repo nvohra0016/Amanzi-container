@@ -52,8 +52,12 @@
 #define STATE_EVALUATOR_MODEL_HH_
 
 #include "AmanziTypes.hh"
+#include "CompositeVectorSpace.hh"
+#include "CompositeVector.hh"
+#include "Factory.hh"
 #include "StateDefs.hh"
 #include "EvaluatorModelLauncher.hh"
+#include "EvaluatorSecondaryMonotype.hh"
 
 namespace Amanzi {
 
@@ -66,17 +70,16 @@ template <template <class, class> class Model,
 class EvaluatorModelCV
   : public EvaluatorSecondaryMonotype<CompositeVector, CompositeVectorSpace> {
  public:
-  using Model_type =
-    Model<cVectorView_type<Device_type>, VectorView_type<Device_type>>;
-  using View_type = VectorView_type<Device_type>;
-  using cView_type = cVectorView_type<Device_type>;
+  using View_type = MultiVectorView_type<Device_type>;
+  using cView_type = cMultiVectorView_type<Device_type>;
+  using Model_type = Model<cView_type, View_type>;
 
   Teuchos::ParameterList plist_;
 
   EvaluatorModelCV(Teuchos::ParameterList& plist);
 
   virtual Teuchos::RCP<Evaluator> Clone() const override;
-  virtual std::string getName() const override { return model_->name; }
+  virtual std::string getType() const override { return model_->name; }
 
  protected:
   virtual void Evaluate_(const State& S,
@@ -86,6 +89,11 @@ class EvaluatorModelCV
     const State& S, const Key& wrt_key, const Tag& wrt_tag,
     const std::vector<CompositeVector*>& results) override;
 
+  virtual void EnsureCompatibility_Structure_(State& S) override {
+    // make sure all my_keys have the same CVS
+    EnsureCompatibility_StructureSame_(S);
+  }
+
  protected:
   Teuchos::RCP<Model_type> model_;
   std::string name_;
@@ -93,7 +101,7 @@ class EvaluatorModelCV
 
  private:
   // registration in the evaluator factory
-  static Utils::RegisteredFactory<Evaluator, EvaluatorModelCV<Model,Device_type>> fac_;
+  static Utils::RegisteredFactory<Evaluator, EvaluatorModelCV<Model,Device_type>> reg_;
 
 };
 
@@ -110,10 +118,11 @@ EvaluatorModelCV<Model, Device_type>::
     name_(plist.name()),
     tag_(plist.get<std::string>("tag"))
 {
-  auto dep_list = model_->getDependencies();
-  for (const auto& dep : dep_list) {
+  my_keys_.clear();
+  for (const auto& k : model_->getMyKeys())
+    my_keys_.emplace_back(KeyTag(k, tag_));
+  for (const auto& dep : model_->getDependencies())
     dependencies_.insert(KeyTag(dep, tag_));
-  }
 }
 
 template <template <class, class> class Model, class Device_type>
@@ -135,22 +144,12 @@ EvaluatorModelCV<Model, Device_type>::Evaluate_(
     std::vector<cView_type> dependency_views;
     for (const auto& dep : dependencies_) {
       const auto& vec = S.Get<CompositeVector>(dep.first, dep.second);
-      if (vec.getNumVectors(comp) != 1) {
-        Errors::Message msg(
-          "EvaluatorModel: expects only dependencies with one DoF.");
-        throw(msg);
-      }
-      dependency_views.emplace_back(vec.viewComponent(comp, 0, false));
+      dependency_views.emplace_back(vec.viewComponent(comp, false));
     }
 
     std::vector<View_type> result_views;
     for (auto result : results) {
-      if (result->getNumVectors(comp) != 1) {
-        Errors::Message msg(
-          "EvaluatorModel: expects only results with one DoF.");
-        throw(msg);
-      }
-      result_views.emplace_back(result->viewComponent(comp, 0, false));
+      result_views.emplace_back(result->viewComponent(comp, false));
     }
 
     // set up the model and range and then dispatch
@@ -177,22 +176,12 @@ EvaluatorModelCV<Model, Device_type>::EvaluatePartialDerivative_(
     std::vector<cView_type> dependency_views;
     for (const auto& dep : dependencies_) {
       const auto& vec = S.Get<CompositeVector>(dep.first, dep.second);
-      if (vec.getNumVectors(comp) != 1) {
-        Errors::Message msg(
-          "EvaluatorModel: expects only dependencies with one DoF.");
-        throw(msg);
-      }
-      dependency_views.emplace_back(vec.viewComponent(comp, 0, false));
+      dependency_views.emplace_back(vec.viewComponent(comp, false));
     }
 
     std::vector<View_type> result_views;
     for (auto result : results) {
-      if (result->getNumVectors(comp) != 1) {
-        Errors::Message msg(
-          "EvaluatorModel: expects only results with one DoF.");
-        throw(msg);
-      }
-      result_views.emplace_back(result->viewComponent(comp, 0, false));
+      result_views.emplace_back(result->viewComponent(comp, false));
     }
 
     // set up the model and range and then dispatch

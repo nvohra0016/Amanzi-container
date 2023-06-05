@@ -31,7 +31,7 @@ namespace OutputFactory {
 Output::FilenameFormatter createDirectoryFormatter(Teuchos::ParameterList& plist);
 
 std::unique_ptr<Output>
-createForVis(Teuchos::ParameterList& plist, const Teuchos::RCP<const AmanziMesh::Mesh>& mesh);
+createForVis(Teuchos::ParameterList& plist, const Teuchos::RCP<const AmanziMesh::MeshHost>& mesh);
 
 std::unique_ptr<Output>
 createForCheckpoint(Teuchos::ParameterList& plist, const Comm_ptr_type& comm);

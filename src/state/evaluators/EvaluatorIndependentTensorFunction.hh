@@ -52,7 +52,7 @@ class EvaluatorIndependentTensorFunction
   virtual Teuchos::RCP<Evaluator> Clone() const override;
 
   virtual void EnsureCompatibility(State& S) override;
-  virtual std::string getName() const override { return "tensor independent variable"; }
+  virtual std::string getType() const override { return "tensor independent variable"; }
 
  protected:
   // ---------------------------------------------------------------------------

@@ -42,9 +42,9 @@ ShallowWaterTransport_PK::ShallowWaterTransport_PK(
 * Calculate the min of sub-PKs timesteps and limit it.
 ****************************************************************** */
 double
-ShallowWaterTransport_PK::get_dt()
+ShallowWaterTransport_PK::getDt()
 {
-  return cfl_ * PK_MPCWeak::get_dt();
+  return cfl_ * PK_MPCWeak::getDt();
 }
 
 

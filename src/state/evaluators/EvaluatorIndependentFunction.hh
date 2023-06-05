@@ -56,8 +56,8 @@ class EvaluatorIndependentFunction
 
   EvaluatorIndependentFunction& operator=(const EvaluatorIndependentFunction& other);
 
-  virtual std::string getName() const override {
-    return "independent from file";
+  virtual std::string getType() const override {
+    return "independent variable";
   }
 
  protected:

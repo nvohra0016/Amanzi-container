@@ -21,7 +21,7 @@ Vector_type_<GO>
 asVector(const Map_ptr_type& map);
 
 std::vector<std::string>
-getNames(const Teuchos::ParameterList& attrs, std::size_t count);
+names(const Teuchos::ParameterList& attrs, std::size_t count);
 
 } // namespace OutputUtils
 } // namespace Amanzi

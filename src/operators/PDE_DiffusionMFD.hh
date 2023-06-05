@@ -71,7 +71,7 @@ Additional options available only for the MFD family of discretizations include:
 namespace Amanzi {
 namespace Operators {
 
-class PDE_DiffusionMFD : public PDE_Diffusion {
+class PDE_DiffusionMFD : public virtual PDE_Diffusion {
  public:
   PDE_DiffusionMFD(Teuchos::ParameterList& plist,
                    const Teuchos::RCP<Operator>& global_op) :

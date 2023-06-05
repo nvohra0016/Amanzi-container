@@ -255,7 +255,7 @@ SimpleThermoDatabase::RebuildAqueousComplexes_(const Teuchos::ParameterList& pli
   std::vector<std::string> secondaries;
 
   for (int i = 0; i < this->primary_species().size(); ++i) {
-    primaries.push_back(primary_species()[i].name());
+    primaries.push_back(primary_species()[i].getName());
   }
   primaries.push_back("H2O");
 

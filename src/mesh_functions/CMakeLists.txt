@@ -74,16 +74,26 @@ if (BUILD_TESTS)
 
   # Copy test subdirectory for out of source builds
   if (NOT (MFUNCS_SOURCE_DIR STREQUAL MFUNCS_BINARY_DIR))
-      # file(GLOB DataFiles "${MFUNCS_SOURCE_DIR}/test/*.xml")
-      # file(COPY ${DataFiles} DESTINATION ${MFUNCS_BINARY_DIR}/test/)
-    endif()
+    file(GLOB DataFiles "${MFUNCS_SOURCE_DIR}/test/*.xml")
+    file(COPY ${DataFiles} DESTINATION ${MFUNCS_BINARY_DIR}/test/)
+  endif()
 
-    set(mesh_functions_test_link_libs
-      mesh_functions mesh_factory ${mesh_functions_link_libs} ${UnitTest_LIBRARIES} ${HDF5_LIBRARIES} ${Boost_LIBRARIES})
+  set(mesh_functions_test_link_libs
+    mesh_functions mesh_factory ${mesh_functions_link_libs} ${UnitTest_LIBRARIES} ${HDF5_LIBRARIES} ${Boost_LIBRARIES})
 
+  add_amanzi_test(mesh_functions_base mesh_functions_base
+                  KIND unit
+                  SOURCE test/mesh_functions_base.cc test/Main.cc
+                  LINK_LIBS ${mesh_functions_test_link_libs})
+
+  add_amanzi_test(mesh_functions_bcs mesh_functions_bcs
+                  KIND unit
+                  SOURCE test/mesh_functions_bcs.cc test/Main.cc
+                  LINK_LIBS ${mesh_functions_test_link_libs})
+                
   add_amanzi_test(mesh_functions_composite_vector_function mesh_functions_composite_vector_function
                   KIND unit
                   SOURCE test/mesh_functions_composite_vector_function.cc test/Main.cc
                   LINK_LIBS ${mesh_functions_test_link_libs})
-
+                
 endif()

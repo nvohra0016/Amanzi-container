@@ -38,6 +38,7 @@
 #define STATE_EVALUATOR_MODEL_LAUNCHER_HH_
 
 #include "AmanziTypes.hh"
+#include "Mesh.hh"
 #include "StateDefs.hh"
 
 namespace Amanzi {

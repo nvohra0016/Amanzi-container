@@ -37,7 +37,7 @@ namespace AmanziMesh {
 // MeshFrameworkFactory:: constructors / destructor
 // -------------------------------------------------------------
 MeshFrameworkFactory::MeshFrameworkFactory(const Comm_ptr_type& comm,
-                         const Teuchos::RCP<const AmanziGeometry::GeometricModel>& gm,
+                         const Teuchos::RCP<AmanziGeometry::GeometricModel>& gm,
                          const Teuchos::RCP<Teuchos::ParameterList>& plist)
   : comm_(comm),
     gm_(gm),
@@ -284,12 +284,6 @@ MeshFrameworkFactory::create(const Teuchos::RCP<const Mesh>& inmesh,
                              const Entity_kind setkind,
                              const bool flatten)
 {
-  // we have sane defaults from the parent mesh for some things
-  auto gm = Teuchos::RCP<const AmanziGeometry::GeometricModel>(gm_);
-  if (gm == Teuchos::null) {
-    gm = inmesh->getGeometricModel();
-  }
-
   // create the comm via split
   Comm_ptr_type comm = Teuchos::null;
   auto parent_comm = Teuchos::rcp_dynamic_cast<const MpiComm_type>(inmesh->getComm());
@@ -334,7 +328,7 @@ MeshFrameworkFactory::create(const Teuchos::RCP<const Mesh>& inmesh,
       if (comm != Teuchos::null) {
         auto mesh = Teuchos::rcp(new Mesh_MSTK(
                   inmesh->getMeshFramework(), setids, setkind, flatten,
-                  comm, gm, plist_));
+                  comm, gm_, plist_));
         return mesh;
       } else {
         return Teuchos::null;
@@ -360,19 +354,18 @@ MeshFrameworkFactory::create(const Teuchos::RCP<const Mesh>& inmesh,
 {
   if (extraction_method_ == "manifold mesh") {
     const auto& comm = inmesh->getComm();
-    const auto& gm = inmesh->getGeometricModel();
 
     // greedy solution for more than one sets. A new region is forced into GM
     std::string setname(setnames[0]);
     if (setnames.size() > 1) {
       for (int i = 1; i < setnames.size(); ++i) setname += "_" + setnames[i];
       auto rgn = Teuchos::rcp(new AmanziGeometry::RegionLogical(setname, -1, "union", setnames));
-      Teuchos::rcp_const_cast<AmanziGeometry::GeometricModel>(gm)->AddRegion(rgn);
+      gm_->AddRegion(rgn);
     }
 
     auto inmesh_host = onMemSpace<MemSpace_kind::HOST>(inmesh);
     auto mesh = Teuchos::rcp(new MeshExtractedManifold(inmesh_host, setname, setkind,
-            comm, gm, plist_, flatten));
+            comm, gm_, plist_, flatten));
 
     return mesh;
 

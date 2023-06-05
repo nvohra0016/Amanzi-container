@@ -32,7 +32,8 @@ RecordSet::attributes(Tag const* const tag = nullptr) const
   Teuchos::ParameterList attrs(name);
   // attrs.set("units", units());
   attrs.set("location", location());
-  attrs.set("subfieldnames", subfieldnames());
+  auto names = subfieldnames();
+  if (names) attrs.set("subfieldnames", names);
   return attrs;
 }
 

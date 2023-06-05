@@ -113,7 +113,7 @@ class Output {
  protected:
   template<typename Scalar>
   void writeMultiVector_(const Teuchos::ParameterList& attrs, const MultiVector_type_<Scalar>& vec) const {
-    std::vector<std::string> names = OutputUtils::getNames(attrs, vec.getNumVectors());
+    std::vector<std::string> names = OutputUtils::names(attrs, vec.getNumVectors());
     for (int i = 0; i != vec.getNumVectors(); ++i) {
       Teuchos::ParameterList attrs_i(attrs);
       attrs_i.setName(names[i]);

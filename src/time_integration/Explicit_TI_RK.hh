@@ -7,13 +7,71 @@
   Authors: Markus Berndt (berndt@lanl.gov)
 */
 
-//! <MISSING_ONELINE_DOCSTRING>
+//! Explicit time integration methods in a generalized form.
+/*!
+
+This class implements several explicit Runge Kutta methods:
+
+- forward Euler     (1st order)  --> "forward_euler"
+- Heun-Euler method (2nd order)  --> "heun_euler"
+- Midpoint method   (2nd order)  --> "midpoint"
+- Ralston method    (2nd order)  --> "ralston"
+- TVD RK method     (3rd order)  --> "tvd_3rd_order"
+- Kutta method      (3rd order)  --> "kutta_3rd_order"
+- Runge Kutta       (4th order)  --> "runge_kutta_4th_order"
+- User defined      (whatever)   --> user_defined, use special constructor to create
+
+Note that user-defined is only for developers currently, and cannot be created from an input file.
+
+The RK tableau is made up of the three private objects a, b, and c below.  they
+are arranged as follows:
+
+.. code-block:
+
+    c[0]   |
+    c[1]   | a(1,0)
+     .     | a(2,0)    a(2,1)
+     .     |   .         .
+     .     |   .         .
+    c[s-1 ]| a(s-1,0)  a(s-1,1)  . . .  a(s-1,s-2)
+    ---------------------------------------------------------
+           |   b[0]      b[1]    . . .    b[s-2]      b[s-1]
+
+Note that c[0] should always equal zero, and that the entries in the matrix a
+that are not listed in this tableau are not used
+
+The implemented general Runge Kutta scheme of order s based on this tableau arrangement is
+
+.. math::
+    y_{n+1} = y_n + \sum{i=0}^{s-1} b[i]*k_i
+
+    with
+
+      k_0 = h * f(t_n, y_n) \\
+      k_1 = h * f(t_n + c[1]*h, y_n + a(1,0)*k_0) \\
+      k_2 = h * f(t_n + c[2]*h, y_n + a(2,0)*k_0 + a(2,1)*k_1) \\
+       . \\
+       . \\
+       . \\
+      k_{s-1} = h * f(t_n + c[s-1]*h, y_n + a(s-1,0)*k_0 + ... + a(s-1,s-2)*k_{s-2})
+
+
+.. _explicit-ti-rk-spec:
+.. admonition:: explicit-ti-rk-spec
+
+    * `"verbose object`" ``[verbose-object-spec]`` A `Verbose Object`_
+
+    * `"RK method`" ``[string]`` **forward euler**  One of: `"forward Euler`", `"heun euler`", `"midpoint`", `"ralston`", `"tvd 3rd order`", `"kutta 3rd order`", `"runge kutta 4th order`"
+
+*/
+
+
 #ifndef AMANZI_EXPLICIT_TI_RK_HH_
 #define AMANZI_EXPLICIT_TI_RK_HH_
 
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_RCP.hpp"
-#include "Teuchos_SerialDenseMatrix.hpp"
+#include "Epetra_SerialDenseMatrix.h"
 
 #include "errors.hh"
 #include "Explicit_TI_FnBase.hh"
@@ -35,51 +93,8 @@ enum method_t {
 
 template <class Vector>
 class RK {
-  // this class implements several explicit Runge Kutta methods:
-  // forward Euler     (1st order)  --> forward_euler
-  // Heun-Euler method (2nd order)  --> heun_euler
-  // Midpoint method   (2nd order)  --> midpoint
-  // Ralston method    (2nd order)  --> ralston
-  // TVD RK method     (3rd order)  --> tvd_3rd_order
-  // Kutta method      (3rd order)  --> kutta_3rd_order
-  // Runge Kutta       (4th order)  --> runge_kutta_4th_order
-  // User defined      (whatever)   --> user_defined, use special constructor to
-  // create
-
-  // the RK tableau is made up of the three private objects a, b, and c below.
-  // they are arranged as follows:
-  //
-  // c[0]   |
-  // c[1]   | a(1,0)
-  //  .     | a(2,0)    a(2,1)
-  //  .     |   .         .
-  //  .     |   .         .
-  // c[s-1 ]| a(s-1,0)  a(s-1,1)  . . .  a(s-1,s-2)
-  // ---------------------------------------------------------
-  //        |   b[0]      b[1]    . . .    b[s-2]      b[s-1]
-  //
-  // note that c[0] should always equal zero, and that the entries in the matrix
-  // a that are not listed in this tableau are not used
-  //
-  // the implemented general Runge Kutta scheme of order s based on this tableau
-  // arrangement is
-  //
-  //     y_{n+1} = y_n + \sum{i=0}^{s-1} b[i]*k_i
-  //
-  // with
-  //
-  //     k_0 = h * f(t_n, y_n)
-  //     k_1 = h * f(t_n + c[1]*h, y_n + a(1,0)*k_0)
-  //     k_2 = h * f(t_n + c[2]*h, y_n + a(2,0)*k_0 + a(2,1)*k_1)
-  //      .
-  //      .
-  //      .
-  //     k_{s-1} = h * f(t_n + c[s-1]*h, y_n + a(s-1,0)*k_0 + ... +
-  //     a(s-1,s-2)*k_{s-2})
-
  public:
-  // constructor for pre-coded RK methods (see list of methods in the method_t
-  // type above)
+  // constructor for pre-coded RK methods (see list of methods in the method_t type above)
   RK(fnBase<Vector>& fn, const method_t method, const Vector& initvector);
 
   // constructor from ParameterList
@@ -88,7 +103,7 @@ class RK {
   // constructor for user defined RK methods
   RK(fnBase<Vector>& fn,
      const int order,
-     const Teuchos::SerialDenseMatrix<int, double>& a,
+     const Teuchos::SerialDenseMatrix<int,double>& a,
      const std::vector<double> b,
      const std::vector<double> c,
      const Vector& initvector);
@@ -105,7 +120,7 @@ class RK {
   fnBase<Vector>& fn_;
   int order_;
   method_t method_;
-  Teuchos::SerialDenseMatrix<int, double> a_;
+  Epetra_SerialDenseMatrix a_;
   std::vector<double> b_, c_;
   std::vector<Teuchos::RCP<Vector>> k_;
 
@@ -128,7 +143,7 @@ RK<Vector>::RK(fnBase<Vector>& fn, Teuchos::ParameterList& plist, const Vector& 
   : fn_(fn), plist_(plist)
 {
   std::string methodstring = plist_.get<std::string>("RK method", "forward euler");
-  method_t method;
+  method_t method(forward_euler);
   if (methodstring == "forward euler") {
     method = forward_euler;
   } else if (methodstring == "heun euler") {
@@ -159,7 +174,7 @@ RK<Vector>::RK(fnBase<Vector>& fn, Teuchos::ParameterList& plist, const Vector& 
 template <class Vector>
 RK<Vector>::RK(fnBase<Vector>& fn,
                const int order,
-               const Teuchos::SerialDenseMatrix<int, double>& a,
+               const Epetra_SerialDenseMatrix& a,
                const std::vector<double> b,
                const std::vector<double> c,
                const Vector& initvector)
@@ -207,7 +222,7 @@ RK<Vector>::InitMethod_(const method_t method)
     order_ = -1;
   }
 
-  a_.shape(order_, order_);
+  a_.Shape(order_, order_);
   b_.resize(order_);
   c_.resize(order_);
 
@@ -309,7 +324,7 @@ void
 RK<Vector>::CreateStorage_(const Vector& initvector)
 {
   k_.resize(order_);
-  for (int i = 0; i != order_; ++i) { k_[i] = Teuchos::rcp(new Vector(initvector.getMap())); }
+  for (int i = 0; i != order_; ++i) { k_[i] = Teuchos::rcp(new Vector(initvector)); }
 }
 
 
@@ -317,16 +332,15 @@ template <class Vector>
 void
 RK<Vector>::TimeStep(double t, double h, const Vector& y, Vector& y_new)
 {
-  y_new.assign(y);
-  fn_.ModifySolution(t, y_new);
-  Vector y_tmp(y_new, Teuchos::Copy);
+  Vector y_tmp(y);
+  fn_.ModifySolution(t, y_tmp);
 
   double sum_time;
   for (int i = 0; i != order_; ++i) {
     sum_time = t + c_[i] * h;
 
     if (i == 0) {
-      fn_.FunctionalTimeDerivative(sum_time, y_new, *k_[0]);
+      fn_.FunctionalTimeDerivative(sum_time, y_tmp, *k_[0]);
     } else {
       y_new.assign(y_tmp);
 

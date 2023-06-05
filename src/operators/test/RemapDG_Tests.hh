@@ -43,7 +43,7 @@ class RemapDG_Tests : public Operators::RemapDG {
   // output
   void CollectStatistics(double t, const CompositeVector& u);
   virtual double global_time(double t) { return t; }
-  void set_dt_output(double dt) { dt_output_ = dt; }
+  void setDt_output(double dt) { dt_output_ = dt; }
 
  protected:
   std::vector<WhetStone::Polynomial> det0_, det1_;

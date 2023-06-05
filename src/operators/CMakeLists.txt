@@ -60,7 +60,7 @@ set(operators_inc_files
   Operator.hh
   Operator_Cell.hh
   Operator_FaceCell.hh
-  Operator_FacCellSff.hh
+  Operator_FaceCellSff.hh
 #  Operator_CellBndFace.hh
   Operator_Factory.hh
   TreeOperator.hh

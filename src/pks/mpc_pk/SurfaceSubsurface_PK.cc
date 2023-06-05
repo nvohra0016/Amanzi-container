@@ -41,10 +41,10 @@ SurfaceSubsurface_PK::SurfaceSubsurface_PK(Teuchos::ParameterList& pk_tree,
 // Calculate the min of sub PKs timestep sizes.
 // -----------------------------------------------------------------------------
 double
-SurfaceSubsurface_PK::get_dt()
+SurfaceSubsurface_PK::getDt()
 {
-  // double dt = Amanzi::PK_MPCSubcycled::get_dt();
-  double dt = sub_pks_[master_]->get_dt();
+  // double dt = Amanzi::PK_MPCSubcycled::getDt();
+  double dt = sub_pks_[master_]->getDt();
   return dt;
 }
 
@@ -92,10 +92,10 @@ SurfaceSubsurface_PK::Initialize()
 // Set master dt
 // -----------------------------------------------------------------------------
 void
-SurfaceSubsurface_PK::set_dt(double dt)
+SurfaceSubsurface_PK::setDt(double dt)
 {
   master_dt_ = dt;
-  sub_pks_[master_]->set_dt(dt);
+  sub_pks_[master_]->setDt(dt);
 }
 
 
@@ -125,7 +125,7 @@ SurfaceSubsurface_PK::AdvanceStep(double t_old, double t_new, bool reinit)
 
   sub_pks_[master_]->CommitStep(t_old, t_new, Tags::DEFAULT);
 
-  slave_dt_ = sub_pks_[slave_]->get_dt();
+  slave_dt_ = sub_pks_[slave_]->getDt();
 
   if (slave_dt_ > master_dt_) slave_dt_ = master_dt_;
 
@@ -160,10 +160,10 @@ SurfaceSubsurface_PK::AdvanceStep(double t_old, double t_new, bool reinit)
       water_exchange += sw_pk->get_total_source();
 
       // allow dt to grow only when success
-      dt_next = sub_pks_[slave_]->get_dt();
+      dt_next = sub_pks_[slave_]->getDt();
     }
 
-    // dt_next = sub_pks_[slave_]->get_dt();
+    // dt_next = sub_pks_[slave_]->getDt();
     // no state recovery (e.g. pressure) is made, so the only option is to fail.
     if (dt_next < min_dt_)
       Exceptions::amanzi_throw("Failure in SurfaceSubsurface_PK: small time step.");

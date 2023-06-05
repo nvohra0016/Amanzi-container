@@ -125,8 +125,8 @@ class ImplicitPK : public Amanzi::PK_PhysicalBDF {
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false) override;
   virtual void CommitStep(double t_old, double t_new, const Tag& tag) override;
 
-  virtual double get_dt() override { return dt_ * cfl_; }
-  virtual void set_dt(double dt) override { dt_ = dt; }
+  virtual double getDt() override { return dt_ * cfl_; }
+  virtual void setDt(double dt) override { dt_ = dt; }
 
   virtual void FunctionalResidual(double t_old,
                                   double t_new,

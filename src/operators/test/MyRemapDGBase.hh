@@ -44,7 +44,7 @@ class MyRemapDGBase : public Operators::RemapDG {
   // output
   void CollectStatistics(double t, const CompositeVector& u);
   virtual double global_time(double t) { return t; }
-  void set_dt_output(double dt) { dt_output_ = dt; }
+  void setDt_output(double dt) { dt_output_ = dt; }
 
   // statistics
   double tprint_, dt_output_, l2norm_;

@@ -70,7 +70,7 @@ Richards_PK::SolveFullySaturatedProblem(double t_old,
     u.Norm2(&pnorm);
 
     Teuchos::OSTab tab = vo_->getOSTab();
-    *vo_->os() << "saturated solver (" << solver->name() << "): ||p,lambda||=" << pnorm
+    *vo_->os() << "saturated solver (" << solver->getName() << "): ||p,lambda||=" << pnorm
                << " itr=" << num_itrs << " code=" << code << std::endl;
 
     CompositeVector r(rhs);
@@ -160,7 +160,7 @@ Richards_PK::EnforceConstraints(double t_new, Teuchos::RCP<CompositeVector> u)
     u->Norm2(&pnorm);
 
     Teuchos::OSTab tab = vo_->getOSTab();
-    *vo_->os() << "constraints solver (" << solver->name() << "): ||p,lambda||=" << pnorm
+    *vo_->os() << "constraints solver (" << solver->getName() << "): ||p,lambda||=" << pnorm
                << " itr=" << num_itrs << " code=" << code << std::endl;
   }
 

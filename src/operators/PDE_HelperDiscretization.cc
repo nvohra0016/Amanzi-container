@@ -87,126 +87,126 @@ void PDE_HelperDiscretization::SetBCs(const Teuchos::RCP<const BCs>& bc_trial,
   bcs_test_.emplace_back(bc_test);
 }
 
-void PDE_HelperDiscretization::AddBCs(const Teuchos::RCP<const BCs>& bc_trial,
-        const Teuchos::RCP<const BCs>& bc_test)
-{
-  const std::vector<int>& bc_model = bc.bc_model();
-  const std::vector<double>& bc_value = bc.bc_value();
+// void PDE_HelperDiscretization::AddBCs(const Teuchos::RCP<const BCs>& bc_trial,
+//         const Teuchos::RCP<const BCs>& bc_test)
+// {
+//   const auto& bc_model = bc.bc_model();
+//   const auto& bc_value = bc.bc_value();
 
-  AmanziMesh::cEntity_ID_View entities, cells;
-  std::vector<int> offset;
+//   AmanziMesh::cEntity_ID_View entities, cells;
+//   std::vector<int> offset;
 
-  CompositeVector& rhs = *global_op_->rhs();
-  rhs.PutScalarGhosted(0.0);
+//   CompositeVector& rhs = *global_op_->rhs();
+//   rhs.PutScalarGhosted(0.0);
 
-  const Schema& schema_row = global_op_->schema_row();
-  const Schema& schema_col = global_op_->schema_col();
+//   const Schema& schema_row = global_op_->schema_row();
+//   const Schema& schema_col = global_op_->schema_col();
 
-  AmanziMesh::Entity_kind kind = bc.kind();
-  Teuchos::RCP<Epetra_MultiVector> rhs_kind;
-  if (primary) {
-    std::string name = schema_row.KindToString(kind);
-    if (!rhs.HasComponent(name)) return;
-    rhs_kind = rhs.ViewComponent(name, true);
-  }
+//   AmanziMesh::Entity_kind kind = bc.kind();
+//   Teuchos::RCP<Epetra_MultiVector> rhs_kind;
+//   if (primary) {
+//     std::string name = schema_row.KindToString(kind);
+//     if (!rhs.HasComponent(name)) return;
+//     rhs_kind = rhs.ViewComponent(name, true);
+//   }
 
-  for (int c = 0; c != ncells_owned; ++c) {
-    WhetStone::DenseMatrix& Acell = op->matrices[c];
-    int ncols = Acell.NumCols();
-    int nrows = Acell.NumRows();
+//   for (int c = 0; c != ncells_owned; ++c) {
+//     WhetStone::DenseMatrix& Acell = op->matrices[c];
+//     int ncols = Acell.NumCols();
+//     int nrows = Acell.NumRows();
 
-    int nents_owned(0);
-    if (kind == AmanziMesh::Entity_kind::FACE) {
-      entities = mesh_->getCellFaces(c);
-      nents_owned = nfaces_owned;
-    } else if (kind == AmanziMesh::Entity_kind::EDGE) {
-      entities = mesh_->getCellEdges(c);
-      nents_owned = nedges_owned;
-    } else if (kind == AmanziMesh::Entity_kind::NODE) {
-      entities = mesh_->getCellNodes(c);
-      nents_owned = nnodes_owned;
-    }
-    int nents = entities.size();
+//     int nents_owned(0);
+//     if (kind == AmanziMesh::Entity_kind::FACE) {
+//       entities = mesh_->getCellFaces(c);
+//       nents_owned = nfaces_owned;
+//     } else if (kind == AmanziMesh::Entity_kind::EDGE) {
+//       entities = mesh_->getCellEdges(c);
+//       nents_owned = nedges_owned;
+//     } else if (kind == AmanziMesh::Entity_kind::NODE) {
+//       entities = mesh_->getCellNodes(c);
+//       nents_owned = nnodes_owned;
+//     }
+//     int nents = entities.size();
 
-    // check for a boundary entity
-    bool found(false);
-    for (int n = 0; n != nents; ++n) {
-      int x = entities[n];
-      if (bc_model[x] == OPERATOR_BC_DIRICHLET) found = true;
-    }
-    if (!found) continue;
+//     // check for a boundary entity
+//     bool found(false);
+//     for (int n = 0; n != nents; ++n) {
+//       int x = entities[n];
+//       if (bc_model[x] == OPERATOR_BC_DIRICHLET) found = true;
+//     }
+//     if (!found) continue;
 
-    // essential conditions for test functions
-    schema_row.ComputeOffset(c, mesh_, offset);
+//     // essential conditions for test functions
+//     schema_row.ComputeOffset(c, mesh_, offset);
 
-    int item(0);
-    AmanziMesh::Entity_kind itkind;
+//     int item(0);
+//     AmanziMesh::Entity_kind itkind;
 
-    for (auto it = op->schema_row().begin(); it != op->schema_row().end(); ++it, ++item) {
-      std::tie(itkind, std::ignore, std::ignore) = *it;
+//     for (auto it = op->schema_row().begin(); it != op->schema_row().end(); ++it, ++item) {
+//       std::tie(itkind, std::ignore, std::ignore) = *it;
 
-      if (itkind == kind) {
-        for (int n = 0; n != nents; ++n) {
-          int x = entities[n];
-          if (bc_model[x] == OPERATOR_BC_DIRICHLET) {
-            if (op->matrices_shadow[c].NumRows() == 0) { op->matrices_shadow[c] = Acell; }
-            int noff(n + offset[item]);
-            for (int m = 0; m < ncols; m++) Acell(noff, m) = 0.0;
-          }
-        }
-      }
-    }
+//       if (itkind == kind) {
+//         for (int n = 0; n != nents; ++n) {
+//           int x = entities[n];
+//           if (bc_model[x] == OPERATOR_BC_DIRICHLET) {
+//             if (op->matrices_shadow[c].NumRows() == 0) { op->matrices_shadow[c] = Acell; }
+//             int noff(n + offset[item]);
+//             for (int m = 0; m < ncols; m++) Acell(noff, m) = 0.0;
+//           }
+//         }
+//       }
+//     }
 
-    // essential zero conditions for trial functions
-    schema_col.ComputeOffset(c, mesh_, offset);
+//     // essential zero conditions for trial functions
+//     schema_col.ComputeOffset(c, mesh_, offset);
 
-    item = 0;
-    for (auto it = op->schema_col().begin(); it != op->schema_col().end(); ++it, ++item) {
-      std::tie(itkind, std::ignore, std::ignore) = *it;
+//     item = 0;
+//     for (auto it = op->schema_col().begin(); it != op->schema_col().end(); ++it, ++item) {
+//       std::tie(itkind, std::ignore, std::ignore) = *it;
 
-      if (itkind == kind) {
-        for (int n = 0; n != nents; ++n) {
-          int x = entities[n];
-          double value = bc_value[x];
+//       if (itkind == kind) {
+//         for (int n = 0; n != nents; ++n) {
+//           int x = entities[n];
+//           double value = bc_value[x];
 
-          if (bc_model[x] == OPERATOR_BC_DIRICHLET) {
-            if (op->matrices_shadow[c].NumRows() == 0) { // make a copy
-              op->matrices_shadow[c] = Acell;
-            }
+//           if (bc_model[x] == OPERATOR_BC_DIRICHLET) {
+//             if (op->matrices_shadow[c].NumRows() == 0) { // make a copy
+//               op->matrices_shadow[c] = Acell;
+//             }
 
-            int noff(n + offset[item]);
-            WhetStone::DenseVector rhs_loc(nrows);
+//             int noff(n + offset[item]);
+//             WhetStone::DenseVector rhs_loc(nrows);
 
-            if (eliminate) {
-              for (int m = 0; m < nrows; m++) {
-                rhs_loc(m) = -Acell(m, noff) * value;
-                Acell(m, noff) = 0.0;
-              }
-            }
+//             if (eliminate) {
+//               for (int m = 0; m < nrows; m++) {
+//                 rhs_loc(m) = -Acell(m, noff) * value;
+//                 Acell(m, noff) = 0.0;
+//               }
+//             }
 
-            if (essential_eqn) {
-              rhs_loc(noff) = 0.0;
-              (*rhs_kind)[0][x] = (x < nents_owned) ? value : 0.0;
+//             if (essential_eqn) {
+//               rhs_loc(noff) = 0.0;
+//               (*rhs_kind)[0][x] = (x < nents_owned) ? value : 0.0;
 
-              if (kind == AmanziMesh::Entity_kind::FACE) {
-                cells = mesh_->getFaceCells(x, AmanziMesh::Parallel_kind::ALL);
-              } else if (kind == AmanziMesh::Entity_kind::NODE) {
-                cells = mesh_->getNodeCells(x, AmanziMesh::Parallel_kind::ALL);
-              } else if (kind == AmanziMesh::Entity_kind::EDGE) {
-                cells = mesh_->getEdgeCells(x, AmanziMesh::Parallel_kind::ALL);
-              }
-              Acell(noff, noff) = 1.0 / cells.size();
-            }
+//               if (kind == AmanziMesh::Entity_kind::FACE) {
+//                 cells = mesh_->getFaceCells(x, AmanziMesh::Parallel_kind::ALL);
+//               } else if (kind == AmanziMesh::Entity_kind::NODE) {
+//                 cells = mesh_->getNodeCells(x, AmanziMesh::Parallel_kind::ALL);
+//               } else if (kind == AmanziMesh::Entity_kind::EDGE) {
+//                 cells = mesh_->getEdgeCells(x, AmanziMesh::Parallel_kind::ALL);
+//               }
+//               Acell(noff, noff) = 1.0 / cells.size();
+//             }
 
-            AssembleVectorCellOp(c, *mesh_, schema_row, rhs_loc, rhs);
-          }
-        }
-      }
-    }
-  }
+//             AssembleVectorCellOp(c, *mesh_, schema_row, rhs_loc, rhs);
+//           }
+//         }
+//       }
+//     }
+//   }
 
-  rhs.GatherGhostedToMaster(Add);
-}
+//   rhs.GatherGhostedToMaster(Add);
+// }
 
 
 // /* ******************************************************************

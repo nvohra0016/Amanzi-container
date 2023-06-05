@@ -202,7 +202,7 @@ MultiphaseMatrixFracture_PK::Initialize()
     *vo_->os() << "\nmatrix:" << std::endl
                << op_tree_matrix_->PrintDiagnostics() << "preconditioner:" << std::endl
                << op_tree_pc_->PrintDiagnostics() << std::endl
-               << vo_->color("green") << "Initialization of PK is complete: my dT=" << get_dt()
+               << vo_->color("green") << "Initialization of PK is complete: my dT=" << getDt()
                << vo_->reset() << std::endl
                << std::endl;
   }
@@ -217,7 +217,7 @@ MultiphaseMatrixFracture_PK::AdvanceStep(double t_old, double t_new, bool reinit
 {
   // create copies of conservative fields
   std::vector<std::string> fields = { "saturation_liquid", "fracture-saturation_liquid" };
-  if (sub_pks_[0]->name() == "richards") {
+  if (sub_pks_[0]->getName() == "richards") {
     fields.push_back("water_storage");
     fields.push_back("fracture-water_storage");
   }

@@ -25,24 +25,29 @@
 
 // Operators
 #include "PDE_DiffusionFV.hh"
+#include "PDE_DiffusionWithGravity.hh"
 
 namespace Amanzi {
 namespace Operators {
 
 class BCs;
 
-class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV {
+class PDE_DiffusionFVwithGravity : public PDE_DiffusionFV , public PDE_DiffusionWithGravity {
  public:
   PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
                              const Teuchos::RCP<Operator>& global_op) :
-      PDE_DiffusionFV(plist, global_op)
+    PDE_Diffusion(plist, global_op),
+    PDE_DiffusionFV(plist, global_op),
+    PDE_DiffusionWithGravity(plist, global_op)
   {}
 
   PDE_DiffusionFVwithGravity(Teuchos::ParameterList& plist,
                              const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) :
-      PDE_DiffusionFV(plist, mesh)
+    PDE_Diffusion(plist, mesh),
+    PDE_DiffusionFV(plist, mesh),
+    PDE_DiffusionWithGravity(plist, mesh)
   {}
-  
+
   virtual void Init() override;
 
   // main virtual members

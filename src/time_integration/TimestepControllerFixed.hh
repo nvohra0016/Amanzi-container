@@ -14,6 +14,8 @@
 a constant timestep size.  Note that the actual timestep size is given by the
 minimum of PK's initial timestep sizes.
 
+No parameters are required.
+
 */
 
 
@@ -30,15 +32,15 @@ namespace Amanzi {
 
 class TimestepControllerFixed : public TimestepController {
  public:
-  TimestepControllerFixed(Teuchos::ParameterList& plist) : plist_(plist) {}
+  TimestepControllerFixed(Teuchos::ParameterList& plist) : TimestepController(plist), plist_(plist)
+  {}
 
   // single method for timestep control
   double get_timestep(double dt, int iterations)
   {
     if (iterations < 0) {
-      std::string msg = "Timestep failed: Time step crash";
-      Errors::Message m(msg);
-      Exceptions::amanzi_throw(m);
+      Errors::TimeStepCrash msg("Timestep failed: fixed time step size failed.");
+      Exceptions::amanzi_throw(msg);
     }
 
     return dt;

@@ -48,10 +48,10 @@ PK_MPCSubcycled::PK_MPCSubcycled(Teuchos::ParameterList& pk_tree,
 // Calculate the min of sub PKs timestep sizes.
 // -----------------------------------------------------------------------------
 double
-PK_MPCSubcycled::get_dt()
+PK_MPCSubcycled::getDt()
 {
-  master_dt_ = sub_pks_[master_]->get_dt();
-  slave_dt_ = sub_pks_[slave_]->get_dt();
+  master_dt_ = sub_pks_[master_]->getDt();
+  slave_dt_ = sub_pks_[slave_]->getDt();
   if (slave_dt_ > master_dt_) slave_dt_ = master_dt_;
 
   return master_dt_;
@@ -73,7 +73,7 @@ PK_MPCSubcycled::AdvanceStep(double t_old, double t_new, bool reinit)
   master_dt_ = t_new - t_old;
   if (slave_dt_ > master_dt_) slave_dt_ = master_dt_;
 
-  slave_dt_ = sub_pks_[slave_]->get_dt();
+  slave_dt_ = sub_pks_[slave_]->getDt();
 
   // --etc: unclear if state should be commited?
   sub_pks_[master_]->CommitStep(t_old, t_new, Tags::DEFAULT);
@@ -104,7 +104,7 @@ PK_MPCSubcycled::AdvanceStep(double t_old, double t_new, bool reinit)
       dt_done += dt_next;
     }
 
-    dt_next = sub_pks_[slave_]->get_dt();
+    dt_next = sub_pks_[slave_]->getDt();
 
     // check for done condition
     done =

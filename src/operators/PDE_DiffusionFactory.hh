@@ -1,14 +1,14 @@
 // PDE_DiffusionFactory constructs objects which implement the interface for a PDE_Diffusion.
 
 /*
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 
-  This documentation is for the entire Diffusion concept, which is maintained 
+  This documentation is for the entire Diffusion concept, which is maintained
   here because the input spec for Diffusion objects is defined/used here.
 */
 
@@ -38,8 +38,8 @@
 .. math::
   \nabla \cdot k \nabla u
 
-with a variety of discretizations. Note also, for reasons that are one part historical 
-and potentially not that valid, this also supports and implementation with an advective 
+with a variety of discretizations. Note also, for reasons that are one part historical
+and potentially not that valid, this also supports and implementation with an advective
 source, i.e.:
 
 .. math::
@@ -69,8 +69,8 @@ The input spec for a diffusion operator consists of:
 
 * `"gravity`" ``[bool]`` **false** specifies if the gravitational flow term is included
 
-* `"Newton correction`" ``[string]`` specifies a model for non-physical terms 
-  that must be added to the matrix. These terms represent Jacobian and are needed 
+* `"Newton correction`" ``[string]`` specifies a model for non-physical terms
+  that must be added to the matrix. These terms represent Jacobian and are needed
   for the preconditioner. Available options are `"true Jacobian`" and `"approximate Jacobian`".
   The FV scheme accepts only the first options. The other schemes accept only the second option.
 
@@ -107,7 +107,7 @@ struct PDE_DiffusionFactory {
       op->SetDensity(rho);
       op->SetGravity(g);
       return op;
-      
+
     } else {
       return CreateWithoutGravity_(oplist, mesh, bc);
     }
@@ -138,7 +138,7 @@ struct PDE_DiffusionFactory {
   {
     return CreateWithoutGravity_(oplist, mesh, bc);
   }
-  
+
   Teuchos::RCP<PDE_Diffusion>
   Create(Teuchos::ParameterList& oplist,
          const Teuchos::RCP<Operator>& global_op,
@@ -146,17 +146,17 @@ struct PDE_DiffusionFactory {
   {
     return CreateWithoutGravity_(oplist, global_op, bc);
   }
-         
+
   // Diffusion operators with gravity.
-  Teuchos::RCP<PDE_Diffusion>
+  Teuchos::RCP<PDE_DiffusionWithGravity>
   CreateWithGravity(Teuchos::ParameterList& oplist,
                     const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
                     const Teuchos::RCP<BCs>& bc=Teuchos::null)
   {
     return CreateWithGravity_(oplist, mesh, bc);
   }
-                    
-  Teuchos::RCP<PDE_Diffusion>
+
+  Teuchos::RCP<PDE_DiffusionWithGravity>
   CreateWithGravity(Teuchos::ParameterList& oplist,
                     const Teuchos::RCP<Operator>& global_op,
                     const Teuchos::RCP<BCs>& bc=Teuchos::null)
@@ -173,11 +173,11 @@ struct PDE_DiffusionFactory {
           const Teuchos::RCP<BCs>& bc);
 
   template<class Second_ptr_type>
-  Teuchos::RCP<PDE_Diffusion>
+  Teuchos::RCP<PDE_DiffusionWithGravity>
   CreateWithGravity_(Teuchos::ParameterList& oplist,
                      const Second_ptr_type& mesh_or_global_op,
                      const Teuchos::RCP<BCs>& bc);
-};  
+};
 
 
 //
@@ -187,7 +187,7 @@ template<class Second_ptr_type>
 Teuchos::RCP<PDE_Diffusion>
 PDE_DiffusionFactory::CreateWithoutGravity_(
     Teuchos::ParameterList& oplist,
-    const Second_ptr_type& mesh_or_global_op, 
+    const Second_ptr_type& mesh_or_global_op,
     const Teuchos::RCP<BCs>& bc)
 {
   std::string name = oplist.get<std::string>("discretization primary");
@@ -213,16 +213,16 @@ PDE_DiffusionFactory::CreateWithoutGravity_(
 }
 
 template<class Second_ptr_type>
-Teuchos::RCP<PDE_Diffusion>
+Teuchos::RCP<PDE_DiffusionWithGravity>
 PDE_DiffusionFactory::CreateWithGravity_(
     Teuchos::ParameterList& oplist,
-    const Second_ptr_type& mesh_or_global_op, 
+    const Second_ptr_type& mesh_or_global_op,
     const Teuchos::RCP<BCs>& bc)
 {
   std::string name = oplist.get<std::string>("discretization primary");
   bool fractured_matrix = oplist.isParameter("fracture");
 
-  Teuchos::RCP<PDE_Diffusion> op_g;
+  Teuchos::RCP<PDE_DiffusionWithGravity> op_g;
   if (name == "fv: default") {
     op_g = Teuchos::rcp(new PDE_DiffusionFVwithGravity(oplist, mesh_or_global_op));
   // } else if (name == "nlfv: default") {

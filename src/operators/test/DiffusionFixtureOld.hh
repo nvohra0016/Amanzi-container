@@ -105,10 +105,11 @@ struct DiffusionFixture {
     g[mesh->getSpaceDimension()-1] = -gravity;
     Teuchos::ParameterList op_list = plist->sublist("PK operator").sublist(name);
     op_list.set("gravity", true);
-    op = Teuchos::rcp(new PDE_Diffusion_type(op_list, mesh_dev));
-    op->SetDensity(1.0);
-    op->SetGravity(g);
-    op->Init();
+    auto op_grav = Teuchos::rcp(new PDE_Diffusion_type(op_list, mesh_dev));
+    op_grav->SetDensity(1.0);
+    op_grav->SetGravity(g);
+    op_grav->Init();
+    op = op_grav;
 
     // modify diffusion coefficient
     CompositeVectorSpace K_map;

@@ -64,7 +64,7 @@ WalkaboutCheckpoint::CalculateDarcyVelocity(Teuchos::RCP<State>& S,
   // optional flux constraint at nodes
   // -- flag
   bool projection(false);
-  if (pk_ != Teuchos::null && (pk_->name() == "darcy" || pk_->name() == "richards"))
+  if (pk_ != Teuchos::null && (pk_->getName() == "darcy" || pk_->getName() == "richards"))
     projection = true;
 
   // least-square recovery at mesh nodes

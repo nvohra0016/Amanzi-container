@@ -41,8 +41,8 @@ class Dummy_PK : public PK_PhysicalBDF {
   virtual void Initialize(){};
 
   // Choose a time step compatible with physics.
-  virtual double get_dt() { return dummy_dt; }
-  virtual void set_dt(double dt) { dummy_dt = dt; };
+  virtual double getDt() { return dummy_dt; }
+  virtual void setDt(double dt) { dummy_dt = dt; };
 
   // Advance PK by step size dt.
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false);

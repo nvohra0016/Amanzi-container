@@ -364,7 +364,7 @@ Alquimia_PK::ParseChemicalConditionRegions(const Teuchos::ParameterList& param_l
   // Go through the sublist containing the chemical conditions.
   for (auto it = param_list.begin(); it != param_list.end(); ++it) {
     // This parameter list contains sublists, each corresponding to a condition.
-    std::string cond_name = param_list.name(it);
+    std::string cond_name = param_list.getName(it);
     assert(param_list.isSublist(cond_name));
     const Teuchos::ParameterList& cond_sublist = param_list.sublist(cond_name);
 
@@ -407,7 +407,7 @@ Alquimia_PK::XMLParameters()
     for (auto it = conditions.begin(); it != conditions.end(); ++it) {
       // This parameter list contains sublists, each corresponding to a
       // geochemical condition.
-      std::string cond_name = conditions.name(it);
+      std::string cond_name = conditions.getName(it);
       assert(conditions.isSublist(cond_name));
       const Teuchos::ParameterList& cond_sublist = conditions.sublist(cond_name);
 
@@ -417,7 +417,7 @@ Alquimia_PK::XMLParameters()
 
       // Now mine the entry for details.
       for (auto it2 = cond_sublist.begin(); it2 != cond_sublist.end(); ++it2) {
-        std::string species_name = cond_sublist.name(it2);
+        std::string species_name = cond_sublist.getName(it2);
         assert(cond_sublist.isSublist(species_name));
         const Teuchos::ParameterList& aqueous_constraint = cond_sublist.sublist(species_name);
 

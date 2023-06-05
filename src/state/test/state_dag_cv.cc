@@ -74,7 +74,7 @@ class AEvaluator
     return Teuchos::rcp(new AEvaluator(*this));
   }
 
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
   virtual void Evaluate_(const State& S,
                          const std::vector<CompositeVector*>& results) override
@@ -138,7 +138,7 @@ class CEvaluator
   {
     return Teuchos::rcp(new CEvaluator(*this));
   }
-  virtual std::string getName() const override { return "CEvaluator"; }
+  virtual std::string getType() const override { return "CEvaluator"; }
 
   virtual void Evaluate_(const State& S,
                          const std::vector<CompositeVector*>& results) override
@@ -182,7 +182,7 @@ class DEvaluator
   {
     return Teuchos::rcp(new DEvaluator(*this));
   }
-  virtual std::string getName() const override { return "DEvaluator"; }
+  virtual std::string getType() const override { return "DEvaluator"; }
 
   virtual void Evaluate_(const State& S,
                          const std::vector<CompositeVector*>& results) override
@@ -223,7 +223,7 @@ class EEvaluator
   {
     return Teuchos::rcp(new EEvaluator(*this));
   }
-  virtual std::string getName() const override { return "EEvaluator"; }
+  virtual std::string getType() const override { return "EEvaluator"; }
 
   virtual void Evaluate_(const State& S,
                          const std::vector<CompositeVector*>& results) override
@@ -272,7 +272,7 @@ class FEvaluator
   {
     return Teuchos::rcp(new FEvaluator(*this));
   }
-  virtual std::string getName() const override { return "FEvaluator"; }
+  virtual std::string getType() const override { return "FEvaluator"; }
 
   virtual void Evaluate_(const State& S,
                          const std::vector<CompositeVector*>& results) override
@@ -312,7 +312,7 @@ class HEvaluator
   {
     return Teuchos::rcp(new HEvaluator(*this));
   }
-  virtual std::string getName() const override { return "HEvaluator"; }
+  virtual std::string getType() const override { return "HEvaluator"; }
 
   virtual void Evaluate_(const State& S,
                          const std::vector<CompositeVector*>& results) override

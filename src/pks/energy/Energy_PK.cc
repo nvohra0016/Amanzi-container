@@ -43,7 +43,7 @@ Energy_PK::Energy_PK(Teuchos::ParameterList& pk_tree,
                      const Teuchos::RCP<TreeVector>& soln)
   : PK_PhysicalBDF(pk_tree, glist, S, soln), glist_(glist), passwd_(""), flow_on_manifold_(false)
 {
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 

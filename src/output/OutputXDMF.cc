@@ -20,7 +20,7 @@
 namespace Amanzi {
 
 OutputXDMF::OutputXDMF(Teuchos::ParameterList& plist,
-                       const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
+                       const Teuchos::RCP<const AmanziMesh::MeshHost>& mesh)
   : mesh_(mesh),
     is_dynamic_(plist.get<bool>("dynamic mesh", false)),
     init_(false)
@@ -113,12 +113,12 @@ OutputXDMF::writeMesh_(int cycle)
   for (AmanziMesh::Entity_ID c = 0; c != cell_map->getLocalNumElements(); ++c) {
     AmanziMesh::Cell_kind ctype = vis_mesh.getCellType(c);
     if (ctype != AmanziMesh::Cell_kind::POLYGON) {
-      auto nodes = vis_mesh.getCellNodes(c);
-      local_conns += nodes.size() + 1;
+      int nnodes = vis_mesh.getCellNumNodes(c);
+      local_conns += nnodes + 1;
 
     } else if (manifold_dim == 2) {
-      auto nodes = vis_mesh.getCellNodes(c);
-      local_conns += nodes.size() + 2;
+      int nnodes = vis_mesh.getCellNumNodes(c);
+      local_conns += nnodes + 2;
 
     } else {
       Errors::Message message("OutputXDMF: Polyhedral meshes cannot yet be "
@@ -214,7 +214,7 @@ OutputXDMF::writeMesh_(int cycle)
 std::tuple<int, int, int>
 OutputXDMF::writeDualMesh_(int cycle)
 {
-  const AmanziMesh::Mesh& vis_mesh = mesh_->getVisMesh();
+  const auto& vis_mesh = mesh_->getVisMesh();
 
   std::stringstream h5path;
   h5path << "/" << cycle << "/Mesh/";

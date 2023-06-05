@@ -62,7 +62,7 @@ Beaker::EnforceConstraint(BeakerState* state,
       int im(0);
       bool found(false);
       for (auto it = minerals_.begin(); it != minerals_.end(); ++it, ++im) {
-        if (it->name() == pair.second) {
+        if (it->getName() == pair.second) {
           found = true;
           break;
         }
@@ -77,7 +77,7 @@ Beaker::EnforceConstraint(BeakerState* state,
       int ip(0);
       bool found(false);
       for (auto it = primary_species_.begin(); it != primary_species_.end(); ++it, ++ip) {
-        if (it->name() == pair.second + "(aq)") {
+        if (it->getName() == pair.second + "(aq)") {
           found = true;
           map[i] = ip;
           break;
@@ -87,7 +87,7 @@ Beaker::EnforceConstraint(BeakerState* state,
       if (!found) {
         ip = 0;
         for (auto it = aq_complex_rxns_.begin(); it != aq_complex_rxns_.end(); ++it, ip++) {
-          if (it->name() == pair.second + "(aq)") {
+          if (it->getName() == pair.second + "(aq)") {
             found = true;
             map_aqx[i] = ip;
             break;

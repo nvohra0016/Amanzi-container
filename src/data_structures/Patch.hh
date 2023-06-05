@@ -16,6 +16,7 @@
 #include "Teuchos_RCP.hpp"
 #include "Kokkos_Core.hpp"
 
+#include "Key.hh"
 #include "Mesh.hh"
 
 namespace Amanzi {
@@ -35,6 +36,8 @@ struct PatchSpace {
   AmanziMesh::Entity_kind entity_kind;
   int num_vectors;
   int flag_type;
+  Kokkos::View<int*> flags;
+
 
   PatchSpace() : ghosted(false) {}
   PatchSpace(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh_,
@@ -49,7 +52,9 @@ struct PatchSpace {
       entity_kind(entity_kind_),
       num_vectors(num_vectors_),
       flag_type(flag_type_)
-  {}
+  {
+    if (flag_type == -1) Kokkos::resize(flags, size());
+  }
 
   int size() const
   {
@@ -64,26 +69,34 @@ struct PatchSpace {
                             ghosted ? AmanziMesh::Parallel_kind::ALL :
                                       AmanziMesh::Parallel_kind::OWNED);
   }
+
+  AmanziMesh::Mesh::cEntity_ID_View getIDs() const {
+    return mesh->getSetEntities(region, entity_kind,
+            ghosted ? AmanziMesh::Parallel_kind::ALL : AmanziMesh::Parallel_kind::OWNED);
+  }
 };
 
 
 //
-// A collection of independent patch spaces.  Conceptually these should share
-// the same entity_kind, ghosted, mesh, and num_vectors.
+// A collection of independent patch spaces.  Conceptually these may share the
+// same entity_kind, ghosted, mesh, and num_vectors, or may not, but they MUST
+// share the same mesh.
+//
 template<typename T> struct MultiPatch;
 
 struct MultiPatchSpace {
   Teuchos::RCP<const AmanziMesh::Mesh> mesh;
   bool ghosted;
   int flag_type;
-  AmanziMesh::Entity_kind flag_entity;
 
   MultiPatchSpace() : ghosted(false) {}
   MultiPatchSpace(bool ghosted_) : ghosted(ghosted_) {}
   MultiPatchSpace(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh_,
                   bool ghosted_,
                   int flag_type_ = -1)
-    : mesh(mesh_), ghosted(ghosted_), flag_type(flag_type_), flag_entity(AmanziMesh::UNKNOWN)
+    : mesh(mesh_),
+      ghosted(ghosted_),
+      flag_type(flag_type_)
   {}
 
   template<typename T>
@@ -125,7 +138,8 @@ template<typename T>
 struct Patch {
   using ViewType = Kokkos::View<T**, Kokkos::LayoutLeft>;
 
-  Patch(const PatchSpace& space_) : space(space_)
+  Patch(const PatchSpace& space_)
+    : space(space_)
   {
     Kokkos::resize(data, space.size(), space.num_vectors);
   }
@@ -178,5 +192,76 @@ MultiPatchSpace::Create() const
 {
   return Teuchos::rcp(new MultiPatch<T>(*this));
 }
+
+//
+// Nonmember function for creating PatchSpaces from a ParameterList
+//
+inline void
+readMultiPatchSpace(Teuchos::ParameterList& list,
+                    MultiPatchSpace& mps,
+                    AmanziMesh::Entity_kind entity_kind = AmanziMesh::Entity_kind::UNKNOWN)
+{
+  Teuchos::Array<std::string> regions;
+  if (list.isParameter("regions")) {
+    regions = list.get<Teuchos::Array<std::string>>("regions");
+  } else {
+    regions.push_back(list.get<std::string>("region", Keys::cleanPListName(list.name())));
+  }
+
+  Teuchos::Array<AmanziMesh::Entity_kind> entity_kinds;
+  if (entity_kind == AmanziMesh::Entity_kind::UNKNOWN) {
+    if (list.isParameter("entity kind")) {
+      entity_kinds.push_back(AmanziMesh::createEntityKind(list.get<std::string>("entity kind")));
+    } else {
+      auto ekinds = list.get<Teuchos::Array<std::string>>("entity kinds");
+      for (auto ekind : ekinds) entity_kinds.push_back(AmanziMesh::createEntityKind(ekind));
+    }
+  } else {
+    entity_kinds.push_back(entity_kind);
+  }
+
+  int n_dofs = list.get<int>("number of vectors", 1);
+
+  for (auto r : regions) {
+    for (auto e_kind : entity_kinds) {
+      mps.addPatch(r, e_kind, n_dofs);
+    }
+  }
+}
+
+//
+// Nonmember function for creating MultiPatchSpaces from a ParameterList
+//
+inline MultiPatchSpace
+createMultiPatchSpace(Teuchos::ParameterList& list,
+                      const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
+                      AmanziMesh::Entity_kind entity_kind = AmanziMesh::Entity_kind::UNKNOWN,
+                      int flag_type = 0)
+{
+  // All are expected to be sublists of identical structure.
+  MultiPatchSpace mps(mesh, false, flag_type);
+
+  for (auto sublist : list) {
+    std::string name = sublist.first;
+    if (list.isSublist(name)) {
+      Teuchos::ParameterList& spec_plist = list.sublist(name);
+
+      try {
+        readMultiPatchSpace(spec_plist, mps, entity_kind);
+      } catch (Errors::Message& msg) {
+        Errors::Message m;
+        m << "in sublist " << name << ": " << msg.what();
+        throw(m);
+      }
+
+    } else { // ERROR -- parameter is not a sublist
+      Errors::Message m;
+      m << "parameter " << name << " is not a sublist";
+      throw(m);
+    }
+  }
+  return mps;
+}
+
 
 } // namespace Amanzi

@@ -27,11 +27,11 @@ namespace Amanzi {
 // Calculate the min of sub PKs timestep sizes.
 // -----------------------------------------------------------------------------
 double
-PK_MPCWeak::get_dt()
+PK_MPCWeak::getDt()
 {
   double dt = 1.0e99;
   for (PK_MPC<PK>::SubPKList::iterator pk = sub_pks_.begin(); pk != sub_pks_.end(); ++pk) {
-    dt = std::min<double>(dt, (*pk)->get_dt());
+    dt = std::min<double>(dt, (*pk)->getDt());
   }
   return dt;
 }

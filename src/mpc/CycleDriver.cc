@@ -125,7 +125,7 @@ CycleDriver::Init_PK(int time_pr_id)
     Exceptions::amanzi_throw(message);
   }
   Teuchos::ParameterList::ConstIterator pk_item = pk_tree_list.begin();
-  const std::string& pk_name = pk_tree_list.name(pk_item);
+  const std::string& pk_name = pk_tree_list.getName(pk_item);
 
   if (!pk_tree_list.isSublist(pk_name)) {
     Errors::Message message("CycleDriver: PK tree list does not have node \"" + pk_name + "\".");
@@ -229,7 +229,7 @@ CycleDriver::Setup()
   }
 
   pk_->Setup();
-  pk_->set_tags(Tags::CURRENT, Tags::NEXT);
+  pk_->setTags(Tags::CURRENT, Tags::NEXT);
   S_->Require<double>("dt", Tags::NEXT, "dt");
   S_->Setup();
 
@@ -406,7 +406,7 @@ CycleDriver::ReadParameterList_()
 
   int i = 0;
   for (item = time_periods_list.begin(); item != time_periods_list.end(); ++item) {
-    const std::string& tp_name = time_periods_list.name(item);
+    const std::string& tp_name = time_periods_list.getName(item);
     tp_start_[i] = time_periods_list.sublist(tp_name).get<double>("start period time");
     tp_end_[i] = time_periods_list.sublist(tp_name).get<double>("end period time");
     tp_dt_[i] = time_periods_list.sublist(tp_name).get<double>("initial time step", 1.0);
@@ -480,12 +480,12 @@ CycleDriver::ReadParameterList_()
 * Acquire the chosen timestep size
 *******************************************************************/
 double
-CycleDriver::get_dt(bool after_failure)
+CycleDriver::getDt(bool after_failure)
 {
   // get the physical step size
   double dt;
 
-  dt = pk_->get_dt();
+  dt = pk_->getDt();
 
   std::vector<std::pair<double, double>>::iterator it;
   std::vector<std::pair<double, double>>::iterator it_max;
@@ -496,10 +496,10 @@ CycleDriver::get_dt(bool after_failure)
       if (reset_max_.size() > 0) { max_dt_ = it_max->second; }
 
       if (dt < it->second) {
-        pk_->set_dt(dt);
+        pk_->setDt(dt);
       } else {
         dt = it->second;
-        pk_->set_dt(dt);
+        pk_->setDt(dt);
         after_failure = true;
       }
 
@@ -545,7 +545,7 @@ CycleDriver::get_dt(bool after_failure)
 * Time step management.
 ****************************************************************** */
 void
-CycleDriver::set_dt(double dt)
+CycleDriver::setDt(double dt)
 {
   double dt_;
 
@@ -562,7 +562,7 @@ CycleDriver::set_dt(double dt)
   dt_ = tsm_->TimeStep(S_->get_time() + dt, dt);
 
   // set the physical step size
-  pk_->set_dt(dt_);
+  pk_->setDt(dt_);
 }
 
 
@@ -617,7 +617,7 @@ CycleDriver::Advance(double dt)
       S_->set_position(TIME_PERIOD_END);
     }
 
-    dt_new = get_dt(fail);
+    dt_new = getDt(fail);
 
     if (!reset_info_.empty())
       if (S_->get_time() == reset_info_.front().first) force_check = true;
@@ -638,7 +638,7 @@ CycleDriver::Advance(double dt)
       *vo_->os() << "New time = " << units.OutputTime(S_->get_time()) << std::endl;
     }
   } else {
-    dt_new = get_dt(fail);
+    dt_new = getDt(fail);
     // Failed the timestep.
     // Potentially write out failed timestep for debugging
     for (auto& vis : failed_visualization_) { WriteVis(*vis, *S_); }
@@ -689,7 +689,7 @@ CycleDriver::Visualize(bool force, const Tag& tag)
 
   for (const auto& vis : visualization_) {
     if (force || vis->DumpRequested(S_->get_cycle(), S_->get_time())) {
-      vis->set_tag(tag);
+      vis->setTag(tag);
       WriteVis(*vis, *S_);
       Teuchos::OSTab tab = vo_->getOSTab();
       *vo_->os() << "writing visualization file: " << vis->get_name() << std::endl;
@@ -769,7 +769,7 @@ CycleDriver::Go()
     dt = tp_dt_[time_period_id_];
     max_dt_ = tp_max_dt_[time_period_id_];
     dt = tsm_->TimeStep(S_->get_time(), dt);
-    pk_->set_dt(dt);
+    pk_->setDt(dt);
 
   } else {
     // Read restart file
@@ -822,7 +822,7 @@ CycleDriver::Go()
 
     S_->set_initial_time(S_->get_time());
     dt = tsm_->TimeStep(S_->get_time(), restart_dT);
-    pk_->set_dt(dt);
+    pk_->setDt(dt);
   }
 
   // enfoce consistent physics after initialization
@@ -883,7 +883,7 @@ CycleDriver::Go()
           S_->set_position(TIME_PERIOD_INSIDE);
 
           dt = Advance(dt);
-          // dt = get_dt(fail);
+          // dt = getDt(fail);
         } // while not finished
 
 
@@ -891,7 +891,7 @@ CycleDriver::Go()
         if (time_period_id_ < num_time_periods_) {
           WriteStateStatistics(*S_, *vo_);
           ResetDriver(time_period_id_);
-          dt = get_dt(false);
+          dt = getDt(false);
         }
       }
 #if !DEBUG_MODE
@@ -960,7 +960,7 @@ CycleDriver::ResetDriver(int time_pr_id)
 
   // Setup
   pk_->Setup();
-  pk_->set_tags(Tags::CURRENT, Tags::NEXT);
+  pk_->setTags(Tags::CURRENT, Tags::NEXT);
 
   S_->Require<double>("dt", Tags::NEXT, "dt");
   S_->Setup();
@@ -988,7 +988,7 @@ CycleDriver::ResetDriver(int time_pr_id)
   pk_->CalculateDiagnostics(Tags::DEFAULT);
   Observations();
 
-  pk_->set_dt(tp_dt_[time_pr_id]);
+  pk_->setDt(tp_dt_[time_pr_id]);
   max_dt_ = tp_max_dt_[time_pr_id];
 
   // conditional i/o after initialization is performed only when

@@ -39,13 +39,13 @@ void PDE_DiffusionFVwithGravity::Init()
 void PDE_DiffusionFVwithGravity::SetDensity(
     const Teuchos::RCP<const CompositeVector>& rho)
 {
-  PDE_Diffusion::SetDensity(rho);
+  PDE_DiffusionWithGravity::SetDensity(rho);
   transmissibility_initialized_ = false;
 }
 
 
 void PDE_DiffusionFVwithGravity::SetDensity(double rho) {
-  PDE_Diffusion::SetDensity(rho);
+  PDE_DiffusionWithGravity::SetDensity(rho);
   transmissibility_initialized_ = false;
 }
 

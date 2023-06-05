@@ -132,10 +132,20 @@ struct ReductionArray :
 
 
 template<typename Scalar, typename Reductor_type>
+Reductor_type reduceAllLoc(const Comm_type& comm, const Reductor_type& local_val)
+{
+  using Reduction_type = ReductionArray<int, Scalar, Reductor_type>;
+  std::pair<Scalar, GO> global_val_pair;
+  std::pair<Scalar, GO> local_val_pair{local_val.val, local_val.loc };
+  Teuchos::reduceAll(comm, Reduction_type(), 1, &local_val_pair, &global_val_pair);
+  return Reductor_type(global_val_pair.first, global_val_pair.second);
+}
+
+
+template<typename Scalar, typename Reductor_type>
 Reductor_type reduceAllLoc(const Vector_type_<Scalar>& vec,
                            Kokkos::View<const LO*, DefaultMemorySpace>* indices = nullptr)
 {
-  using Reduction_type = ReductionArray<int, Scalar, Reductor_type>;
   Reductor_type local_val;
   if (indices) {
     auto vec_view = vec.getLocalViewDevice(Tpetra::Access::ReadOnly);
@@ -158,10 +168,8 @@ Reductor_type reduceAllLoc(const Vector_type_<Scalar>& vec,
                             }, local_val);
   }
   // now do the global reduction in Teuchos, first converting to GID from LID
-  std::pair<Scalar, GO> global_val_pair;
-  std::pair<Scalar, GO> local_val_pair{local_val.val, vec.getMap()->getGlobalElement(local_val.loc)};
-  Teuchos::reduceAll(*vec.getMap()->getComm(), Reduction_type(), 1, &local_val_pair, &global_val_pair);
-  return Reductor_type(global_val_pair.first, global_val_pair.second);
+  local_val.loc = vec.getMap()->getGlobalElement(local_val.loc);
+  return reduceAllLoc<Scalar>(*vec.getMap()->getComm(), local_val);
 }
 
 template<typename Scalar>

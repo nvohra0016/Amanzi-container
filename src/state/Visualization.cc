@@ -90,7 +90,7 @@ Visualization::addDomain(const std::string& name)
 void
 Visualization::readParameters_()
 {
-  addDomain(plist_.name());
+  addDomain(Keys::cleanPListName(plist_));
 
   Teuchos::Array<std::string> no_regions(0);
   Teuchos::ParameterList& tmp = plist_.sublist("write regions");
@@ -187,8 +187,8 @@ Visualization::createFiles(bool include_io_set)
 
   Teuchos::ParameterList output_plist(plist_);
   if (include_io_set)
-    output_plist.set("file name base", plist_.name() + "-io-counter" + std::to_string(count_++));
-  output_ = OutputFactory::createForVis(output_plist, mesh_);
+    output_plist.set("file name base", Keys::cleanPListName(plist_) + "-io-counter" + std::to_string(count_++));
+  output_ = OutputFactory::createForVis(output_plist, AmanziMesh::onMemSpace<MemSpace_kind::HOST>(mesh_));
 
   if (write_mesh_exo_ && !dynamic_mesh_ && mesh_->getMeshFramework()) {
     std::string mesh_fname = output_plist.get<std::string>("file name base") + "_mesh.exo";
@@ -234,35 +234,27 @@ Visualization::write(const State& S)
 
     for (auto r = S.data_begin(); r != S.data_end(); ++r) {
       if (writesDomain(Keys::getDomain(r->first))) {
-        // note, no type checking is required -- the type knows if it can be
-        // visualized. However, since overwriting of attributes does not work
-        // properly, we skip them.  This should get fixed by writing attributes
-        // as an attribute of the step or something similar. FIXME --ETC
-        if ((!r->second->ValidType<double>()) && (!r->second->ValidType<int>()) &&
-            (!r->second->ValidType<Teuchos::Array<double>>()) &&
-            (!r->second->ValidType<Teuchos::Array<int>>())) {
-          // Should we vis all tags or just the default tag?
-          // -- write all tags
-          // r->WriteVis(vis, nullptr);
+        // Should we vis all tags or just the default tag?
+        // -- write all tags
+        // r->WriteVis(vis, nullptr);
 
-          // -- write default tag
-          // Tag tag;
-          // r->second->WriteVis(vis, &tag);
+        // -- write default tag
+        // Tag tag;
+        // r->second->WriteVis(vis, &tag);
 
-          // -- write default tag if it exists, else write another tag with the
-          // -- same time
-          Tag tag;
-          if (r->second->HasRecord(tag)) {
-            r->second->WriteVis(*this, &tag);
-          } else {
-            // try to find a record at the same time
-            double time = S.get_time();
-            for (const auto& time_record : S.GetRecordSet("time")) {
-              if (r->second->HasRecord(time_record.first) &&
-                  S.get_time(time_record.first) == time) {
-                r->second->WriteVis(*this, &time_record.first);
-                break;
-              }
+        // -- write default tag if it exists, else write another tag with the
+        // -- same time
+        Tag tag;
+        if (r->second->HasRecord(tag)) {
+          r->second->WriteVis(*this, &tag);
+        } else {
+          // try to find a record at the same time
+          double time = S.get_time();
+          for (const auto& time_record : S.GetRecordSet("time")) {
+            if (r->second->HasRecord(time_record.first) &&
+                S.get_time(time_record.first) == time) {
+              r->second->WriteVis(*this, &time_record.first);
+              break;
             }
           }
         }

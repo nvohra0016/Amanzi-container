@@ -94,7 +94,7 @@ ParseReaction(const std::string& reaction,
       // check to see if we have a primary species
       int id = -1;
       for (auto it = primary_species.begin(); it != primary_species.end(); ++it) {
-        if (it->name() == search_name) {
+        if (it->getName() == search_name) {
           id = it->identifier();
           break;
         }
@@ -108,7 +108,7 @@ ParseReaction(const std::string& reaction,
       } else if (id < 0) {
         // did not match a primary. check to see if it is an surface site
         for (auto it = surface_sites.begin(); it != surface_sites.end(); ++it) {
-          if (it->name() == search_name) {
+          if (it->getName() == search_name) {
             id = it->identifier();
             break;
           }

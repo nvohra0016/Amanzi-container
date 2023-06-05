@@ -97,7 +97,7 @@ SUITE(GeochemistryTestsSpecies)
   TEST_FIXTURE(SpeciesTest, Species_constructor_init_name)
   {
     ac::Species species(id_, name_, plist_);
-    CHECK_EQUAL(name_, species.name());
+    CHECK_EQUAL(name_, species.getName());
   }
 
   //

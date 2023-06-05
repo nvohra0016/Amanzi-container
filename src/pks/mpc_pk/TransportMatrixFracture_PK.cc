@@ -142,9 +142,9 @@ TransportMatrixFracture_PK::Setup()
 * Reduce stable dt to avoid the 2-cycle behavior of the transport PK
 ******************************************************************* */
 double
-TransportMatrixFracture_PK::get_dt()
+TransportMatrixFracture_PK::getDt()
 {
-  return 0.999 * PK_MPCWeak::get_dt();
+  return 0.999 * PK_MPCWeak::getDt();
 }
 
 

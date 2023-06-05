@@ -356,7 +356,7 @@ std::ostream&
 EvaluatorSecondary::writeInfo(std::ostream& os) const
 {
   for (auto key : my_keys_) os << Keys::getKey(key.first, key.second) << ",";
-  os << "(" << getName() << ") [" << to_string(getKind()) << "]" << std::endl;
+  os << "(" << getType() << ") [" << to_string(getKind()) << "]" << std::endl;
   for (auto dep : dependencies_) os << "  " << Keys::getKey(dep.first, dep.second) << std::endl;
   return os;
 }

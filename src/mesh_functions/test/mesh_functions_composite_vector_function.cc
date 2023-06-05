@@ -16,6 +16,7 @@
 
 #include "Teuchos_GlobalMPISession.hpp"
 #include "Teuchos_ParameterList.hpp"
+#include "Teuchos_ParameterXMLFileReader.hpp"
 
 #include "AmanziTypes.hh"
 #include "AmanziComm.hh"
@@ -36,7 +37,7 @@ using namespace Amanzi::AmanziGeometry;
 using namespace Amanzi::Functions;
 
 
-TEST_FIXTURE(reference_mesh, cv_function)
+TEST_FIXTURE(reference_mesh, COMPOSITE_VECTOR_FUNCTION)
 {
   // make the mesh function
   Kokkos::View<double*, Kokkos::HostSpace> grad("grad", 4);
@@ -52,7 +53,6 @@ TEST_FIXTURE(reference_mesh, cv_function)
   CompositeVectorFunction cv_func(mesh);
   cv_func.addSpec("cell", AmanziMesh::Entity_kind::CELL, 1, "DOMAIN", f1);
   cv_func.addSpec("face", AmanziMesh::Entity_kind::FACE, 1, "DOMAIN", f1);
-  cv_func.addSpec("node", AmanziMesh::Entity_kind::FACE, 1, "NODE", f1);
 
   // make the CV
   CompositeVectorSpace cvs;
@@ -78,5 +78,31 @@ TEST_FIXTURE(reference_mesh, cv_function)
   {
     auto cv_c = cv->viewComponent<MirrorHost>("face", false);
     for (int c = 0; c != nfaces; ++c) { CHECK_CLOSE(1.0, cv_c(c, 0), 0.0000001); }
+  }
+}
+
+
+TEST_FIXTURE(reference_mesh, COMPOSITE_VECTOR_FUNCTION_PLIST)
+{
+  std::string xmlFileName = "test/mesh_functions_composite_vector_function.xml";
+  Teuchos::ParameterXMLFileReader xmlreader(xmlFileName);
+  auto plist = xmlreader.getParameters();
+
+  CompositeVectorFunction cv_func(plist, mesh);
+  CompositeVector cv(cv_func.createCVS(false)->CreateSpace());
+  cv_func.Compute(0.0, cv);
+
+  // Check
+  int ncells = mesh->getNumEntities(AmanziMesh::CELL, AmanziMesh::Parallel_kind::OWNED);
+  {
+    auto cv_c = cv.viewComponent<MirrorHost>("cell", false);
+    CHECK_CLOSE(0.5, cv_c(0, 0), 0.0000001);
+    CHECK_CLOSE(2.0, cv_c(ncells-1,0), 0.0000001);
+  }
+
+  int nfaces = mesh->getNumEntities(AmanziMesh::FACE, AmanziMesh::Parallel_kind::OWNED);
+  {
+    auto cv_c = cv.viewComponent<MirrorHost>("face", false);
+    for (int c = 0; c != nfaces; ++c) { CHECK_CLOSE(3.0, cv_c(c, 0), 0.0000001); }
   }
 }

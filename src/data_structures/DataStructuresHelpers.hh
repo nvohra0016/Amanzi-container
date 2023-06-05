@@ -20,7 +20,7 @@ namespace Amanzi {
 
 template<typename T>
 void
-patchToCompositeVector(const Patch<T>& p, const std::string& component, CompositeVector_<T>& cv)
+copyPatchToCompositeVector(const Patch<T>& p, const std::string& component, CompositeVector_<T>& cv)
 {
   auto cv_c = cv.viewComponent(component, p.space.ghosted);
 
@@ -51,7 +51,7 @@ patchToCompositeVector(const Patch<T>& p, const std::string& component, Composit
 
 template<typename T>
 void
-patchToCompositeVector(const Patch<T>& p,
+copyPatchToCompositeVector(const Patch<T>& p,
                        const std::string& component,
                        CompositeVector_<T>& cv,
                        CompositeVector_<int>& flag_cv)
@@ -95,9 +95,9 @@ patchToCompositeVector(const Patch<T>& p,
 //
 template<typename T>
 void
-multiPatchToCompositeVector(const MultiPatch<T>& mp, const std::string& component, CompositeVector_<T>& cv)
+copyMultiPatchToCompositeVector(const MultiPatch<T>& mp, const std::string& component, CompositeVector_<T>& cv)
 {
-  for (const auto& p : mp) { patchToCompositeVector<T>(p, component, cv); }
+  for (const auto& p : mp) { copyPatchToCompositeVector<T>(p, component, cv); }
 }
 
 //
@@ -105,12 +105,12 @@ multiPatchToCompositeVector(const MultiPatch<T>& mp, const std::string& componen
 //
 template<typename T>
 void
-multiPatchToCompositeVector(const MultiPatch<T>& mp,
+copyMultiPatchToCompositeVector(const MultiPatch<T>& mp,
                                         const std::string& component,
                                         CompositeVector_<T>& cv,
                                         CompositeVector_<int>& flag)
 {
-  for (const auto& p : mp) { patchToCompositeVector<T>(p, component, cv, flag); }
+  for (const auto& p : mp) { copyPatchToCompositeVector<T>(p, component, cv, flag); }
 }
 
 

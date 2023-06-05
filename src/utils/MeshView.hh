@@ -11,13 +11,8 @@
 
 #include "Kokkos_Core.hpp"
 #include "Kokkos_DualView.hpp"
+#include "AmanziTypes.hh"
 #include "Iterators.hh"
-
-enum class MemSpace_kind {
-  HOST,
-  DEVICE
-};
-
 
 //
 // NOTE: begin/end must live in Kokkos namespace to work!

@@ -10,6 +10,7 @@
 
 
 #include "AmanziMap.hh"
+#include "FIFO_Set.hh"
 #include "RegionLabeledSet.hh"
 #include "MeshCache.hh"
 #include "Mesh_Algorithms.hh"
@@ -267,12 +268,45 @@ View_type<const Entity_ID, MemSpace_kind::HOST>
 resolveBoundaryEntityMeshSet(const AmanziGeometry::Region& region,
                              const Entity_kind kind,
                              const Parallel_kind ptype,
-                             const MeshCache<MemSpace_kind::HOST>& parent_mesh)
+                             const MeshCache<MemSpace_kind::HOST>& mesh)
 {
-  Errors::Message msg;
-  msg << "Resolving " << to_string(kind) << " not yet implemented...";
-  Exceptions::amanzi_throw(msg);
-  return MeshCache<MemSpace_kind::HOST>::cEntity_ID_View();
+  if (kind == Entity_kind::BOUNDARY_FACE) {
+    View_type<const Entity_ID, MemSpace_kind::HOST> ents;
+    bool is_faces = false;
+    try {
+      // get face entities, then filter for boundary faces.
+      ents = mesh.getSetEntities(region.get_name(), Entity_kind::FACE, ptype);
+      is_faces = true;
+    } catch (...) {
+      ents = mesh.getSetEntities(region.get_name(), Entity_kind::CELL, ptype);
+    }
+
+    Utils::FIFO_Set<Entity_ID> bfs;
+    if (is_faces) {
+      // filter faces for boundary_faces
+      for (auto f : ents) {
+        auto bf = getFaceOnBoundaryBoundaryFace(mesh, f);
+        if (bf >= 0) bfs.insert(bf);
+      }
+    } else {
+      // find boundary_faces whose internal cell is here
+      for (auto c : ents) {
+        auto cfaces = mesh.getCellFaces(c);
+        for (auto f : cfaces) {
+          auto bf = getFaceOnBoundaryBoundaryFace(mesh, f);
+          if (bf >= 0) bfs.insert(bf);
+        }
+      }
+    }
+    vectorToConstView(ents, bfs.asVector());
+    return ents;
+
+  } else {
+    Errors::Message msg;
+    msg << "Resolving " << to_string(kind) << " not yet implemented...";
+    Exceptions::amanzi_throw(msg);
+    return MeshCache<MemSpace_kind::HOST>::cEntity_ID_View();
+  }
 }
 
 

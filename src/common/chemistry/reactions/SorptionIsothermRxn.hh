@@ -42,7 +42,7 @@ class SorptionIsothermRxn {
 
   void SetIsothermParameters(const std::vector<double>& params);
 
-  std::string IsothermName() const { return isotherm_->name(); }
+  std::string IsothermName() const { return isotherm_->getName(); }
 
   SorptionIsotherm::SorptionIsothermType IsothermType() const { return isotherm_->isotherm_type(); }
 

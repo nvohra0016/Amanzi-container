@@ -142,6 +142,17 @@ CompositeVectorSpace::Update(const CompositeVectorSpace& other)
 
 
 CompositeVectorSpace*
+CompositeVectorSpace::Update(const CompositeSpace& other)
+{
+  if (other.getMesh() != Teuchos::null) SetMesh(other.getMesh());
+  for (const auto& comp : other) {
+    AddComponent(comp, other.getLocation(comp), other.getNumVectors(comp));
+  }
+  return this;
+};
+
+
+CompositeVectorSpace*
 CompositeVectorSpace::UpdateComponents(const CompositeVectorSpace& other)
 {
   if (this != &other) {

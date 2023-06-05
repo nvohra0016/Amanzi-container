@@ -165,7 +165,7 @@ FlowMatrixFracture_PK::Initialize()
 
   FractureInsertion fi(mesh_matrix_, mesh_fracture_);
   fi.InitMatrixFaceToFractureCell(Teuchos::rcpFromRef(mmap), Teuchos::rcpFromRef(gmap));
-  double scale = (sub_pks_[0]->name() == "darcy") ? 1.0 : 1.0 / CommonDefs::MOLAR_MASS_H2O;
+  double scale = (sub_pks_[0]->getName() == "darcy") ? 1.0 : 1.0 / CommonDefs::MOLAR_MASS_H2O;
   fi.SetValues(kn, scale / gravity);
 
   // -- operators
@@ -260,7 +260,7 @@ FlowMatrixFracture_PK::Initialize()
     *vo_->os() << "coupling matrix:" << std::endl << op_matrix_->PrintDiagnostics() << std::endl;
     *vo_->os() << "preconditioner:" << std::endl
                << op_tree_pc_->PrintDiagnostics() << std::endl
-               << vo_->color("green") << "Initialization of PK is complete: my dT=" << get_dt()
+               << vo_->color("green") << "Initialization of PK is complete: my dT=" << getDt()
                << vo_->reset() << std::endl
                << std::endl;
   }
@@ -275,7 +275,7 @@ FlowMatrixFracture_PK::AdvanceStep(double t_old, double t_new, bool reinit)
 {
   // create copies of conservative fields
   std::vector<std::string> fields = { "saturation_liquid", "fracture-saturation_liquid" };
-  if (sub_pks_[0]->name() == "richards") {
+  if (sub_pks_[0]->getName() == "richards") {
     fields.push_back("water_storage");
     fields.push_back("fracture-water_storage");
   }

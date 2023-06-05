@@ -94,34 +94,34 @@ class AModel {
   // the model
   KOKKOS_INLINE_FUNCTION void operator()(const int i) const
   {
-    A_[i] = alpha_ * B_[i] + C_[i] * E_[i] * H_[i];
+    A_(i,0) = alpha_ * B_(i,0) + C_(i,0) * E_(i,0) * H_(i,0);
   }
 
   // derivatives
   //
   // NOTE: the order of these function tags (i.e. Deriv<0>, ...) is set by the
   // above call to getDependencies().  Deriv<I> must correspond to the derivative
-  // with respect to getDependencies()[I];
+  // with respect to getDependencies()(i,0);
 
   // d/dB
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<0>, const int i) const
   {
-    A_[i] = alpha_;
+    A_(i,0) = alpha_;
   }
   // d/dC
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<1>, const int i) const
   {
-    A_[i] = E_[i] * H_[i];
+    A_(i,0) = E_(i,0) * H_(i,0);
   }
   // d/dE
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<2>, const int i) const
   {
-    A_[i] = C_[i] * H_[i];
+    A_(i,0) = C_(i,0) * H_(i,0);
   }
   // d/dH
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<3>, const int i) const
   {
-    A_[i] = C_[i] * E_[i];
+    A_(i,0) = C_(i,0) * E_(i,0);
   }
 
  private:
@@ -165,18 +165,18 @@ class CModel {
 
   KOKKOS_INLINE_FUNCTION void operator()(const int i) const
   {
-    C_[i] = 2 * D_[i] + G_[i];
+    C_(i,0) = 2 * D_(i,0) + G_(i,0);
   }
 
   // d/dD
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<0>, const int i) const
   {
-    C_[i] = 2.0;
+    C_(i,0) = 2.0;
   }
   // d/dG
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<1>, const int i) const
   {
-    C_[i] = 1.0;
+    C_(i,0) = 1.0;
   }
 
 
@@ -217,13 +217,13 @@ class DModel {
 
   KOKKOS_INLINE_FUNCTION void operator()(const int i) const
   {
-    D_[i] = 2 * G_[i];
+    D_(i,0) = 2 * G_(i,0);
   }
 
   // derivatives
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<0>, const int i) const
   {
-    D_[i] = 2.0;
+    D_(i,0) = 2.0;
   }
 
  private:
@@ -263,18 +263,18 @@ class EModel {
 
   KOKKOS_INLINE_FUNCTION void operator()(const int i) const
   {
-    E_[i] = D_[i] * F_[i];
+    E_(i,0) = D_(i,0) * F_(i,0);
   }
 
   // d/dD
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<0>, const int i) const
   {
-    E_[i] = F_[i];
+    E_(i,0) = F_(i,0);
   }
   // d/dF
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<1>, const int i) const
   {
-    E_[i] = D_[i];
+    E_(i,0) = D_(i,0);
   }
 
 
@@ -315,13 +315,13 @@ class FModel {
 
   KOKKOS_INLINE_FUNCTION void operator()(const int i) const
   {
-    F_[i] = 2 * G_[i];
+    F_(i,0) = 2 * G_(i,0);
   }
 
   // d/dG
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<0>, const int i) const
   {
-    F_[i] = 2.0;
+    F_(i,0) = 2.0;
   }
 
 
@@ -360,13 +360,13 @@ class HModel {
 
   KOKKOS_INLINE_FUNCTION void operator()(const int i) const
   {
-    H_[i] = 2 * F_[i];
+    H_(i,0) = 2 * F_(i,0);
   }
 
   // d/dF
   KOKKOS_INLINE_FUNCTION void operator()(Deriv<0>, const int i) const
   {
-    H_[i] = 2.0;
+    H_(i,0) = 2.0;
   }
 
 

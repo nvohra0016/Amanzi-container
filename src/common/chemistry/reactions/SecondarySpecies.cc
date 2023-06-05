@@ -125,7 +125,7 @@ SecondarySpecies::ParseReaction_(const std::string& reaction,
     } else {
       int id(-1);
       for (auto it = primary_species.begin(); it != primary_species.end(); ++it) {
-        if (it->name() == primary_name) {
+        if (it->getName() == primary_name) {
           id = it->identifier();
           break;
         }

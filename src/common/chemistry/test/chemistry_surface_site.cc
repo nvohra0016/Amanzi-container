@@ -74,7 +74,7 @@ SUITE(GeochemistryTestsSurfaceSite)
 
   TEST_FIXTURE(SurfaceSiteTest, SurfaceSite_constructor_init_name)
   {
-    CHECK_EQUAL(name_, site_.name());
+    CHECK_EQUAL(name_, site_.getName());
   }
 
   TEST_FIXTURE(SurfaceSiteTest, SurfaceSite_constructor_init_change)

@@ -680,22 +680,20 @@ bool MeshAudit_Geometry<Mesh_type>::check_cell_to_faces_to_nodes() const
     bool bad_face = false;
     bool bad_dir  = false;
 
-    if (cface.size() != Topology::nface_std[ctype])
+    if (cface.size() != Topology::nface_std[ctype]) {
       bad_face = true;
-    else {
+    } else {
 
       for (int k = 0; k < cface.size(); ++k) {
-
-	auto fnode = mesh_->getFaceNodes(cface[k]); // this should not fail
-
-	int nfn = Topology::nfnodes_std[ctype][k];
+        auto fnode = mesh_->getFaceNodes(cface[k]); // this should not fail
+        int nfn = Topology::nfnodes_std[ctype][k];
 
         if (fnode.size() != nfn) {
           bad_face = true;
           break;
         }
 
-	Entity_ID_View fnode_ref("fnode_red", nfn);
+        MeshHost::Entity_ID_View fnode_ref("fnode_red", nfn);
         for (int i = 0; i < nfn; ++i) {
           int nodenum = Topology::fnodes_std[ctype][k][i];
           fnode_ref[i] = cnode[nodenum];

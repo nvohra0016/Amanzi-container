@@ -23,10 +23,19 @@ namespace Amanzi {
 // -----------------------------------------------------------------------------
 // Transfer operators -- copies ONLY pointers
 // -----------------------------------------------------------------------------
+Teuchos::RCP<TreeVectorSpace>
+PK_Physical::getSolutionSpace() const
+{
+  CompositeVectorSpace& cvs = S_->Require<CompositeVector,CompositeVectorSpace>(key_, tag_next_);
+  auto soln_space = Teuchos::rcp(new TreeVectorSpace(cvs.getComm()));
+  soln_space->setData(cvs.CreateSpace());
+  return soln_space;
+}
+
 void
 PK_Physical::State_to_Solution(const Tag& tag, TreeVector& solution)
 {
-  solution.setData(S_->GetPtrW<CompositeVector>(key_, tag, name()));
+  solution.setData(S_->GetPtrW<CompositeVector>(key_, tag, getName()));
 }
 
 

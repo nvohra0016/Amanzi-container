@@ -33,10 +33,10 @@ FlowReactiveTransport_PK::FlowReactiveTransport_PK(
 // Calculate the min of sub PKs timestep sizes.
 // -----------------------------------------------------------------------------
 double
-FlowReactiveTransport_PK::get_dt()
+FlowReactiveTransport_PK::getDt()
 {
-  //double dt = Amanzi::PK_MPCSubcycled::get_dt();
-  double dt = sub_pks_[master_]->get_dt();
+  //double dt = Amanzi::PK_MPCSubcycled::getDt();
+  double dt = sub_pks_[master_]->getDt();
   return dt;
 }
 
@@ -45,10 +45,10 @@ FlowReactiveTransport_PK::get_dt()
 // Set master dt
 // -----------------------------------------------------------------------------
 void
-FlowReactiveTransport_PK::set_dt(double dt)
+FlowReactiveTransport_PK::setDt(double dt)
 {
   master_dt_ = dt;
-  sub_pks_[master_]->set_dt(dt);
+  sub_pks_[master_]->setDt(dt);
 }
 
 
@@ -78,7 +78,7 @@ FlowReactiveTransport_PK::AdvanceStep(double t_old, double t_new, bool reinit)
 
   sub_pks_[master_]->CommitStep(t_old, t_new, Tags::DEFAULT);
 
-  slave_dt_ = sub_pks_[slave_]->get_dt();
+  slave_dt_ = sub_pks_[slave_]->getDt();
 
   if (slave_dt_ > master_dt_) slave_dt_ = master_dt_;
 
@@ -106,10 +106,10 @@ FlowReactiveTransport_PK::AdvanceStep(double t_old, double t_new, bool reinit)
       sub_pks_[slave_]->CommitStep(t_old + dt_done, t_old + dt_done + dt_next, Tags::DEFAULT);
       dt_done += dt_next;
       // allow dt to grow only when success
-      dt_next = sub_pks_[slave_]->get_dt();
+      dt_next = sub_pks_[slave_]->getDt();
     }
 
-    // dt_next = sub_pks_[slave_]->get_dt();
+    // dt_next = sub_pks_[slave_]->getDt();
     // no state recovery (e.g. pressure) is made, so the only option is to fail.
     if (dt_next < min_dt_)
       Exceptions::amanzi_throw("Failure in ReactiveTransport_PK: small time step.");

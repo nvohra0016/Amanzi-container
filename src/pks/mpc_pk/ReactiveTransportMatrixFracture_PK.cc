@@ -135,10 +135,10 @@ ReactiveTransportMatrixFracture_PK::Initialize()
 // Calculate minimum of sub PKs timestep sizes
 // -----------------------------------------------------------------------------
 double
-ReactiveTransportMatrixFracture_PK::get_dt()
+ReactiveTransportMatrixFracture_PK::getDt()
 {
-  double dTchem = sub_pks_[0]->get_dt();
-  double dTtran = sub_pks_[1]->get_dt();
+  double dTchem = sub_pks_[0]->getDt();
+  double dTtran = sub_pks_[1]->getDt();
 
   if (subcycling_) return dTtran;
 
@@ -153,10 +153,10 @@ ReactiveTransportMatrixFracture_PK::get_dt()
 //
 // -----------------------------------------------------------------------------
 void
-ReactiveTransportMatrixFracture_PK::set_dt(double dt)
+ReactiveTransportMatrixFracture_PK::setDt(double dt)
 {
-  sub_pks_[0]->set_dt(dt);
-  sub_pks_[1]->set_dt(dt);
+  sub_pks_[0]->setDt(dt);
+  sub_pks_[1]->setDt(dt);
 }
 
 
@@ -176,14 +176,14 @@ ReactiveTransportMatrixFracture_PK::AdvanceStep(double t_old, double t_new, bool
   }
 
   std::vector<Teuchos::RCP<Transport::Transport_PK>> subpks_tran;
-  if (sub_pks_[1]->name() == "coupled transport") {
+  if (sub_pks_[1]->getName() == "coupled transport") {
     auto tpk = Teuchos::rcp_dynamic_cast<TransportMatrixFracture_PK>(sub_pks_[1]);
 
     for (auto ic = tpk->begin(); ic != tpk->end(); ++ic) {
       auto ic1 = Teuchos::rcp_dynamic_cast<Transport::Transport_PK>(*ic);
       subpks_tran.push_back(ic1);
     }
-  } else if (sub_pks_[1]->name() == "coupled transport implicit") {
+  } else if (sub_pks_[1]->getName() == "coupled transport implicit") {
     auto tpk = Teuchos::rcp_dynamic_cast<TransportMatrixFractureImplicit_PK>(sub_pks_[1]);
 
     for (auto ic = tpk->begin(); ic != tpk->end(); ++ic) {
@@ -200,7 +200,7 @@ ReactiveTransportMatrixFracture_PK::AdvanceStep(double t_old, double t_new, bool
   }
 
   // advance the slave, subcycling if needed
-  double dTchem = sub_pks_[0]->get_dt();
+  double dTchem = sub_pks_[0]->getDt();
   double dt_next(dTchem), dt_done(0.0);
 
   try {
@@ -223,7 +223,7 @@ ReactiveTransportMatrixFracture_PK::AdvanceStep(double t_old, double t_new, bool
         }
       } else {
         dt_done += dt_next;
-        dt_next = sub_pks_[0]->get_dt();
+        dt_next = sub_pks_[0]->getDt();
       }
 
       // no state recovery is made, so the only option is to fail

@@ -59,8 +59,8 @@ class Richards_PK : public Flow_PK {
   virtual void Setup() final;
   virtual void Initialize() final;
 
-  virtual double get_dt() override { return dt_; }
-  virtual void set_dt(double dt) override
+  virtual double getDt() override { return dt_; }
+  virtual void setDt(double dt) override
   {
     dt_ = dt;
     dt_desirable_ = dt_;

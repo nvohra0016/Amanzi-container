@@ -38,7 +38,6 @@ if the Framework itself is deleted (hence the split).
 #include "GeometryDefs.hh"
 #include "MeshDefs.hh"
 #include "AmanziComm.hh"
-#include "Mesh_Helpers.hh"
 
 namespace Amanzi {
 

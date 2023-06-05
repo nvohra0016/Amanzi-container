@@ -173,7 +173,7 @@ std::ostream&
 EvaluatorPrimary_::writeInfo(std::ostream& os) const
 {
   os << Keys::getKey(my_key_, my_tag_) << std::endl
-     << "(" << getName() << ") [" << to_string(getKind()) << "]" << std::endl;
+     << "(" << getType() << ") [" << to_string(getKind()) << "]" << std::endl;
   return os;
 }
 

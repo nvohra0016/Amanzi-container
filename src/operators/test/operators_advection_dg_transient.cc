@@ -73,7 +73,7 @@ class AdvectionFn : public Explicit_TI::fnBase<CompositeVector> {
   void FunctionalTimeDerivative(double t, const CompositeVector& u, CompositeVector& f) override;
 
   // modify time step
-  void set_dt(double dt) { dt_ = dt; }
+  void setDt(double dt) { dt_ = dt; }
 
   // calculate cell-center and face-centered velocities using analytic formulas
   virtual void ComputeVelocities(
@@ -830,7 +830,7 @@ void Transient(std::string filename, int nx, int ny, int nz,
   Explicit_TI::RK<CompositeVector> rk(fn, Explicit_TI::tvd_3rd_order, sol);
 
   while(std::fabs(t < tend) < dt/4 || dt > 1e-12) {
-    fn.set_dt(dt);
+    fn.setDt(dt);
     fn.ApplyLimiter(limiter, sol);
     rk.TimeStep(t, dt, sol, sol_next);
 

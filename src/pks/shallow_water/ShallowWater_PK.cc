@@ -42,7 +42,7 @@ ShallowWater_PK::ShallowWater_PK(Teuchos::ParameterList& pk_tree,
                                  const Teuchos::RCP<TreeVector>& soln)
   : PK(pk_tree, glist, S, soln), glist_(glist), soln_(soln), S_(S), passwd_(""), iters_(0)
 {
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 
@@ -690,7 +690,7 @@ ShallowWater_PK::NumericalSource(int c,
 // Calculation of time step limited by the CFL condition
 //--------------------------------------------------------------
 double
-ShallowWater_PK::get_dt()
+ShallowWater_PK::getDt()
 {
   double d, d_min = 1.e10, vn, dt = 1.e10, dt_dry = 1.e-1;
 

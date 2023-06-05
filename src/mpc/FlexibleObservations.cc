@@ -52,8 +52,8 @@ FlexibleObservations::FlexibleObservations(Teuchos::RCP<Teuchos::ParameterList> 
 
   // loop over the sublists and create an observation for each
   for (auto i = obs_list_->begin(); i != obs_list_->end(); i++) {
-    if (obs_list_->isSublist(obs_list_->name(i))) {
-      Teuchos::ParameterList observable_plist = obs_list_->sublist(obs_list_->name(i));
+    if (obs_list_->isSublist(obs_list_->getName(i))) {
+      Teuchos::ParameterList observable_plist = obs_list_->sublist(obs_list_->getName(i));
 
       std::vector<double> times;
       std::vector<std::vector<double>> time_sps;
@@ -104,7 +104,7 @@ FlexibleObservations::FlexibleObservations(Teuchos::RCP<Teuchos::ParameterList> 
       std::string var = observable_plist.get<std::string>("variable");
       Key domain_name = observable_plist.get<std::string>("domain name", "domain");
       observations.insert(std::pair<std::string, Teuchos::RCP<Observable>>(
-        obs_list_->name(i),
+        obs_list_->getName(i),
         CreateObservable(
           *coordinator_list, observable_plist, *units_list, S->GetMesh(domain_name))));
       // Observable(var, observable_plist.get<std::string>("region"),
@@ -281,7 +281,7 @@ FlexibleObservations::FlushObservations()
       out << "============================================================================\n";
 
       for (auto it = obs_list_->begin(); it != obs_list_->end(); ++it) {
-        std::string label = obs_list_->name(it);
+        std::string label = obs_list_->getName(it);
         const Teuchos::ParameterEntry& entry = obs_list_->getEntry(label);
         if (entry.isList()) {
           const Teuchos::ParameterList& ind_obs_list = obs_list_->sublist(label);

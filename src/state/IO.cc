@@ -29,6 +29,7 @@
 #include "errors.hh"
 #include "Mesh.hh"
 #include "StringExt.hh"
+#include "ViewUtils.hh"
 
 #include "State.hh"
 #include "IO.hh"
@@ -134,57 +135,6 @@ ReadCheckpointPosition(const Comm_ptr_type& comm, std::string filename)
 //     if (tmp_data != NULL) free(tmp_data);
 //   }
 // }
-
-
-// -----------------------------------------------------------------------------
-// Non-member function for deforming the mesh after reading a checkpoint file
-// that contains the vertex coordinate field (this is written by deformation pks)
-//
-// FIX ME: Refactor this to make the name more general.  Should align with a
-// mesh name prefix or something, and the coordinates should be written by
-// state in WriteCheckpoint if mesh IsDeformableMesh() --ETC
-// -----------------------------------------------------------------------------
-void
-DeformCheckpointMesh(State& S, Key domain)
-{
-  Key vc_key = Keys::getKey(domain, "vertex_coordinates");
-  if (S.HasRecord(vc_key, Tags::DEFAULT)) {
-    // only deform mesh if vertex_coordinates field exists
-    auto write_access_mesh = S.GetDeformableMesh(domain);
-
-    // get vertex coordinates state
-    const CompositeVector& vc = S.Get<CompositeVector>(vc_key, Tags::DEFAULT);
-    vc.scatterMasterToGhosted("node");
-
-    Amanzi::AmanziMesh::Entity_ID_List nodeids;
-    AmanziGeometry::Point_List new_pos, final_pos;
-    {
-      auto vc_n = vc.viewComponent<Kokkos::HostSpace>("node", true);
-      int dim = write_access_mesh->getSpaceDimension();
-      Amanzi::AmanziGeometry::Point new_coords(dim);
-
-      int nV = vc_n.extent(0);
-      for (int n = 0; n != nV; ++n) {
-        for (int k = 0; k != dim; ++k) new_coords[k] = vc_n(n,k);
-
-        // push back for deform method
-        nodeids.emplace_back(n);
-        new_pos.emplace_back(new_coords);
-      }
-    }
-
-    // deform the mesh
-    if (Keys::starts_with(domain, "column"))
-      AmanziMesh::deform(*write_access_mesh, asView(nodeids), asView(new_pos));
-    else
-      AmanziMesh::deform(*write_access_mesh, asView(nodeids), asView(new_pos));
-  } else {
-    Errors::Message msg;
-    msg << "DeformCheckpointMesh: unable to deform mesh because field \"" << vc_key
-        << "\" does not exist in state.";
-    Exceptions::amanzi_throw(msg);
-  }
-}
 
 
 // // -----------------------------------------------------------------------------

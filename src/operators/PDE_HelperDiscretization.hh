@@ -45,8 +45,8 @@ class PDE_HelperDiscretization {
   // trial spaces. For a single PDE, these BCs could be the same.
   void SetBCs(const Teuchos::RCP<const BCs>& bc_trial,
               const Teuchos::RCP<const BCs>& bc_test);
-  void AddBCs(const Teuchos::RCP<const BCs>& bc_trial,
-              const Teuchos::RCP<const BCs>& bc_test);
+  // void AddBCs(const Teuchos::RCP<const BCs>& bc_trial,
+  //             const Teuchos::RCP<const BCs>& bc_test);
 
  private:
   void PopulateDimensions_();

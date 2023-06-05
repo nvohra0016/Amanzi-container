@@ -351,26 +351,25 @@ State::RequireEvaluator(const Key& key, const Tag& tag)
 
   // Create the evaluator from State's plist
   // -- Get the Field Evaluator plist
-  Teuchos::ParameterList& fm_plist = state_plist_.sublist("evaluators");
-
   if (HasEvaluatorList(key)) {
-    // -- Get this evaluator's plist.
+    // -- Get a copy of this evaluator's plist.
     Teuchos::ParameterList sublist = GetEvaluatorList(key);
     sublist.setName(key);
 
     // -- Insert any model parameters.
     if (sublist.isParameter("model parameters")) {
-      std::string modelname = sublist.get<std::string>("model parameters");
-      Teuchos::ParameterList modellist = GetModelParameters(modelname);
-      std::string modeltype = modellist.get<std::string>("model type");
-      sublist.set(modeltype, modellist);
+      if (sublist.isType<std::string>("model parameters")) {
+        std::string modelname = sublist.get<std::string>("model parameters");
+        sublist.remove("model parameters");
+        Teuchos::ParameterList modellist = GetModelParameters(modelname);
+        sublist.set("model parameters", modellist);
+      }
     } else if (sublist.isParameter("models parameters")) {
       Teuchos::Array<std::string> modelnames =
         sublist.get<Teuchos::Array<std::string>>("models parameters");
       for (auto modelname = modelnames.begin(); modelname != modelnames.end(); ++modelname) {
         Teuchos::ParameterList modellist = GetModelParameters(*modelname);
-        std::string modeltype = modellist.get<std::string>("model type");
-        sublist.set(modeltype, modellist);
+        sublist.set("model parameters", modellist);
       }
     }
 
@@ -388,6 +387,11 @@ State::RequireEvaluator(const Key& key, const Tag& tag)
     cv_list.set("evaluator type", "cell volume");
     // recursive call will result in the above, HasEvaluatorList() branch being taken.
     return RequireEvaluator(key, tag);
+  } else if (Keys::getVarName(key) == "mesh") {
+    Teuchos::ParameterList& eval_list = GetEvaluatorList(key);
+    eval_list.set("evaluator type", "static mesh");
+    // recursive call will result in the above, HasEvaluatorList() branch being taken.
+    return RequireEvaluator(key, tag);
   }
 
   // cannot find the evaluator, error
@@ -395,6 +399,7 @@ State::RequireEvaluator(const Key& key, const Tag& tag)
   message << "Evaluator \"" << key << "@" << tag.get() << "\" cannot be created in State. "
           << "Verify (1) SetEvaluator is called or (2) name exists in state->evaluators.";
   Exceptions::amanzi_throw(message);
+  Teuchos::ParameterList& fm_plist = state_plist_.sublist("evaluators");
   return *Evaluator_Factory().createEvaluator(fm_plist); // silences warning
 }
 
@@ -715,41 +720,42 @@ State::InitializeFields(const Tag& tag)
   }
 
   Tag failed;
-  if (state_plist_.isSublist("initial conditions")) {
-    double t_ini = state_plist_.sublist("initial conditions").get<double>("time", 0.0);
-    for (auto& e : data_) {
-      std::string flag("... skipped");
-      if (pre_initialization || !e.second->isInitialized(failed)) {
-        if (state_plist_.sublist("initial conditions").isSublist(e.first)) {
-          flag = "[ok]";
-          if (state_plist_.sublist("initial conditions").isSublist(e.first)) {
+  Teuchos::ParameterList& ic_list = state_plist_.isSublist("constants") ?
+    state_plist_.sublist("constants") : state_plist_.sublist("initial conditions");
+
+  double t_ini = ic_list.get<double>("time", 0.0);
+  for (auto& e : data_) {
+    std::string flag("... skipped");
+    if (pre_initialization || !e.second->isInitialized(failed)) {
+      if (ic_list.isSublist(e.first)) {
+        flag = "[ok]";
+        if (ic_list.isSublist(e.first)) {
+          Teuchos::ParameterList sublist =
+            ic_list.sublist(e.first);
+          sublist.set<double>("time", t_ini);
+          e.second->Initialize(sublist, true);
+        }
+      } else {
+        // check for domain set
+        KeyTriple split;
+        bool is_ds = Keys::splitDomainSet(e.first, split);
+        Key ds_name = std::get<0>(split);
+        if (is_ds) {
+          Key lifted_key = Keys::getKey(ds_name, "*", std::get<2>(split));
+          if (ic_list.isSublist(lifted_key)) {
+            flag = "[ok]";
             Teuchos::ParameterList sublist =
-              state_plist_.sublist("initial conditions").sublist(e.first);
-            sublist.set<double>("time", t_ini);
-            e.second->Initialize(sublist, true);
-          }
-        } else {
-          // check for domain set
-          KeyTriple split;
-          bool is_ds = Keys::splitDomainSet(e.first, split);
-          Key ds_name = std::get<0>(split);
-          if (is_ds) {
-            Key lifted_key = Keys::getKey(ds_name, "*", std::get<2>(split));
-            if (state_plist_.sublist("initial conditions").isSublist(lifted_key)) {
-              flag = "[ok]";
-              Teuchos::ParameterList sublist =
-                state_plist_.sublist("initial conditions").sublist(lifted_key);
-              sublist.set("evaluator name", e.first);
-              e.second->Initialize(sublist);
-            }
+              ic_list.sublist(lifted_key);
+            sublist.set("evaluator name", e.first);
+            e.second->Initialize(sublist);
           }
         }
       }
+    }
 
-      if (vo.os_OK(Teuchos::VERB_HIGH)) {
-        Teuchos::OSTab tab = vo.getOSTab();
-        *vo_->os() << "initializing \"" << e.first << "\" " << flag << std::endl;
-      }
+    if (vo.os_OK(Teuchos::VERB_HIGH)) {
+      Teuchos::OSTab tab = vo.getOSTab();
+      *vo_->os() << "initializing \"" << e.first << "\" " << flag << std::endl;
     }
   }
 }

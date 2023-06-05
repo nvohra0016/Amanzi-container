@@ -107,8 +107,8 @@ class Multiphase_PK : public PK_PhysicalBDF {
   virtual void Setup() override;
   virtual void Initialize() override;
 
-  virtual double get_dt() override { return dt_; }
-  virtual void set_dt(double dt) override { dt_ = dt; }
+  virtual double getDt() override { return dt_; }
+  virtual void setDt(double dt) override { dt_ = dt; }
 
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit) override;
   virtual void CommitStep(double t_old, double t_new, const Tag& tag) override;

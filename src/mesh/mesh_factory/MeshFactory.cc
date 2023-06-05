@@ -14,6 +14,8 @@
 #include "Mesh.hh"
 #include "MeshFrameworkColumn.hh"
 #include "MeshSurfaceCell.hh"
+#include "MeshLogical.hh"
+#include "MeshLogicalFactory.hh"
 #include "MeshFactory.hh"
 
 namespace Amanzi {
@@ -52,6 +54,19 @@ MeshFactory::create(const Teuchos::RCP<const Mesh>& parent_mesh,
   return mesh;
 }
 
+
+
+Teuchos::RCP<Mesh>
+MeshFactory::createLogical(Teuchos::ParameterList& log_plist)
+{
+  MeshLogicalFactory log_fac(comm_, gm_);
+  Teuchos::RCP<MeshFramework> mesh_fw = log_fac.Create(log_plist);
+  auto mesh = Teuchos::rcp(new Mesh(mesh_fw,
+          Teuchos::rcp(new MeshLogicalAlgorithms()), Teuchos::null));
+  return mesh;
+}
+
+
 // Create a 1D Column Mesh from a columnar structured volume mesh.
 //
 Teuchos::RCP<Mesh>
@@ -66,12 +81,12 @@ MeshFactory::createColumn(const Teuchos::RCP<Mesh>& parent,
   parent->buildColumns();
 
   // create the extracted mesh of the column of cells
-  MeshFrameworkFactory fac(getCommSelf(), parent->getGeometricModel(), plist);
+  MeshFrameworkFactory fac(getCommSelf(), gm_, plist);
   auto col_list = parent->columns.getCells<MemSpace_kind::HOST>(col_id);
   auto extracted_mesh = fac.create(parent, col_list, Entity_kind::CELL, false);
 
   // create the MeshColumn object
-  return Teuchos::rcp(new Mesh(extracted_mesh, Teuchos::rcp(new MeshAlgorithms()), plist));
+  return Teuchos::rcp(new Mesh(extracted_mesh, Teuchos::rcp(new MeshColumnAlgorithms()), plist));
 }
 
 // Create a MeshSurfaceCell from a MeshFrameworkColumn

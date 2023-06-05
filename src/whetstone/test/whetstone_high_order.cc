@@ -140,7 +140,7 @@ HighOrderCrouzeixRaviartSerendipity(int dim, std::string file_name)
   Teuchos::RCP<Teuchos::ParameterList> factory_plist = Teuchos::rcp(new Teuchos::ParameterList());
   factory_plist->set<bool>("request edges", true);
   factory_plist->set<bool>("request faces", true);
-  Teuchos::RCP<const AmanziGeometry::GeometricModel> gm;
+  Teuchos::RCP<AmanziGeometry::GeometricModel> gm;
   MeshFactory meshfactory(comm, gm, factory_plist);
   meshfactory.set_preference(Preference({ Framework::MSTK }));
   Teuchos::RCP<Mesh> mesh = meshfactory.create(file_name);
@@ -220,7 +220,7 @@ HighOrderLagrange2D(std::string file_name)
   Teuchos::RCP<Teuchos::ParameterList> factory_plist = Teuchos::rcp(new Teuchos::ParameterList());
   factory_plist->set<bool>("request edges", true);
   factory_plist->set<bool>("request faces", true);
-  Teuchos::RCP<const AmanziGeometry::GeometricModel> gm;
+  Teuchos::RCP<AmanziGeometry::GeometricModel> gm;
   MeshFactory meshfactory(comm, gm, factory_plist);
   meshfactory.set_preference(Preference({ Framework::MSTK }));
   Teuchos::RCP<Mesh> mesh = meshfactory.create(file_name);
@@ -312,7 +312,7 @@ HighOrderLagrange3D(const std::string& filename1, const std::string& filename2)
   Teuchos::RCP<Teuchos::ParameterList> factory_plist = Teuchos::rcp(new Teuchos::ParameterList());
   factory_plist->set<bool>("request edges", true);
   factory_plist->set<bool>("request faces", true);
-  Teuchos::RCP<const AmanziGeometry::GeometricModel> gm;
+  Teuchos::RCP<AmanziGeometry::GeometricModel> gm;
   MeshFactory meshfactory(comm, gm, factory_plist);
   meshfactory.set_preference(Preference({ Framework::MSTK }));
   Teuchos::RCP<Mesh> mesh1 = meshfactory.create(filename1);
@@ -409,7 +409,7 @@ HighOrderLagrangeSerendipity(const std::string& filename)
   Teuchos::RCP<Teuchos::ParameterList> factory_plist = Teuchos::rcp(new Teuchos::ParameterList());
   factory_plist->set<bool>("request edges", true);
   factory_plist->set<bool>("request faces", true);
-  Teuchos::RCP<const AmanziGeometry::GeometricModel> gm;
+  Teuchos::RCP<AmanziGeometry::GeometricModel> gm;
   MeshFactory meshfactory(comm, gm, factory_plist);
   meshfactory.set_preference(Preference({ Framework::MSTK }));
   Teuchos::RCP<Mesh> mesh = meshfactory.create(filename);
@@ -503,7 +503,7 @@ TEST(HIGH_ORDER_LAGRANGE_SURFACE)
   std::cout << "\nTest: High-order Lagrange element on surface" << std::endl;
   auto comm = Amanzi::getDefaultComm();
 
-  Teuchos::RCP<const AmanziGeometry::GeometricModel> gm;
+  Teuchos::RCP<AmanziGeometry::GeometricModel> gm;
   MeshFactory meshfactory(comm, gm);
   meshfactory.set_preference(Preference({ Framework::MSTK }));
   Teuchos::RCP<Mesh> mesh2d = meshfactory.create(0.0, 0.0, 1.0, 1.0, 1, 1);

@@ -105,8 +105,8 @@ class NavierStokes_PK : public PK_PhysicalBDF {
   virtual void Setup() final;
   virtual void Initialize() final;
 
-  virtual double get_dt() final { return dt_; }
-  virtual void set_dt(double dt) final
+  virtual double getDt() final { return dt_; }
+  virtual void setDt(double dt) final
   {
     dt_ = dt;
     dt_desirable_ = dt_;

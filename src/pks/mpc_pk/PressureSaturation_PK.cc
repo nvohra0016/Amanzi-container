@@ -33,9 +33,9 @@ PressureSaturation_PK::PressureSaturation_PK(
 // Calculate the min of sub PKs timestep sizes.
 // -----------------------------------------------------------------------------
 double
-PressureSaturation_PK::get_dt()
+PressureSaturation_PK::getDt()
 {
-  double dt = Amanzi::MPCSubcycled::get_dt();
+  double dt = Amanzi::MPCSubcycled::getDt();
   return dt;
 };
 
@@ -44,10 +44,10 @@ PressureSaturation_PK::get_dt()
 // -----------------------------------------------------------------------------
 
 void
-PressureSaturation_PK::set_dt(double dt)
+PressureSaturation_PK::setDt(double dt)
 {
   master_dt_ = dt;
-  slave_dt_ = sub_pks_[slave_]->get_dt();
+  slave_dt_ = sub_pks_[slave_]->getDt();
   //  std::cout<<"master_dt_ "<<master_dt_<<" slave_dt_ "<<slave_dt_<<"\n";
   if (slave_dt_ > master_dt_) slave_dt_ = master_dt_;
 }
@@ -63,7 +63,7 @@ PressureSaturation_PK::AdvanceStep(double t_old, double t_new, bool reinit)
   bool fail = false;
 
   // advance the master PK using the full step size
-  //std::cout << "Master PK: " << sub_pks_[master_]->name() << "\n";
+  //std::cout << "Master PK: " << sub_pks_[master_]->getName() << "\n";
   //std::cout<<"Advance Master PK: "<<t_old<<" "<<t_new<<"\n";
   fail = sub_pks_[master_]->AdvanceStep(t_old, t_new, reinit);
   if (fail) return fail;
@@ -88,7 +88,7 @@ PressureSaturation_PK::AdvanceStep(double t_old, double t_new, bool reinit)
     S_->set_intermediate_time(t_old + dt_done + dt_next);
 
     // take the step
-    //std::cout << "Slave PK: " << sub_pks_[slave_]->name() << "\n";
+    //std::cout << "Slave PK: " << sub_pks_[slave_]->getName() << "\n";
     //std::cout<<"Advance Slave PK: "<<t_old<<" "<<t_new<<"\n";
     fail = sub_pks_[slave_]->AdvanceStep(t_old + dt_done, t_old + dt_done + dt_next, reinit);
 

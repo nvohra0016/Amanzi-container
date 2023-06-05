@@ -42,7 +42,7 @@ TransportMatrixFractureImplicit_PK::TransportMatrixFractureImplicit_PK(
     glist_(glist),
     soln_(soln)
 {
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 
@@ -107,7 +107,7 @@ TransportMatrixFractureImplicit_PK::Initialize()
   PK_MPCStrong<PK_BDF>::Initialize();
 
   // set a huge time step that will be limited by advance step
-  set_dt(1e+98);
+  setDt(1e+98);
 
   TimestepControllerFactory<TreeVector> factory;
   auto ts_list = tp_list_->sublist("time integrator").sublist("BDF1");

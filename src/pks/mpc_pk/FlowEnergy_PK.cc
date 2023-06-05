@@ -34,7 +34,7 @@ FlowEnergy_PK::FlowEnergy_PK(Teuchos::ParameterList& pk_tree,
     Amanzi::PK_MPCStrong<PK_BDF>(pk_tree, glist, S, soln),
     glist_(glist)
 {
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 
@@ -256,7 +256,7 @@ FlowEnergy_PK::Initialize()
                << op_tree_matrix_->PrintDiagnostics() << std::endl
                << "preconditioner:" << std::endl
                << op_tree_pc_->PrintDiagnostics() << std::endl
-               << vo_->color("green") << "Initialization of PK is complete: my dT=" << get_dt()
+               << vo_->color("green") << "Initialization of PK is complete: my dT=" << getDt()
                << vo_->reset() << std::endl
                << std::endl;
   }

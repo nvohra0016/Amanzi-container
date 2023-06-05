@@ -74,7 +74,7 @@ EvaluatorIndependentFunction::Update_(State& S)
   if (!computed_once_) {
     // Create the function.
     AMANZI_ASSERT(plist_.isSublist("function"));
-    func_ = Functions::createCompositeVectorFunction(plist_.sublist("function"), cv->getMesh());
+    func_ = Teuchos::rcp(new Functions::CompositeVectorFunction(plist_.sublist("function"), cv->getMesh()));
   }
 
   // NOTE: EvaluatorIndependentFunctions own their own data.

@@ -341,7 +341,8 @@ TreeVector::setSubVector(int i, const Teuchos::RCP<TreeVector>& subvec)
 void
 TreeVector::setData(const Teuchos::RCP<CompositeVector>& data)
 {
-  if (!data->getMap()->locallySameAs(*getMap()->getData())) {
+  if (!getMap()->getData().get() ||
+      !data->getMap()->locallySameAs(*getMap()->getData())) {
     Errors::Message message("TreeVector: setData called with incompatible vector.");
     throw(message);
   }

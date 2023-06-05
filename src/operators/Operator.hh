@@ -187,6 +187,8 @@ class Operator: public Matrix<CompositeVector,CompositeSpace> {
 
   int applyAssembled(const CompositeVector& X, CompositeVector& Y,
                      double scalar=0.0) const;
+  int applyUnassembled(const CompositeVector& X, CompositeVector& Y,
+                     double scalar=0.0) const;
   virtual int applyInverse(const CompositeVector& X, CompositeVector& Y) const override;
 
   // diagonal
@@ -515,12 +517,14 @@ class Operator: public Matrix<CompositeVector,CompositeSpace> {
   int num_colors_;
   Teuchos::RCP<std::vector<int>> coloring_;
   Teuchos::ParameterList inv_plist_;
-  bool inited_, updated_, computed_;
+
+  bool inverse_pars_set_;
+  bool initialize_complete_, compute_complete_, assembly_complete_;
 
   int schema_old_;
   Schema schema_row_, schema_col_;
   std::string schema_string_;
-  double shift_;
+  double shift_, shift_min_;
 
   mutable int apply_calls_;
 

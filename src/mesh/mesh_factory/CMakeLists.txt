@@ -33,6 +33,7 @@ include_directories(${SEACAS_INCLUDE_DIRS})
 include_directories(${DBC_SOURCE_DIR})
 include_directories(${GEOMETRY_SOURCE_DIR})
 include_directories(${MESH_EXTRACTED_SOURCE_DIR})
+include_directories(${MESH_LOGICAL_SOURCE_DIR})
 
 # include mesh frameworks
 include_directories(${MESH_SOURCE_DIR})
@@ -75,7 +76,7 @@ set(mesh_factory_inc_files
 
 add_amanzi_library(mesh_factory
                    SOURCE ${mesh_factory_files} HEADERS ${mesh_factory_inc_files}
-                   LINK_LIBS ${mesh_factory_frameworks} mesh_extracted ${Boost_LIBRARIES})
+                   LINK_LIBS ${mesh_factory_frameworks} mesh_extracted mesh_logical ${Boost_LIBRARIES})
 
 
 if (BUILD_TESTS)

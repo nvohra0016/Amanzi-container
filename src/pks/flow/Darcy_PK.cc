@@ -55,7 +55,7 @@ Darcy_PK::Darcy_PK(Teuchos::ParameterList& pk_tree,
 {
   S_ = S;
 
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 
@@ -485,7 +485,7 @@ Darcy_PK::InitializeStatistics_(bool init_darcy)
     VV_PrintSourceExtrema();
 
     *vo_->os() << vo_->color("green") << "Initialization of PK is complete, T=" << S_->get_time()
-               << " dT=" << get_dt() << vo_->reset() << std::endl
+               << " dT=" << getDt() << vo_->reset() << std::endl
                << std::endl;
   }
 

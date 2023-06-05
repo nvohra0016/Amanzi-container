@@ -49,10 +49,10 @@ Output::FilenameFormatter createDirectoryFormatter(Teuchos::ParameterList& plist
 
 
 std::unique_ptr<Output>
-createForVis(Teuchos::ParameterList& plist, const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
+createForVis(Teuchos::ParameterList& plist, const Teuchos::RCP<const AmanziMesh::MeshHost>& mesh)
 {
   // set the filename base based on domain if needed
-  std::string domain_name = Keys::cleanName(plist.name());
+  std::string domain_name = Keys::cleanName(Keys::cleanPListName(plist));
   std::string filenamebase = plist.get<std::string>("file name base", "amanzi_vis");
   if (!domain_name.empty() && domain_name != "domain")
     filenamebase = filenamebase + "_" + domain_name;
@@ -80,7 +80,7 @@ std::unique_ptr<Output>
 createForCheckpoint(Teuchos::ParameterList& plist, const Comm_ptr_type& comm)
 {
   // set the filename base based on domain if needed
-  std::string domain_name = Keys::cleanName(plist.name());
+  std::string domain_name = Keys::cleanName(Keys::cleanPListName(plist));
   if (!plist.isParameter("file name base"))
     plist.set<std::string>("file name base", "checkpoint");
 

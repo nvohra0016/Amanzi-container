@@ -46,7 +46,7 @@ class Evaluator_BCs : public EvaluatorSecondary {
   }
 
   virtual std::string name() const override { return "boundary condition aggregrator"; }
-  
+
  protected:
   std::vector<int> bc_types_;
   bool inited_;
@@ -59,7 +59,7 @@ class Evaluator_BCs : public EvaluatorSecondary {
 // class Evaluator_BCsFunction : public EvaluatorIndependent<BCs,BCs_Factory> {
 //  public:
 //   explicit Evaluator_BCsFunction(Teuchos::ParameterList& plist);
-    
+
 //   virtual Teuchos::RCP<Evaluator> Clone() const override {
 //     return Teuchos::rcp(new Evaluator_BCsFunction(*this));
 //   }
@@ -73,7 +73,7 @@ class Evaluator_BCs : public EvaluatorSecondary {
 //  protected:
 //   Teuchos::RCP<Functions::CompositeVectorFunction> func_;
 //   int bc_model_;
-  
+
 // };
 
 

@@ -40,7 +40,7 @@ class TransportMatrixFracture_PK : public PK_MPCWeak {
   virtual void Setup() override;
   virtual void Initialize() override;
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false) override;
-  virtual double get_dt() override; // the minimum of sub-pks's dt
+  virtual double getDt() override; // the minimum of sub-pks's dt
 
   // -- miscaleneous methods
   virtual std::string name() override { return "coupled transport"; }

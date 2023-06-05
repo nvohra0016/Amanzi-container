@@ -145,7 +145,7 @@ RunTestDarcyWell(std::string controller, bool fit)
       GMV::close_data_file();
     }
 
-    dt = DPK->get_dt();
+    dt = DPK->getDt();
 
     for (int c = 0; c < K.MyLength(); c++) {
       if (fit) {

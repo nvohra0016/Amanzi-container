@@ -73,7 +73,7 @@ class AEvaluator : public EvaluatorSecondaryMonotype<double> {
     return Teuchos::rcp(new AEvaluator(*this));
   }
 
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
   virtual void Evaluate_(const State& S, const std::vector<double*>& results) override
   {
@@ -120,7 +120,7 @@ class CEvaluator : public EvaluatorSecondaryMonotype<double> {
   {
     return Teuchos::rcp(new CEvaluator(*this));
   }
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
   virtual void Evaluate_(const State& S, const std::vector<double*>& results) override
   {
@@ -156,7 +156,7 @@ class DEvaluator : public EvaluatorSecondaryMonotype<double> {
   {
     return Teuchos::rcp(new DEvaluator(*this));
   }
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
   virtual void Evaluate_(const State& S, const std::vector<double*>& results) override
   {
@@ -188,7 +188,7 @@ class EEvaluator : public EvaluatorSecondaryMonotype<double> {
   {
     return Teuchos::rcp(new EEvaluator(*this));
   }
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
   virtual void Evaluate_(const State& S, const std::vector<double*>& results) override
   {
@@ -227,7 +227,7 @@ class FEvaluator : public EvaluatorSecondaryMonotype<double> {
   {
     return Teuchos::rcp(new FEvaluator(*this));
   }
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
   virtual void Evaluate_(const State& S, const std::vector<double*>& results) override
   {
@@ -258,7 +258,7 @@ class HEvaluator : public EvaluatorSecondaryMonotype<double> {
   {
     return Teuchos::rcp(new HEvaluator(*this));
   }
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
   virtual void Evaluate_(const State& S, const std::vector<double*>& results) override
   {

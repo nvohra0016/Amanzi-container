@@ -106,7 +106,7 @@ RunTestDarcySource(const std::string& xmlFileName)
     DPK->CommitStep(t_old, t_new, Tags::DEFAULT);
 
     t_old = t_new;
-    dt = DPK->get_dt();
+    dt = DPK->getDt();
 
     // verification
     double vmin, vmax;

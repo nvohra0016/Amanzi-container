@@ -55,7 +55,7 @@ KineticRate::SetSpeciesIds(const SpeciesArray& species,
   for (int current = 0; current < in_names.size(); current++) {
     bool found = false;
     for (auto s = species.begin(); s != species.end(); s++) {
-      if (in_names.at(current) == s->name()) {
+      if (in_names.at(current) == s->getName()) {
         found = true;
         out_ids->push_back(s->identifier());
         if (out_stoichiometry != NULL) {

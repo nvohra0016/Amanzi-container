@@ -89,7 +89,7 @@ SorptionIsothermFactory::VerifySpeciesName(const std::string& species_name,
 {
   int species_id = -1;
   for (auto it = species.begin(); it != species.end(); ++it) {
-    if (it->name() == species_name) {
+    if (it->getName() == species_name) {
       species_id = it->identifier();
       break;
     }

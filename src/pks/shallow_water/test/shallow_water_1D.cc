@@ -262,7 +262,7 @@ TEST(SHALLOW_WATER_1D)
 
     if (iter % 50 == 0) { IO_Fields(t_out, iter, MyPID, io, *S, &hh_ex, &vel_ex); }
 
-    dt = SWPK.get_dt();
+    dt = SWPK.getDt();
 
     t_new = t_old + dt;
 

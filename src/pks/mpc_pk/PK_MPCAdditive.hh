@@ -62,8 +62,8 @@ class PK_MPCAdditive : public PK_MPC<PK> {
   // -- loops over sub-PKs
   virtual void CommitStep(double t_old, double t_new, const Tag& tag);
   virtual void CalculateDiagnostics(const Tag& tag);
-  virtual double get_dt();
-  virtual void set_dt(double dt);
+  virtual double getDt();
+  virtual void setDt(double dt);
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false);
 };
 
@@ -83,7 +83,7 @@ PK_MPCAdditive<PK_Base>::PK_MPCAdditive(Teuchos::ParameterList& pk_tree,
   solution_ = soln;
 
   // name the PK
-  name_ = pk_tree.name();
+  name_ = pk_tree.getName();
   auto found = name_.rfind("->");
   if (found != std::string::npos) name_.erase(0, found + 2);
 
@@ -176,11 +176,11 @@ PK_MPCAdditive<PK_Base>::CalculateDiagnostics(const Tag& tag)
 // -----------------------------------------------------------------------------
 template <class PK_Base>
 double
-PK_MPCAdditive<PK_Base>::get_dt()
+PK_MPCAdditive<PK_Base>::getDt()
 {
   double dt = 1.0e99;
   for (PK_MPCAdditive<PK>::SubPKList::iterator pk = sub_pks_.begin(); pk != sub_pks_.end(); ++pk) {
-    dt = std::min<double>(dt, (*pk)->get_dt());
+    dt = std::min<double>(dt, (*pk)->getDt());
   }
   return dt;
 }
@@ -190,11 +190,11 @@ PK_MPCAdditive<PK_Base>::get_dt()
 // -----------------------------------------------------------------------------
 template <class PK_Base>
 void
-PK_MPCAdditive<PK_Base>::set_dt(double dt_)
+PK_MPCAdditive<PK_Base>::setDt(double dt_)
 {
   // double dt = 1.0e99;
   for (PK_MPCAdditive<PK>::SubPKList::iterator pk = sub_pks_.begin(); pk != sub_pks_.end(); ++pk) {
-    (*pk)->set_dt(dt_);
+    (*pk)->setDt(dt_);
   }
 }
 

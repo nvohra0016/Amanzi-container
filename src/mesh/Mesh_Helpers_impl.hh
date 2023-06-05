@@ -15,6 +15,7 @@
 #include "MeshDefs.hh"
 #include "ViewUtils.hh"
 #include "MeshUtils.hh"
+#include "MeshCache_decl.hh"
 
 #include "Mesh_Helpers_decl.hh"
 

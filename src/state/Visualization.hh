@@ -86,12 +86,22 @@ class Visualization : public IOEvent {
   // public interface for coordinator clients
   void createFiles(bool include_io_set = true);
   void createTimestep(double time, int cycle);
-  void finalizeTimestep();
+  virtual void finalizeTimestep();
 
   // public interface for data clients
   template <typename T>
   void write(const Teuchos::ParameterList& attrs, const T& t) const {
     output_->write(attrs, t);
+  }
+
+  // a few special cases get intercepted and delegated to a virtual protected member
+  template<>
+  inline void write<Vector_type>(const Teuchos::ParameterList& attrs, const Vector_type& t) const {
+    writeVector_(attrs, t);
+  }
+  template<>
+  inline void write<MultiVector_type>(const Teuchos::ParameterList& attrs, const MultiVector_type& t) const {
+    writeVector_(attrs, t);
   }
 
   void writeRegions() const;;
@@ -102,6 +112,14 @@ class Visualization : public IOEvent {
  protected:
   void readParameters_();
 
+  virtual void writeVector_(const Teuchos::ParameterList& attrs, const Vector_type& t) const {
+    output_->write(attrs, t);
+  }
+  virtual void writeVector_(const Teuchos::ParameterList& attrs, const MultiVector_type& t) const {
+    output_->write(attrs, t);
+  }
+
+ protected:
   std::vector<std::string> domains_;
   std::string my_units_;
   std::string name_;

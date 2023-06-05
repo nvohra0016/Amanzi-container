@@ -94,8 +94,8 @@ class Chemistry_PK : public PK_Physical {
   virtual void Setup() override;
   virtual void Initialize() override;
 
-  virtual void set_dt(double dt) override{};
-  virtual double get_dt() override { return dt_next_; }
+  virtual void setDt(double dt) override{};
+  virtual double getDt() override { return dt_next_; }
 
   // Required members for chemistry interface
   // -- output of auxillary cellwise data from chemistry

@@ -157,7 +157,7 @@ SUITE(GeochemistryTestsKineticRateFactory)
   {
     std::string name("TST");
     RunTest(name);
-    CHECK_EQUAL(typeid(ac::KineticRateTST).name(), typeid(*kinetic_rate_).name());
+    CHECK_EQUAL(typeid(ac::KineticRateTST).getName(), typeid(*kinetic_rate_).getName());
   }
 
   TEST_FIXTURE(KineticRateFactoryTest, KineticRateFactory_invalid_rate)

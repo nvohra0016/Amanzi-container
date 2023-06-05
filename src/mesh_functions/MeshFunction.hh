@@ -16,6 +16,7 @@
 
 #include "Teuchos_RCP.hpp"
 
+#include "Key.hh"
 #include "Mesh.hh"
 #include "MultiFunction.hh"
 #include "Patch.hh"
@@ -29,29 +30,42 @@ namespace Functions {
 //
 // Class used to hold space and a functor to evaluate on that space
 //
-template<class Functor, typename Marker=bool>
 class MeshFunction {
 
 public:
-  using Spec = std::tuple<std::string, PatchSpace, Teuchos::RCP<const Functor>, Marker>;
+  using Spec = std::tuple<std::string, PatchSpace, Teuchos::RCP<const MultiFunction>>;
   using SpecList = std::vector<Spec>;
-  using Marker_type = Marker;
 
-  MeshFunction() {}
-  MeshFunction(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
-    : mesh_(mesh) {}
+  MeshFunction(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
+               AmanziMesh::Entity_kind entity_kind = AmanziMesh::Entity_kind::UNKNOWN);
 
-  Teuchos::RCP<const AmanziMesh::Mesh>& getMesh() const { return mesh_; }
-  void setMesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) {
+  MeshFunction(Teuchos::ParameterList& list,
+               const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
+               const std::string& function_name = "function",
+               AmanziMesh::Entity_kind entity_kind = AmanziMesh::Entity_kind::UNKNOWN,
+               int flag = 0);
+
+  Teuchos::RCP<const AmanziMesh::Mesh> getMesh() const { return mesh_; }
+  void setMesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
+  {
     mesh_ = mesh;
     for (auto& spec : *this) std::get<1>(spec).mesh = mesh;
   }
 
+  int getFlag() const { return flag_; }
+
   // add a spec -- others may inherit this and overload to do some checking?
-  virtual void addSpec(const Spec& spec) {
-    if (mesh_ == Teuchos::null) setMesh(std::get<1>(spec).mesh);
-    AMANZI_ASSERT(std::get<1>(spec).mesh == mesh_);
-    spec_list_.push_back(spec);
+  virtual void addSpec(const Spec& spec);
+
+  void addSpec(const std::string& compname,
+               AmanziMesh::Entity_kind entity_kind,
+               int num_vectors,
+               const std::string& region,
+               const Teuchos::RCP<const MultiFunction>& func)
+  {
+    addSpec(Spec(compname,
+                 PatchSpace(mesh_, false, region, entity_kind, num_vectors, flag_),
+                 func));
   }
 
   // access specs
@@ -66,27 +80,20 @@ public:
   nc_spec_iterator end() { return spec_list_.end(); }
 
   // data creation
-  Teuchos::RCP<CompositeVectorSpace> createCVS(bool ghosted) const {
-    auto cvs = Teuchos::rcp(new CompositeVectorSpace());
-    cvs->SetMesh(mesh_)
-      ->SetGhosted(ghosted);
-    for (auto [compname, ps, functor, marker] : *this) {
-      cvs->AddComponent(compname,
-                        ps.entity_kind,
-                        ps.num_vectors);
-    }
-    return cvs;
-  };
+  Teuchos::RCP<CompositeVectorSpace> createCVS(bool ghosted) const;
+  Teuchos::RCP<MultiPatchSpace> createMPS(bool ghosted = false) const;
 
-  Teuchos::RCP<MultiPatchSpace> createMPS(bool ghosted) const {
-    auto mps = Teuchos::rcp(new MultiPatchSpace(mesh_, ghosted));
-    for (auto spec : *this) mps->addPatch(std::get<1>(spec));
-    return mps;
-  }
+  void Compute(double time, MultiPatch<double>& mp);
+
+ protected:
+  void readSpec_(Teuchos::ParameterList& list,
+                 const std::string& function_name);
 
  protected:
   Teuchos::RCP<const AmanziMesh::Mesh> mesh_;
   SpecList spec_list_;
+  AmanziMesh::Entity_kind entity_kind_;
+  int flag_;
 };
 
 
@@ -109,10 +116,21 @@ computeFunction(const MultiFunction& f, double time, Patch<double>& p);
 void
 computeFunction(const MultiFunction& f, double time, const PatchSpace& p, CompositeVector& cv);
 
+//
+// Computes function on a patch space, sticking the answer directly into a vector
+//
+void
+copyFlags(const PatchSpace& p, CompositeVector_<int>& flag_vec);
+
+void
+copyFlags(const MultiPatchSpace& mp, CompositeVector_<int>& flag_vec);
+
 void
 computeFunctionDepthCoordinate(const MultiFunction& f, double time, Patch<double>& p);
 
 
 } // namespace Impl
+
+
 } // namespace Functions
 } // namespace Amanzi

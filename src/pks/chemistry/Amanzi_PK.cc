@@ -196,7 +196,7 @@ Amanzi_PK::Initialize()
   int nprimary = chem_->primary_species().size();
   if (nprimary == comp_names_.size()) {
     for (int i = 0; i < nprimary; ++i) {
-      std::string species_name = chem_->primary_species().at(i).name();
+      std::string species_name = chem_->primary_species().at(i).getName();
       if (comp_names_[i] != species_name) {
         Errors::Message msg;
         msg << "Amanzi PK: mismatch of name: \"" << comp_names_[i] << "\" and \"" << species_name
@@ -720,7 +720,7 @@ Amanzi_PK::InitializeBeakerFields_()
 void
 Amanzi_PK::EstimateNextTimeStep_(double t_old, double t_new)
 {
-  // we keep own estimate of stable time step and report it to CD via get_dt()
+  // we keep own estimate of stable time step and report it to CD via getDt()
   if (dt_control_method_ == "simple") {
     double dt_next_tmp(dt_next_);
 

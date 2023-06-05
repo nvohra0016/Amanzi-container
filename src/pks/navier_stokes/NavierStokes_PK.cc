@@ -36,7 +36,7 @@ NavierStokes_PK::NavierStokes_PK(Teuchos::ParameterList& pk_tree,
 {
   S_ = S;
 
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 

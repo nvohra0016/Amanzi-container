@@ -168,21 +168,28 @@ class TensorVector_Factory {
  public:
   TensorVector_Factory() : d_(0), rank_(0), ghosted_(false) {}
 
-  int dimension() const { return d_; }
-  int rank() const { return rank_; }
-  const CompositeVectorSpace& map() const { return map_; }
+  int getDimension() const {
+    return map_.getMesh().get() ? map_.getMesh()->getSpaceDimension() : -1;
+  }
+  int getRank() const { return rank_; }
+  const CompositeVectorSpace& getMap() const { return map_; }
+  CompositeVectorSpace& getMap() { return map_; }
 
-  void set_rank(int rank) { rank_ = rank; }
-  void set_map(CompositeVectorSpace map)
+  void setRank(int rank) { rank_ = rank; }
+  void setMap(CompositeVectorSpace map)
   {
     map_ = std::move(map);
-    d_ = map_.getMesh()->getSpaceDimension();
   }
-  void set_ghosted(bool ghosted) { ghosted_ = ghosted; }
+  void setGhosted(bool ghosted) { ghosted_ = ghosted; }
 
   Teuchos::RCP<TensorVector> Create() const
   {
-    return Teuchos::rcp(new TensorVector(map_, d_, rank_, ghosted_));
+    int d = getDimension();
+    if (d < 0) {
+      Errors::Message msg("Cannot create TensorVector when map's mesh has not been set.");
+      Exceptions::amanzi_throw(msg);
+    }
+    return Teuchos::rcp(new TensorVector(map_, d, rank_, ghosted_));
   }
 
  private:

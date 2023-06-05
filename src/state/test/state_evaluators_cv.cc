@@ -47,7 +47,7 @@ class AEvaluator : public EvaluatorSecondaryMonotype<CompositeVector, CompositeV
     return Teuchos::rcp(new AEvaluator(*this));
   };
 
-  virtual std::string getName() const override { return "AEvaluator"; }
+  virtual std::string getType() const override { return "AEvaluator"; }
 
  protected:
   virtual void Evaluate_(const State& S, const std::vector<CompositeVector*>& results) override

@@ -90,21 +90,6 @@ class PDE_Diffusion : public PDE_HelperDiscretization {
     k_ = k;
     dkdp_ = dkdp;
   }
-  // Note that gravity and density can be ignored in non-gravity-affected
-  // diffusion.
-  virtual void SetGravity(const AmanziGeometry::Point& g) {
-    g_ = g;
-  }
-  virtual void SetDensity(double rho) {
-    is_scalar_ = true;
-    rho_ = rho;
-  }
-  virtual void SetDensity(const Teuchos::RCP<const CompositeVector>& rho) {
-    is_scalar_ = false;
-    if (rho->hasComponent("cell")) {
-      rho_cv_ = rho;
-    }
-  }
 
   // Lumped Setters for lazy developers
   void Setup(const Teuchos::RCP<const TensorVector>& K,
@@ -112,26 +97,6 @@ class PDE_Diffusion : public PDE_HelperDiscretization {
              const Teuchos::RCP<const CompositeVector>& dkdp) {
     SetTensorCoefficient(K);
     SetScalarCoefficient(k, dkdp);
-  }
-  void Setup(const Teuchos::RCP<const TensorVector>& K,
-             const Teuchos::RCP<const CompositeVector>& k,
-             const Teuchos::RCP<const CompositeVector>& dkdp,
-             const double rho,
-             const AmanziGeometry::Point& g) {
-    SetTensorCoefficient(K);
-    SetScalarCoefficient(k, dkdp);
-    SetDensity(rho);
-    SetGravity(g);
-  }
-  void Setup(const Teuchos::RCP<const TensorVector>& K,
-             const Teuchos::RCP<const CompositeVector>& k,
-             const Teuchos::RCP<const CompositeVector>& dkdp,
-             const Teuchos::RCP<const CompositeVector>& rho,
-             const AmanziGeometry::Point& g) {
-    SetTensorCoefficient(K);
-    SetScalarCoefficient(k, dkdp);
-    SetDensity(rho);
-    SetGravity(g);
   }
 
   // generate linearized operator
@@ -255,22 +220,6 @@ class PDE_Diffusion : public PDE_HelperDiscretization {
     return k_face;
   }
 
-  cMultiVectorView_type_<DefaultDevice,double>
-  DensityCells(bool scatter) const {
-    if (!is_scalar_ && !rho_cv_.get()) {
-      Errors::Message msg("Diffusion: density was not set.");
-      Exceptions::amanzi_throw(msg);
-    }
-    if (!is_scalar_) {
-      if (scatter) rho_cv_->scatterMasterToGhosted("cell");
-      AMANZI_ASSERT(rho_cv_->hasComponent("cell"));
-      return rho_cv_->viewComponent("cell", true);
-    }
-    MultiVectorView_type_<DefaultDevice,double> rho_c("rho_cell", ncells_wghost, 1);
-    Kokkos::deep_copy(rho_c, rho_);
-    return rho_c;
-  }
-
  protected:
   Teuchos::ParameterList plist_;
   Teuchos::RCP<const TensorVector> K_;
@@ -279,12 +228,6 @@ class PDE_Diffusion : public PDE_HelperDiscretization {
   // nonlinear coefficient and its representation
   Teuchos::RCP<const CompositeVector> k_, dkdp_;
   int little_k_type_;
-
-  // gravity
-  bool is_scalar_;
-  double rho_;
-  Teuchos::RCP<const CompositeVector> rho_cv_;
-  AmanziGeometry::Point g_;
 
   // additional operators
   int newton_correction_;
@@ -298,13 +241,13 @@ class PDE_Diffusion : public PDE_HelperDiscretization {
 /* ******************************************************************
 * Default implementations
 ****************************************************************** */
-inline void
-PDE_Diffusion::UpdateFluxManifold_(const Teuchos::Ptr<const CompositeVector>& u,
-                                   const Teuchos::Ptr<CompositeVector>& flux)
-{
-  Errors::Message msg("Diffusion does not know how to compute flux on manifolds.");
-  Exceptions::amanzi_throw(msg);
-}
+// inline void
+// PDE_Diffusion::UpdateFluxManifold_(const Teuchos::Ptr<const CompositeVector>& u,
+//                                    const Teuchos::Ptr<CompositeVector>& flux)
+// {
+//   Errors::Message msg("Diffusion does not know how to compute flux on manifolds.");
+//   Exceptions::amanzi_throw(msg);
+// }
 
 
 /* ******************************************************************

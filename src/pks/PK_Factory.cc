@@ -44,10 +44,10 @@ namespace Amanzi {
 
 Teuchos::RCP<PK>
 PKFactory::CreatePK(std::string pk_name,
+                    const Comm_ptr_type& comm,
                     Teuchos::ParameterList& pk_tree,
                     const Teuchos::RCP<Teuchos::ParameterList>& global_list,
-                    const Teuchos::RCP<State>& state,
-                    const Teuchos::RCP<TreeVector>& soln)
+                    const Teuchos::RCP<State>& state)
 {
   // make sure we can find PKs
   if (!global_list->isSublist("PKs")) {
@@ -153,7 +153,11 @@ PKFactory::CreatePK(std::string pk_name,
   // construct the PK
   num_pks++;
   if (list_pks.size() < 1024) list_pks += "|" + pk_name;
-  return Teuchos::rcp(iter->second(pk_subtree, global_list, state, soln));
+  Teuchos::RCP<PK> pk = Teuchos::rcp(iter->second(comm, pk_subtree, global_list, state));
+
+  // virtual constructor/parse parameters
+  pk->ParseParameterList_();
+  return pk;
 }
 
 

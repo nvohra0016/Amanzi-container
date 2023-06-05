@@ -109,7 +109,7 @@ TEST(NEW_DRIVER_DUMMY_PK)
   S = cycle_driver.Go();
 
   double dt_last;
-  dt_last = cycle_driver.get_dt();
+  dt_last = cycle_driver.getDt();
   int cycle = S->get_cycle();
 
 

@@ -64,7 +64,7 @@ class DomainSet {
   std::size_t size() const { return meshes_.size(); }
 
   Comm_ptr_type getComm() const { return referencing_parent_->getComm(); }
-  const std::string& getName() const { return name_; }
+  const std::string& name() const { return name_; }
   Teuchos::RCP<const Mesh> getIndexingParent() const {
     return indexing_parent_; }
   Teuchos::RCP<const Mesh> getReferencingParent() const {

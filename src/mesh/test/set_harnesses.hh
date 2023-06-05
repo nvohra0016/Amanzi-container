@@ -11,6 +11,7 @@
 
 #include "MeshFrameworkTraits.hh"
 #include "MeshAudit.hh"
+#include "Mesh_Algorithms.hh"
 
 #include "geometry_harnesses.hh"
 
@@ -94,6 +95,26 @@ testHexMeshSets3x3x3(const Teuchos::RCP<Mesh_type>& mesh,
         for (const auto& e : ents) {
           auto cc = mesh->getCellCentroid(e);
           CHECK_CLOSE(2.5/3, cc[2], 1.e-10);
+        }
+      }
+
+      if (r_name == "Top Box" || (labeled && r_name == "Top LS")) {
+        CHECK(mesh->isValidSetType(r->get_type(), AmanziMesh::Entity_kind::BOUNDARY_FACE));
+        if (!mesh->isValidSetType(r->get_type(), AmanziMesh::Entity_kind::BOUNDARY_FACE)) continue;
+        int n_ents = mesh->getSetSize(r_name, AmanziMesh::Entity_kind::BOUNDARY_FACE, AmanziMesh::Parallel_kind::OWNED);
+        // 3 * 3 on the top face plane, and then the first ring of faces around that.
+        CHECK_CLOSE_SUMALL(3*3 + 3 * 4, n_ents, *mesh->getComm());
+
+        auto ents = mesh->getSetEntities(r_name, AmanziMesh::Entity_kind::BOUNDARY_FACE, AmanziMesh::Parallel_kind::ALL);
+        for (const auto& e : ents) {
+          auto f = AmanziMesh::getBoundaryFaceFace(*mesh, e);
+          auto fc = mesh->getFaceCentroid(f);
+          std::cout << r_name << " face: " << fc << std::endl;
+          // check the centroid is in the top third
+          CHECK(fc[2] > 0.67);
+
+          // check is a boundary face
+          CHECK_EQUAL(1, mesh->getFaceNumCells(f, Parallel_kind::ALL));
         }
       }
 
@@ -214,6 +235,22 @@ testHexMeshSets3x3x3(const Teuchos::RCP<Mesh_type>& mesh,
         auto ents = mesh->getSetEntities(r_name, AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_kind::ALL);
         for (const auto& e : ents) {
           auto fc = mesh->getFaceCentroid(e);
+          std::cout << r_name << " face: " << fc << std::endl;
+          CHECK_CLOSE(1, fc[2], 1.e-10);
+        }
+      }
+
+      if (r_name == "Top Face Plane") {
+        // also boundary_face should be valid for the top face
+        CHECK(mesh->isValidSetType(r->get_type(), AmanziMesh::Entity_kind::BOUNDARY_FACE));
+        if (!mesh->isValidSetType(r->get_type(), AmanziMesh::Entity_kind::BOUNDARY_FACE)) continue;
+        int n_ents = mesh->getSetSize(r_name, AmanziMesh::Entity_kind::BOUNDARY_FACE, AmanziMesh::Parallel_kind::OWNED);
+        CHECK_CLOSE_SUMALL(3*3, n_ents, *mesh->getComm());
+
+        auto ents = mesh->getSetEntities(r_name, AmanziMesh::Entity_kind::BOUNDARY_FACE, AmanziMesh::Parallel_kind::ALL);
+        for (const auto& e : ents) {
+          auto f = AmanziMesh::getBoundaryFaceFace(*mesh, e);
+          auto fc = mesh->getFaceCentroid(f);
           std::cout << r_name << " face: " << fc << std::endl;
           CHECK_CLOSE(1, fc[2], 1.e-10);
         }

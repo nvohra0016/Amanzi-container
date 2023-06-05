@@ -254,7 +254,7 @@ EnergyMatrixFracture_PK::Initialize()
     *vo_->os() << "coupling matrix:" << std::endl << op_matrix_->PrintDiagnostics() << std::endl;
     *vo_->os() << "preconditioner:" << std::endl
                << op_tree_pc_->PrintDiagnostics() << std::endl
-               << vo_->color("green") << "Initialization of PK is complete: my dT=" << get_dt()
+               << vo_->color("green") << "Initialization of PK is complete: my dT=" << getDt()
                << vo_->reset() << std::endl
                << std::endl;
   }

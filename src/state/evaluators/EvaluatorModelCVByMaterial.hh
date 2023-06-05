@@ -52,43 +52,50 @@ namespace Amanzi {
 //
 template <template <class, class> class Model,
           class Device_type = DefaultDevice>
-class EvaluatorModelByMaterial
+class EvaluatorModelCVByMaterial
   : public EvaluatorSecondaryMonotype<CompositeVector, CompositeVectorSpace> {
- public:
-  using Model_type =
-    Model<cVectorView_type<Device_type>, VectorView_type<Device_type>>;
-  using View_type = VectorView_type<Device_type>;
-  using cView_type = cVectorView_type<Device_type>;
 
-  EvaluatorModelByMaterial(Teuchos::ParameterList& plist);
+ public:
+  using cView_type = cMultiVectorView_type<Device_type>;
+  using View_type = MultiVectorView_type<Device_type>;
+  using Model_type = Model<cView_type, View_type>;
+
+  EvaluatorModelCVByMaterial(Teuchos::ParameterList& plist);
 
   virtual Teuchos::RCP<Evaluator> Clone() const override;
-  virtual std::string getName() const override { return models_.front().second->name + " by material"; }
+  virtual std::string getType() const override {
+    return models_.front().second->name + " by material";
+  }
 
-
-// This function needs to be public for Kokkos::CUDA backend
-// Function calling kernel cannot be protected/private 
-public:
+ // This function needs to be public for Kokkos::CUDA backend
+ // Function calling kernel cannot be protected/private
+ public:
   virtual void Evaluate_(const State& S,
                          const std::vector<CompositeVector*>& results) override;
   virtual void EvaluatePartialDerivative_(
     const State& S, const Key& wrt_key, const Tag& wrt_tag,
     const std::vector<CompositeVector*>& results) override;
+
 protected:
+  virtual void EnsureCompatibility_Structure_(State& S) override {
+    // make sure all my_keys have the same CVS
+    EnsureCompatibility_StructureSame_(S);
+  }
 
-
+ protected:
   std::vector<std::pair<std::string, Teuchos::RCP<Model_type>>> models_;
   std::string name_;
   Key tag_;
 
  private:
   // registration in the evaluator factory
-  static Utils::RegisteredFactory<Evaluator, EvaluatorModelByMaterial<Model,Device_type>> fac_;
+  static Utils::RegisteredFactory<Evaluator, EvaluatorModelCVByMaterial<Model,Device_type>> reg_;
+
 };
 
 
 template <template <class, class> class Model, class Device_type>
-EvaluatorModelByMaterial<Model, Device_type>::EvaluatorModelByMaterial(
+EvaluatorModelCVByMaterial<Model, Device_type>::EvaluatorModelCVByMaterial(
   Teuchos::ParameterList& plist)
   : EvaluatorSecondaryMonotype<CompositeVector, CompositeVectorSpace>(plist),
     name_(plist.name()),
@@ -107,38 +114,39 @@ EvaluatorModelByMaterial<Model, Device_type>::EvaluatorModelByMaterial(
         std::make_pair(region_name, Teuchos::rcp(new Model_type(model_list))));
     } else {
       Errors::Message msg(
-        "EvaluatorModelByMaterial: \"model parameters\" sublist should only contain "
+        "EvaluatorModelCVByMaterial: \"model parameters\" sublist should only contain "
         "sublists, one per material region.");
       throw(msg);
     }
   }
 
   if (models_.size() == 0) {
-    Errors::Message msg("EvaluatorModelByMaterial: \"model parameters\" sublist was "
+    Errors::Message msg("EvaluatorModelCVByMaterial: \"model parameters\" sublist was "
                         "empty, must have at least one model.");
     throw(msg);
   }
 
-  // Take the dependencies from the first model.  Could check that they
+  // Take my_keys and dependencies from the first model.  Could check that they
   // are all the same?  Shouldn't be necessary since they all got constructed
   // from the same list.
-  auto dep_list = models_[0].second->getDependencies();
-  for (const auto& dep : dep_list) {
+  my_keys_.clear();
+  for (const auto& k : models_[0].second->getMyKeys())
+    my_keys_.emplace_back(KeyTag(k, tag_));
+  for (const auto& dep : models_[0].second->getDependencies())
     dependencies_.insert(KeyTag(dep, tag_));
-  }
 }
 
 
 template <template <class, class> class Model, class Device_type>
 Teuchos::RCP<Evaluator>
-EvaluatorModelByMaterial<Model, Device_type>::Clone() const
+EvaluatorModelCVByMaterial<Model, Device_type>::Clone() const
 {
-  return Teuchos::rcp(new EvaluatorModelByMaterial<Model, Device_type>(*this));
+  return Teuchos::rcp(new EvaluatorModelCVByMaterial<Model, Device_type>(*this));
 }
 
 template <template <class, class> class Model, class Device_type>
 void
-EvaluatorModelByMaterial<Model, Device_type>::Evaluate_(
+EvaluatorModelCVByMaterial<Model, Device_type>::Evaluate_(
   const State& S, const std::vector<CompositeVector*>& results)
 {
   AMANZI_ASSERT(results.size() > 0);
@@ -148,30 +156,18 @@ EvaluatorModelByMaterial<Model, Device_type>::Evaluate_(
     std::vector<cView_type> dependency_views;
     for (const auto& dep : dependencies_) {
       const auto& vec = S.Get<CompositeVector>(dep.first, dep.second);
-      if (vec.getNumVectors(comp) != 1) {
-        Errors::Message msg(
-          "EvaluatorModel: expects only dependencies with one DoF.");
-        throw(msg);
-      }
-      dependency_views.emplace_back(vec.viewComponent(comp, 0, false));
+      dependency_views.emplace_back(vec.viewComponent(comp, false));
     }
 
     // get the list of result views
     std::vector<View_type> result_views;
     for (auto result : results) {
-      if (result->getNumVectors(comp) != 1) {
-        Errors::Message msg(
-          "EvaluatorModel: expects only results with one DoF.");
-        throw(msg);
-      }
-      result_views.emplace_back(result->viewComponent(comp, 0, false));
+      AMANZI_ASSERT(result->hasComponent(comp));
+      result_views.emplace_back(result->viewComponent(comp, false));
     }
 
     // get the location on which we are executing
     auto mesh_location = results[0]->getMap()->getLocation(comp);
-
-    // not yet implemented on boundary faces
-    AMANZI_ASSERT(mesh_location != AmanziMesh::Entity_kind::BOUNDARY_FACE);
 
     // loop over region/model pairs and execute the model
     for (const auto& region_model : models_) {
@@ -199,7 +195,7 @@ EvaluatorModelByMaterial<Model, Device_type>::Evaluate_(
 
 template <template <class, class> class Model, class Device_type>
 void
-EvaluatorModelByMaterial<Model, Device_type>::EvaluatePartialDerivative_(
+EvaluatorModelCVByMaterial<Model, Device_type>::EvaluatePartialDerivative_(
   const State& S, const Key& wrt_key, const Tag& wrt_tag,
   const std::vector<CompositeVector*>& results)
 {
@@ -215,7 +211,7 @@ EvaluatorModelByMaterial<Model, Device_type>::EvaluatePartialDerivative_(
           "EvaluatorModel: expects only dependencies with one DoF.");
         throw(msg);
       }
-      dependency_views.emplace_back(vec.viewComponent(comp, 0, false));
+      dependency_views.emplace_back(vec.viewComponent(comp, false));
     }
 
     // get the list of results views
@@ -226,7 +222,7 @@ EvaluatorModelByMaterial<Model, Device_type>::EvaluatePartialDerivative_(
           "EvaluatorModel: expects only results with one DoF.");
         throw(msg);
       }
-      result_views.emplace_back(result->viewComponent(comp, 0, false));
+      result_views.emplace_back(result->viewComponent(comp, false));
     }
 
     // get the location on which we are executing

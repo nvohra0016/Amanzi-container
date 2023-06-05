@@ -98,7 +98,7 @@ SUITE(GeochemistryTestsIonExchangeSite)
 
   TEST_FIXTURE(IonExchangeSiteTest, IonExchangeSite_constructor_init_name)
   {
-    CHECK_EQUAL(exchanger_name_, ies_.name());
+    CHECK_EQUAL(exchanger_name_, ies_.getName());
   }
 
   TEST_FIXTURE(IonExchangeSiteTest, IonExchangeSite_constructor_init_location)

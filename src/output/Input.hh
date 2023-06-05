@@ -56,6 +56,12 @@ class Input {
   virtual void read(const Teuchos::ParameterList& attrs, Vector_type& vec) const = 0;
   virtual void read(const Teuchos::ParameterList& attrs, IntVector_type& vec) const = 0;
 
+  virtual void read(const Teuchos::ParameterList& attrs, AmanziGeometry::Point& val) const {
+    Teuchos::Array<double> arr(val.dim());
+    readArray_(attrs, arr);
+    for (int i=0; i!=val.dim(); ++i) val[i] = arr[i];
+  }
+
   virtual void read(const Teuchos::ParameterList& attrs, MultiVector_type& vec) const {
     readMultiVector_(attrs, vec);
   }
@@ -73,9 +79,19 @@ class Input {
   }
 
  protected:
+
+  template<typename SerialArray>
+  void readArray_(const Teuchos::ParameterList& attrs, SerialArray& arr) const {
+    for (int i=0; i!=arr.size(); ++i) {
+      Teuchos::ParameterList attrs_i(attrs);
+      attrs_i.setName(attrs.name() + "_" + std::to_string(i));
+      read(attrs_i, arr[i]);
+    }
+  }
+
   template<typename Scalar>
   void readMultiVector_(const Teuchos::ParameterList& attrs, MultiVector_type_<Scalar>& vec) const {
-    std::vector<std::string> names = OutputUtils::getNames(attrs, vec.getNumVectors());
+    std::vector<std::string> names = OutputUtils::names(attrs, vec.getNumVectors());
     for (int i = 0; i != vec.getNumVectors(); ++i) {
       Teuchos::ParameterList attrs_i(attrs);
       attrs_i.setName(names[i]);

@@ -14,6 +14,7 @@
 #include "errors.hh"
 
 #include "VerboseObject.hh"
+#include "ViewUtils.hh"
 #include "Point.hh"
 #include "GeometricModel.hh"
 

@@ -7,7 +7,12 @@
   Authors: Ethan Coon
 */
 
-//! <MISSING_ONELINE_DOCSTRING>
+/*
+  Time Integration
+
+  Simple timestep control based upon previous iteration count.
+*/
+
 #include "errors.hh"
 #include "dbc.hh"
 #include "TimestepControllerStandard.hh"
@@ -15,7 +20,7 @@
 namespace Amanzi {
 
 TimestepControllerStandard::TimestepControllerStandard(Teuchos::ParameterList& plist)
-  : plist_(plist)
+  : TimestepController(plist), plist_(plist)
 {
   max_its_ = plist_.get<int>("max iterations");
   min_its_ = plist_.get<int>("min iterations");
@@ -29,8 +34,16 @@ TimestepControllerStandard::TimestepControllerStandard(Teuchos::ParameterList& p
   increase_factor_ = plist_.get<double>("time step increase factor");
   AMANZI_ASSERT(increase_factor_ >= 1.0);
 
-  max_dt_ = plist_.get<double>("max time step");
-  min_dt_ = plist_.get<double>("min time step");
+  if (plist_.isParameter("max time step [s]")) {
+    max_dt_ = plist_.get<double>("max time step [s]");
+  } else {
+    max_dt_ = plist_.get<double>("max time step");
+  }
+  if (plist_.isParameter("min time step [s]")) {
+    min_dt_ = plist_.get<double>("min time step [s]");
+  } else {
+    min_dt_ = plist_.get<double>("min time step");
+  }
 }
 
 
@@ -51,9 +64,9 @@ TimestepControllerStandard::get_timestep(double dt, int iterations)
   // check min step size
   if (dt_next < min_dt_) {
     if (iterations < 0) {
-      std::string msg = "dT is too small, terminating...";
-      Errors::Message m(msg);
-      Exceptions::amanzi_throw(m);
+      Errors::TimeStepCrash msg;
+      msg << "Timestep failed: dT less than minimum (" << min_dt_ << ").";
+      Exceptions::amanzi_throw(msg);
     } else {
       dt_next = min_dt_;
     }
@@ -62,9 +75,9 @@ TimestepControllerStandard::get_timestep(double dt, int iterations)
   // check that if we have failed, our step size has decreased.
   if (iterations < 0) {
     if (dt - dt_next < 1.0e-10) {
-      std::string msg = "dT change is too small (check reduction_factor), terminating...";
-      Errors::Message m(msg);
-      Exceptions::amanzi_throw(m);
+      Errors::TimeStepCrash msg(
+        "Timestep failed: dT change is too small (check reduction_factor).");
+      Exceptions::amanzi_throw(msg);
     }
   }
 

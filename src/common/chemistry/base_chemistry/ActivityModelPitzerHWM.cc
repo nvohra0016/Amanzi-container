@@ -110,12 +110,12 @@ ActivityModelPitzerHWM::Setup(const ActivityModelParameters& parameters,
   for (auto it = primary_species.begin(); it != primary_species.end(); ++it) {
     molality.push_back(0.0);
     charge.push_back((*it).charge());
-    name_species.push_back((*it).name());
+    name_species.push_back((*it).getName());
   }
   for (auto it = aqueous_complexes.begin(); it != aqueous_complexes.end(); ++it) {
     molality.push_back(0.0);
     charge.push_back((*it).charge());
-    name_species.push_back((*it).name());
+    name_species.push_back((*it).getName());
   }
   number_species = primary_species.size() + aqueous_complexes.size();
 

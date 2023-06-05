@@ -18,6 +18,7 @@
 
 #include "OperatorDefs.hh"
 #include "PDE_DiffusionMFD.hh"
+#include "PDE_DiffusionWithGravity.hh"
 
 /*!
 Additional options for MFD with the gravity term include:
@@ -51,17 +52,21 @@ namespace Impl {
 
 class BCs;
 
-class PDE_DiffusionMFDwithGravity : public PDE_DiffusionMFD {
+class PDE_DiffusionMFDwithGravity : public PDE_DiffusionMFD, public PDE_DiffusionWithGravity {
 
  public:
   PDE_DiffusionMFDwithGravity(Teuchos::ParameterList& plist,
                               const Teuchos::RCP<Operator>& global_op) :
-      PDE_DiffusionMFD(plist, global_op)
+    PDE_Diffusion(plist, global_op),
+    PDE_DiffusionMFD(plist, global_op),
+    PDE_DiffusionWithGravity(plist, global_op)
   {}
 
   PDE_DiffusionMFDwithGravity(Teuchos::ParameterList& plist,
                               const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) :
-      PDE_DiffusionMFD(plist, mesh)
+    PDE_Diffusion(plist, mesh),
+    PDE_DiffusionMFD(plist, mesh),
+    PDE_DiffusionWithGravity(plist, mesh)
   {}
 
   virtual void Init() override;

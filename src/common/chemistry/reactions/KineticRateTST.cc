@@ -99,7 +99,7 @@ KineticRateTST::Setup(const Mineral& reaction,
                       const SpeciesArray& primary_species)
 {
   // break the reaction string into reactants and products
-  set_name(reaction.name());
+  set_name(reaction.getName());
   set_identifier(reaction.identifier());
 
   // copy the reactant species, ids and stoichiometry from the reaction species

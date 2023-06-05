@@ -193,7 +193,7 @@ FlowEnergyMatrixFracture_PK::Initialize()
   // diagonal blocks (0,0) and (2,2) in tree operator must be Darcy PKs
   // one reason is that Darcy_PK combines matrix and preconditioner
   for (int i = 0; i < 2; ++i) {
-    std::string pk_name = (*Teuchos::rcp_dynamic_cast<FlowEnergy_PK>(sub_pks_[i])->begin())->name();
+    std::string pk_name = (*Teuchos::rcp_dynamic_cast<FlowEnergy_PK>(sub_pks_[i])->begin())->getName();
     AMANZI_ASSERT(pk_name == "darcy" || pk_name == "richards");
   }
 
@@ -322,7 +322,7 @@ FlowEnergyMatrixFracture_PK::Initialize()
     *vo_->os() << "\nmatrix:" << std::endl
                << op_tree_matrix_->PrintDiagnostics() << "preconditioner:" << std::endl
                << op_tree_pc_->PrintDiagnostics() << std::endl
-               << vo_->color("green") << "Initialization of PK is complete: my dT=" << get_dt()
+               << vo_->color("green") << "Initialization of PK is complete: my dT=" << getDt()
                << vo_->reset() << std::endl
                << std::endl;
   }

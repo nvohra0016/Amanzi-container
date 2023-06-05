@@ -44,8 +44,8 @@ class EnergyOnePhase_PK : public Energy_PK {
   virtual void CommitStep(double t_old, double t_new, const Tag& tag) final;
   virtual void CalculateDiagnostics(const Tag& tag) final{};
 
-  double get_dt() final { return dt_; }
-  void set_dt(double dt) final { dt_ = dt; }
+  double getDt() final { return dt_; }
+  void setDt(double dt) final { dt_ = dt; }
 
   virtual std::string name() { return "one-phase energy"; }
 

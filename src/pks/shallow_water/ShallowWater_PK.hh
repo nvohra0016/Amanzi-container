@@ -95,8 +95,8 @@ class ShallowWater_PK : public PK_Physical, public PK_Explicit<TreeVector> {
   virtual void Setup() override;
   virtual void Initialize() override;
 
-  virtual double get_dt() override;
-  virtual void set_dt(double dt) override{};
+  virtual double getDt() override;
+  virtual void setDt(double dt) override{};
 
   // Advance PK by step size dt.
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false) override;

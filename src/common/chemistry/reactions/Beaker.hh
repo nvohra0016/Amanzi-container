@@ -123,7 +123,7 @@ class Beaker {
   void AddSurfaceComplexationRxn(const SurfaceComplexationRxn& r);
   void AddSorptionIsothermRxn(const SorptionIsothermRxn& r);
 
-  void set_dt(double dt) { dt_ = dt; }
+  void setDt(double dt) { dt_ = dt; }
 
  private:
   void CheckChargeBalance_(const std::vector<double>& aqueous_totals) const;

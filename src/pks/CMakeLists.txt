@@ -40,7 +40,7 @@ include_directories(${HDF5_INCLUDE_DIRS})
 # Library: pks
 #
 set(pks_src_files PK_Factory.cc
-                  PK_Utils.cc
+                  # PK_Utils.cc
                   PK_Physical.cc)
 
 add_amanzi_library(pks
@@ -74,7 +74,8 @@ set(pks_inc_files
   PK_DomainFunctionFirstOrderExchange.hh
   PK_DomainFunctionSimpleWell.hh
   PK_Factory.hh
-  PK_Utils.hh)
+  # PK_Utils.hh
+)
 
 add_install_include_file(${pks_inc_files})
 

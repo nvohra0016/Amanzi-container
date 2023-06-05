@@ -55,8 +55,8 @@ class ReactiveTransport_PK : public PK_MPCAdditive<PK> {
 
   // PK methods
   // -- dt is the minimum of the sub pks
-  virtual double get_dt();
-  virtual void set_dt(double dt);
+  virtual double getDt();
+  virtual void setDt(double dt);
 
   // -- advance each sub pk dt.
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false);

@@ -90,7 +90,7 @@ IonExchangeComplex::IonExchangeComplex(const std::string& name,
 
   primary_id_ = -999;
   for (int i = 0; i < primary_species.size(); ++i) {
-    if (primary_name_ == primary_species[i].name()) {
+    if (primary_name_ == primary_species[i].getName()) {
       primary_id_ = i;
       break;
     }

@@ -41,8 +41,8 @@ class FlowEnergyMatrixFracture_PK : public PK_MPCStrong<PK_BDF> {
   virtual void Initialize() override;
 
   // -- dt is the minimum of the sub pks
-  // virtual double get_dt();
-  // virtual void set_dt(double dt);
+  // virtual double getDt();
+  // virtual void setDt(double dt);
 
   // -- advance each sub pk from t_old to t_new.
   virtual bool AdvanceStep(double t_old, double t_new, bool reinit = false) override;

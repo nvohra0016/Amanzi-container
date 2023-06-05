@@ -121,7 +121,7 @@ RunTest(int ntest)
       io.FinalizeCycle();
     }
 
-    dt = SWPK.get_dt();
+    dt = SWPK.getDt();
     if (iter < 10) dt = 0.01 * dt;
 
     t_new = t_old + dt;

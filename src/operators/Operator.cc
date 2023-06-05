@@ -69,13 +69,15 @@ Operator::Operator(const Teuchos::RCP<const CompositeSpace>& cvs_row,
     cvs_col_(cvs_col),
     schema_row_(schema_row),
     schema_col_(schema_col),
-    shift_(0.0), 
+    shift_(0.0),
+    shift_min_(0.0),
     plist_(plist),
     num_colors_(0),
     coloring_(Teuchos::null),
-    inited_(false),
-    updated_(false),
-    computed_(false)
+    inverse_pars_set_(false),
+    initialize_complete_(false),
+    compute_complete_(false),
+    assembly_complete_(false)
 {
   mesh_ = cvs_col_->getMesh();
   rhs_ = Teuchos::rcp(new CompositeVector(cvs_row_));
@@ -100,8 +102,10 @@ Operator::Operator(const Teuchos::RCP<const CompositeSpace>& cvs_row,
   vo_ = Teuchos::rcp(new VerboseObject("Operators", vo_list));
 
   shift_ = plist.get<double>("diagonal shift", 0.0);
+  shift_min_ = plist.get<double>("diagonal shift minimum", 0.0);
+  AMANZI_ASSERT(shift_min_ <= 0.0); // not yet implemented
 
-  apply_calls_ = 0; 
+  apply_calls_ = 0;
 
   if (plist_.isSublist("inverse")) {
     auto& inv_list = plist_.sublist("inverse");
@@ -119,7 +123,7 @@ void Operator::SymbolicAssembleMatrix()
 {
   // Create the supermap given a space (set of possible schemas) and a
   // specific schema (assumed/checked to be consistent with the space).
-  smap_ = createSuperMap(cvs_col_.ptr());
+  if (!smap_.get()) smap_ = createSuperMap(cvs_col_.ptr());
 
   // create the graph
   int row_size = MaxRowSize(*mesh_, schema(), 1);
@@ -136,6 +140,7 @@ void Operator::SymbolicAssembleMatrix()
   Amat_ = Teuchos::rcp(new MatrixFE(graph));
   Amat_->fillComplete(); // some inverse methods seem to need this fillComplete, even with no data.
   A_ = Amat_->getMatrix();
+  assembly_complete_ = false;
 }
 
 
@@ -194,6 +199,10 @@ void Operator::AssembleMatrix()
 {
   if (Amat_ == Teuchos::null) SymbolicAssembleMatrix();
 
+  // note, this is called prior to AssembleMatrix() because Schur complements
+  // override this because ApplyAssembled is not valid for them.
+  assembly_complete_ = true;
+
   Amat_->resumeFill();
   Amat_->zero();
   AssembleMatrix(*smap_, *Amat_, 0, 0);
@@ -201,8 +210,11 @@ void Operator::AssembleMatrix()
 
   if (shift_ != 0.0) {
     Amat_->diagonalShift(shift_);
+  // } else if (shift_min_ != 0.0) {
+  //   Amat_->diagonalShiftMin(shift_min_);
   }
 
+  compute_complete_ = false;
   // WriteMatrix("assembled_matrix");
   // throw("assembed matrix written");
 }
@@ -340,9 +352,37 @@ int Operator::ComputeNegativeResidual(const CompositeVector& u, CompositeVector&
 ******************************************************************* */
 int Operator::apply(const CompositeVector& X, CompositeVector& Y, double scalar) const
 {
+  if (assembly_complete_) {
+    if (shift_ != 0.0) {
+      // shift_ != 0 implies a diagonal shift is being applied.  That diagonal
+      // shift is done at assemble-time.  This is used to ensure that the
+      // matrix is non-singular, which often happens with zero rows.  When it
+      // is used to make the operator non-singular, the intent is to allow it
+      // to be invertible, but not to change the meaning of the forward
+      // operator.  Therefore we have to unshift the assembled matrix prior to
+      // doing the forward apply.
+      Amat_->diagonalShift(-shift_);
+      int ierr = applyAssembled(X, Y, scalar);
+      Amat_->diagonalShift(shift_);
+      return ierr;
+    } else if (shift_min_ != 0.0) {
+      // A shift_min_ is lossy -- we cannot "unshift" it because we cannot know
+      // what the original diagonal value was.  Therefore must use the
+      // unassembled forward apply (or re-assemble without the shift_min).
+      return applyUnassembled(X, Y, scalar);
+    } else {
+      return applyAssembled(X, Y, scalar);
+    }
+  } else {
+    return applyUnassembled(X, Y, scalar);
+  }
+}
+
+int
+Operator::applyUnassembled(const CompositeVector& X, CompositeVector& Y, double scalar) const
+{
   X.scatterMasterToGhosted();
 
-  // initialize ghost elements
   if (scalar == 0.0) {
     Y.putScalarMasterAndGhosted(0.0);
   } else if (scalar == 1.0) {
@@ -352,11 +392,8 @@ int Operator::apply(const CompositeVector& X, CompositeVector& Y, double scalar)
     Y.putScalarGhosted(0.0);
   }
 
-  // apply local matrices
   apply_calls_++;
   for (auto& it : *this) it->ApplyMatrixFreeOp(this, X, Y);
-
-  // gather off-process contributions
   Y.gatherGhostedToMaster();
   return 0;
 }
@@ -404,16 +441,12 @@ int Operator::applyAssembled(const CompositeVector& X, CompositeVector& Y, doubl
 ******************************************************************* */
 int Operator::applyInverse(const CompositeVector& X, CompositeVector& Y) const
 {
+  if (!compute_complete_) const_cast<Operator*>(this)->computeInverse();
   if (preconditioner_.get() == nullptr) {
     Errors::Message msg("Operator did not initialize a preconditioner.\n");
     Exceptions::amanzi_throw(msg);
   }
-  int ierr = preconditioner_->applyInverse(X, Y);
-  // if (ierr) {
-  //   Errors::Message msg("Operator: applyInverse failed.\n");
-  //   Exceptions::amanzi_throw(msg);
-  // }
-  return ierr;
+  return preconditioner_->applyInverse(X, Y);
 }
 
 
@@ -453,6 +486,8 @@ void Operator::Zero()
     if (! (ops_properties_[i] & OPERATOR_PROPERTY_DATA_READ_ONLY))
        ops_[i]->Zero();
   }
+  compute_complete_ = false;
+  assembly_complete_ = false;
 }
 
 /* ******************************************************************
@@ -497,7 +532,9 @@ void Operator::set_inverse_parameters(Teuchos::ParameterList& plist)
   // delay pc construction until we know we have structure and can create the
   // coloring.
   inv_plist_ = plist;
-  inited_ = true; updated_ = false; computed_ = false;
+  inverse_pars_set_ = true;
+  initialize_complete_ = false;
+  compute_complete_ = false;
 }
 
 
@@ -508,7 +545,7 @@ void Operator::set_inverse_parameters(Teuchos::ParameterList& plist)
 ****************************************************************** */
 void Operator::initializeInverse()
 {
-  if (!inited_) {
+  if (!inverse_pars_set_) {
     Errors::Message msg("No inverse parameter list.  Provide a sublist \"inverse\" or ensure set_inverse_parameters() is called.");
     msg << " In: " << typeid(*this).name() << "\n";
     Exceptions::amanzi_throw(msg);
@@ -531,19 +568,17 @@ void Operator::initializeInverse()
   }
   preconditioner_ = AmanziSolvers::createInverse(inv_plist_, Teuchos::rcpFromRef(*this));
   preconditioner_->initializeInverse(); // NOTE: calls this->SymbolicAssembleMatrix()
-  updated_ = true;
-  computed_ = false;
+  initialize_complete_ = true;
+  compute_complete_ = false;
 }
 
 void Operator::computeInverse()
 {
-  if (!updated_) {
-    initializeInverse();
-  }
+  if (!initialize_complete_) initializeInverse();
   // assembly must be possible now
   AMANZI_ASSERT(preconditioner_.get());
   preconditioner_->computeInverse(); // NOTE: calls this->AssembleMatrix()
-  computed_ = true;
+  compute_complete_ = true;
 }
 
 
@@ -570,6 +605,8 @@ void Operator::UpdateRHS(const CompositeVector& source, bool volume_included) {
 void Operator::Rescale(double scaling)
 {
   for (auto& it : *this) it->Rescale(scaling);
+  assembly_complete_ = false;
+  compute_complete_ = false;
 }
 
 
@@ -580,6 +617,8 @@ void Operator::Rescale(const CompositeVector& scaling)
 {
   scaling.scatterMasterToGhosted();
   for (auto& it : *this) it->Rescale(scaling);
+  assembly_complete_ = false;
+  compute_complete_ = false;
 }
 
 
@@ -591,6 +630,8 @@ void Operator::Rescale(const CompositeVector& scaling, int iops)
   AMANZI_ASSERT(iops < ops_.size());
   scaling.scatterMasterToGhosted();
   ops_[iops]->Rescale(scaling);
+  assembly_complete_ = false;
+  compute_complete_ = false;
 }
 
 

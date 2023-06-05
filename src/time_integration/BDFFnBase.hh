@@ -7,7 +7,6 @@
   Authors:
 */
 
-//!
 #ifndef AMANZI_BDFFNBASE_HH_
 #define AMANZI_BDFFNBASE_HH_
 

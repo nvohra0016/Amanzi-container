@@ -248,7 +248,7 @@ TEST(SHALLOW_WATER_2D_SMOOTH)
 
       if (iter % 5 == 0) { IO_Fields(t_out, iter, MyPID, io, *S, &hh_ex, &vel_ex); }
 
-      dt = SWPK.get_dt();
+      dt = SWPK.getDt();
 
       t_new = t_old + dt;
       dt_max = std::max(dt_max, dt);

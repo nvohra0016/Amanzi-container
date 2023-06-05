@@ -71,7 +71,7 @@ class Evaluator {
 
   // access
   Evaluator_kind getKind() const { return type_; }
-  virtual std::string getName() const = 0;
+  virtual std::string getType() const = 0;
   virtual std::ostream& writeInfo(std::ostream& os) const = 0;
 
   // Virtual method for debugging, plotting the dependency graph, etc.

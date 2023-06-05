@@ -61,7 +61,7 @@ Transport_PK::Transport_PK(Teuchos::ParameterList& pk_tree,
 {
   S_ = S;
 
-  std::string pk_name = pk_tree.name();
+  std::string pk_name = pk_tree.getName();
   auto found = pk_name.rfind("->");
   if (found != std::string::npos) pk_name.erase(0, found + 2);
 
@@ -766,7 +766,7 @@ Transport_PK::StableTimeStep(int n)
 * Estimate returns last time step unless it is zero.
 ******************************************************************* */
 double
-Transport_PK::get_dt()
+Transport_PK::getDt()
 {
   if (subcycling_) {
     return 1e+99;
@@ -901,11 +901,11 @@ Transport_PK::ComputeSources_(double tp,
         if (srcs_[m]->keyword() == "producer") {
           // correction for an extraction well
           value *= tcc_prev[imap][c];
-        } else if (srcs_[m]->name() == "domain coupling") {
+        } else if (srcs_[m]->getName() == "domain coupling") {
           value = values[k];
         } else {
           // correction for non-SI concentration units
-          if (srcs_[m]->name() == "volume" || srcs_[m]->name() == "weight")
+          if (srcs_[m]->getName() == "volume" || srcs_[m]->getName() == "weight")
             value /= units_.concentration_factor();
         }
 

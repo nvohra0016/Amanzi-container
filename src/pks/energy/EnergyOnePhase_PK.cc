@@ -222,7 +222,7 @@ EnergyOnePhase_PK::Initialize()
                << "preconditioner: "
                << my_operator(Operators::OPERATOR_PRECONDITIONER_RAW)->PrintDiagnostics()
                << std::endl
-               << vo_->color("green") << "Initialization of PK is complete: my dT=" << get_dt()
+               << vo_->color("green") << "Initialization of PK is complete: my dT=" << getDt()
                << vo_->reset() << std::endl;
   }
 

@@ -23,8 +23,9 @@ namespace AmanziMesh {
 void MeshMaps::initialize(const MeshFramework& mesh, bool renumber)
 {
   std::vector<Entity_kind> to_construct{Entity_kind::CELL,
-    Entity_kind::FACE, Entity_kind::NODE};
+    Entity_kind::FACE};
   if (mesh.hasEdges()) to_construct.push_back(Entity_kind::EDGE);
+  if (mesh.hasNodes()) to_construct.push_back(Entity_kind::NODE);
 
   for (const auto& kind : to_construct) {
     std::pair<Map_ptr_type, Map_ptr_type> maps;
