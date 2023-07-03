@@ -31,7 +31,8 @@ EvaluatorIndependentTensorFunction::EvaluatorIndependentTensorFunction(
   : EvaluatorIndependent<TensorVector, TensorVector_Factory>(plist),
     dimension_(-1),
     rank_(-1),
-    num_funcs_(-1)
+    num_funcs_(-1),
+    rescaling_(plist.get<double>("rescaling factor", 1.0))
 {}
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ EvaluatorIndependentTensorFunction::Update_(State& S)
 
   time_ = S.get_time(my_tag_);
   func_->Compute(time_, cv);
+  if (rescaling_ != 1.0) cv.scale(rescaling_);
   if (tv.ghosted) cv.scatterMasterToGhosted();
 
   // move data into tensor vector

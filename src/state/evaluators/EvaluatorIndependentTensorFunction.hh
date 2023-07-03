@@ -65,6 +65,7 @@ class EvaluatorIndependentTensorFunction
   int num_funcs_;
   int dimension_;
   int rank_;
+  double rescaling_;
 
  private:
   static Utils::RegisteredFactory<Evaluator, EvaluatorIndependentTensorFunction>
