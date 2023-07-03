@@ -193,8 +193,7 @@ void PDE_DiffusionFVwithGravity::AnalyticJacobian_(const CompositeVector& u)
           if (mcells == 2) {
             dpres = pres[0] - pres[1];
             if (little_k_type_ == OPERATOR_LITTLE_K_UPWIND) {
-              double flux0to1;
-              flux0to1 = trans_face(f,0) * dpres;
+              double flux0to1 = trans_face(f,0) * dpres + fdirs(f_index) * gravity_face(f,0);
               if (flux0to1  > OPERATOR_UPWIND_RELATIVE_TOLERANCE) {  // Upwind
                 dKrel_dp[0] = dkdp[0];
                 dKrel_dp[1] = 0.0;
@@ -297,7 +296,6 @@ void PDE_DiffusionFVwithGravity::ComputeTransmissibility_(
   }
 
   transmissibility_->gatherGhostedToMaster();
-  transmissibility_->reciprocal(*transmissibility_);
   h->gatherGhostedToMaster();
 
   {
@@ -314,8 +312,6 @@ void PDE_DiffusionFVwithGravity::ComputeTransmissibility_(
           auto cells = m->getFaceCells(f, AmanziMesh::Parallel_kind::ALL);
           int ncells = cells.size();
 
-          //if (f == 0) std::cout << "rho = " << rho_c(0,0) << std::endl;
-          //if (f == 0) std::cout << "g = " << g_ << std::endl;
           AmanziGeometry::Point a_dist;
           if (ncells == 2) {
             a_dist = m->getCellCentroid(cells[1]) - m->getCellCentroid(cells[0]);
@@ -324,14 +320,18 @@ void PDE_DiffusionFVwithGravity::ComputeTransmissibility_(
           }
           a_dist *= 1.0 / AmanziGeometry::norm(a_dist);
 
+          trans_f(f,0) = 1.0 / trans_f(f,0);
+
           const AmanziGeometry::Point& normal = m->getFaceNormal(f);
           double dir = std::copysign(1.0, normal * a_dist);
 
-          double rho = ncells == 1 ? rho_c(cells(0),0) : (rho_c(cells(0),0) + rho_c(cells(1),0))/2.;
-          //if (f == 0) std::cout << "grav_f = " << trans_f(f,0) << " * " << h_f(f,0) << " * g * " << a_dist << " * " << rho << std::endl;
-          grav_f(f,0) = trans_f(f,0) * h_f(f,0) * (g_ * a_dist) * rho * dir;
-        });
+          double rho = ncells == 1 ? rho_c(cells(0),0) :
+                                    (rho_c(cells(0),0) + rho_c(cells(1),0))/2.;
+          double grav = (g_ * a_dist) * rho * dir;
+          grav *= h_f(f,0);
 
+          grav_f(f,0) = trans_f(f,0) * grav;
+        });
   }
 
   transmissibility_->scatterMasterToGhosted("face");

@@ -228,9 +228,6 @@ EvaluatorModelCVByMaterial<Model, Device_type>::EvaluatePartialDerivative_(
     // get the location on which we are executing
     auto mesh_location = results[0]->getMap()->getLocation(comp);
 
-    // boundary_face not yet implemented
-    AMANZI_ASSERT(mesh_location != AmanziMesh::Entity_kind::BOUNDARY_FACE);
-
     // loop over region/model pairs and execute the model
     for (const auto& region_model : models_) {
       // get a view of the entities to execute over
@@ -242,10 +239,11 @@ EvaluatorModelCVByMaterial<Model, Device_type>::EvaluatePartialDerivative_(
       // set up the model and range and then dispatch
       region_model.second->setViews(dependency_views, result_views, S);
 
+      KeyTag wrt{wrt_key, wrt_tag};
       Impl::EvaluatorModelLauncher<Model_type::n_dependencies - 1,
                                    Model_type,
                                    Device_type>
-        launcher(name_, {wrt_key, wrt_tag}, dependencies_, *region_model.second);
+        launcher(name_, wrt, dependencies_, *region_model.second);
       launcher.launch(mat_ids);
     }
   }

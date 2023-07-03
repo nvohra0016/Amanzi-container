@@ -63,6 +63,11 @@ class Debugger {
   // Write a vector individually.
   void WriteVector(const std::string& vname,
                    const Teuchos::Ptr<const CompositeVector>& vec,
+                   bool include_faces = false) {
+    WriteVector(vname, *vec, include_faces);
+  }
+  void WriteVector(const std::string& vname,
+                   const CompositeVector& vec,
                    bool include_faces = false);
 
   void WriteCellVector(const std::string& name, const MultiVector_type& vec);

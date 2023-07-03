@@ -117,8 +117,8 @@ void MeshMaps::initialize(const MeshFramework& mesh, bool renumber)
           owned_[Entity_kind::BOUNDARY_FACE]));
 
   // -- importer from internal cell --> boundary_face
-  boundary_face_internal_cell_importer_ = Teuchos::rcp(new Import_type(bf_internal_cells_map,
-          owned_[Entity_kind::CELL]));
+  boundary_face_internal_cell_importer_ = Teuchos::rcp(new Import_type(owned_[Entity_kind::CELL],
+          bf_internal_cells_map));
 
   // boundary nodes
   // -- form an ordered set of all boundary nodes whose faces are boundary faces
