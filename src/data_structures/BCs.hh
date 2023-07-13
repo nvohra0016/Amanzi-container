@@ -19,7 +19,7 @@
 
 #include "WhetStoneDefs.hh"
 #include "Mesh.hh"
-#include "OperatorDefs.hh"
+//#include "OperatorDefs.hh"
 #include "CompositeVectorSpace.hh"
 #include "CompositeVector.hh"
 
@@ -30,6 +30,24 @@ class Point;
 }
 
 namespace Operators {
+
+// Boundary Conditions:
+//   Dirichlet, Neumann and Mixed are conventional boundary conditions
+//   for 2nd-order operators. Composite (additive) operators may require
+//   special treatment of total flux conditions. Finally some essential
+//   boundary conditions may be imposed in a weak form which leads to 
+//   type2 boundary conditions. See BCs.hh for more detail.
+const int OPERATOR_BC_NONE = 0;
+const int OPERATOR_BC_DIRICHLET = 1;
+const int OPERATOR_BC_NEUMANN = 2;
+const int OPERATOR_BC_TOTAL_FLUX = 3;
+const int OPERATOR_BC_MIXED = 4;
+const int OPERATOR_BC_DIRICHLET_TYPE2 = 5;
+const int OPERATOR_BC_KINEMATIC = 6;
+const int OPERATOR_BC_NORMAL_STRESS = 7;
+const int OPERATOR_BC_SHEAR_STRESS = 8;
+const int OPERATOR_BC_REMOVE = 9;
+
 
 /* *******************************************************************
  * Elliptic equation E(u) = f. Three types of boundary conditions are
@@ -146,14 +164,25 @@ class BCs {
   {
     return Kokkos::subview(model_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
   }
-
-
   Kokkos::View<double*, Amanzi::HostSpaceSpecial> bc_value_host(bool ghosted=true)
   {
     return Kokkos::subview(value_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
   }
-
   Kokkos::View<double*,Amanzi::HostSpaceSpecial> bc_mixed_host(bool ghosted=true)
+  {
+    if (!mixed_.get()) mixed_ = cvs_.Create();
+    return Kokkos::subview(mixed_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
+  }
+
+  Kokkos::View<const int*,Amanzi::HostSpaceSpecial> bc_model_host(bool ghosted=true) const
+  {
+    return Kokkos::subview(model_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
+  }
+  Kokkos::View<const double*, Amanzi::HostSpaceSpecial> bc_value_host(bool ghosted=true) const
+  {
+    return Kokkos::subview(value_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
+  }
+  Kokkos::View<const double*,Amanzi::HostSpaceSpecial> bc_mixed_host(bool ghosted=true) const
   {
     if (!mixed_.get()) mixed_ = cvs_.Create();
     return Kokkos::subview(mixed_->viewComponent<Amanzi::HostSpaceSpecial>(kind_str_, ghosted), Kokkos::ALL, 0);
@@ -215,12 +244,12 @@ class BCs_Factory {
   BCs_Factory () {}
 
   void set_mesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh) { mesh_ = mesh; }
-  void set_type(WhetStone::DOF_Type type) { type_ = type; }
-  void set_createEntityKind(AmanziMesh::Entity_kind kind) { kind_ = kind; }
+  void set_dof_type(WhetStone::DOF_Type type) { type_ = type; }
+  void set_entity_kind(AmanziMesh::Entity_kind kind) { kind_ = kind; }
   void set_parameterlist(Teuchos::ParameterList& plist) { plist_ = plist; }
 
   Teuchos::RCP<const AmanziMesh::Mesh> mesh() const { return mesh_; }
-  AmanziMesh::Entity_kind createEntityKind() const { return kind_; }
+  AmanziMesh::Entity_kind entity_kind() const { return kind_; }
   WhetStone::DOF_Type type() const { return type_; }
 
   Teuchos::RCP<BCs> Create() const {

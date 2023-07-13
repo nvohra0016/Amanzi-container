@@ -110,7 +110,6 @@ class EvaluatorIndependent : public EvaluatorIndependent_ {
   }
 };
 
-using EvaluatorIndependentCV = EvaluatorIndependent<CompositeVector, CompositeVectorSpace>;
 
 } // namespace Amanzi
 

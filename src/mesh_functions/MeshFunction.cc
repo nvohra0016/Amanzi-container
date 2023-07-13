@@ -58,8 +58,8 @@ MeshFunction::MeshFunction(Teuchos::ParameterList& list,
 void
 MeshFunction::addSpec(const Spec& spec)
 {
-  if (mesh_ == Teuchos::null) setMesh(std::get<1>(spec).mesh);
-  AMANZI_ASSERT(std::get<1>(spec).mesh == mesh_);
+  if (mesh_ == Teuchos::null) setMesh(std::get<1>(spec)->mesh);
+  AMANZI_ASSERT(std::get<1>(spec)->mesh == mesh_);
   spec_list_.push_back(spec);
 }
 
@@ -73,8 +73,8 @@ MeshFunction::createCVS(bool ghosted) const
   cvs->SetMesh(mesh_)->SetGhosted(ghosted);
   for (auto [compname, ps, functor] : *this) {
     cvs->AddComponent(compname,
-                      ps.entity_kind,
-                      ps.num_vectors);
+                      ps->entity_kind,
+                      ps->num_vectors);
   }
   return cvs;
 };
@@ -242,7 +242,7 @@ Kokkos::View<double**> getMeshFunctionCoordinates(double time, const PatchSpace&
 void
 computeFunction(const MultiFunction& f, double time, Patch<double>& p)
 {
-  auto txyz = getMeshFunctionCoordinates(time, p.space);
+  auto txyz = getMeshFunctionCoordinates(time, *p.space);
   Kokkos::fence();
   f.apply(txyz, p.data);
 }
@@ -289,8 +289,8 @@ copyFlags(const PatchSpace& ps, CompositeVector_<int>& flag_vec)
 void
 copyFlags(const MultiPatchSpace& mps, CompositeVector_<int>& flag_vec)
 {
-  for (const PatchSpace& ps : mps) {
-    copyFlags(ps, flag_vec);
+  for (auto& ps : mps) {
+    copyFlags(*ps, flag_vec);
   }
 }
 

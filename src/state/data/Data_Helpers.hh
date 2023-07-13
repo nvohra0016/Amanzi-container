@@ -69,7 +69,7 @@ namespace Amanzi {
 struct TensorVector;
 class TreeVector;
 class TreeVectorSpace;
-template<typename T> struct Patch;
+template<typename T> struct MultiPatch;
 
 namespace Helpers {
 
@@ -309,6 +309,82 @@ template <>
 bool
 Initialize<Teuchos::Array<double>>(Teuchos::ParameterList& plist,
         Teuchos::Array<double>& t);
+
+
+// ======================================================================
+// Specializations for Patch<double>, Patch<int>
+// ======================================================================
+template <>
+inline void
+WriteVis<MultiPatch<double>>(const Visualization& vis,
+                        Teuchos::ParameterList& attrs,
+                        const MultiPatch<double>& vec) {}
+
+template <>
+inline void
+WriteCheckpoint<MultiPatch<double>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        const MultiPatch<double>& vec) {}
+
+template <>
+inline void
+ReadCheckpoint<MultiPatch<double>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        MultiPatch<double>& vec) {}
+
+template <>
+inline bool
+Initialize<MultiPatch<double>>(Teuchos::ParameterList& plist,
+                          MultiPatch<double>& t) { return true;}
+
+
+template <>
+inline void
+WriteVis<MultiPatch<int>>(const Visualization& vis,
+                        Teuchos::ParameterList& attrs,
+                        const MultiPatch<int>& vec) {}
+
+template <>
+inline void
+WriteCheckpoint<MultiPatch<int>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        const MultiPatch<int>& vec) {}
+
+template <>
+inline void
+ReadCheckpoint<MultiPatch<int>>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        MultiPatch<int>& vec) {}
+
+template <>
+inline bool
+Initialize<MultiPatch<int>>(Teuchos::ParameterList& plist,
+                       MultiPatch<int>& t) { return true;}
+
+
+template <>
+inline void
+WriteVis<Operators::BCs>(const Visualization& vis,
+                        Teuchos::ParameterList& attrs,
+                        const Operators::BCs& vec) {}
+
+template <>
+inline void
+WriteCheckpoint<Operators::BCs>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        const Operators::BCs& vec) {}
+
+template <>
+inline void
+ReadCheckpoint<Operators::BCs>(const Checkpoint& chkp,
+        Teuchos::ParameterList& attrs,
+        Operators::BCs& vec) {}
+
+template <>
+inline bool
+Initialize<Operators::BCs>(Teuchos::ParameterList& plist,
+                       Operators::BCs& t) { return true;}
+
 
 
 } // namespace Helpers

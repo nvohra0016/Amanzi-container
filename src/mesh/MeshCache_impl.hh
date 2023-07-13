@@ -172,7 +172,8 @@ MeshCache<MEM>::getSetEntities(const std::string& region_name,
     if (gsize == 0) {
       Errors::Message msg;
       msg << "AmanziMesh::getSetEntities: Region \"" << region->get_name() << "\" of type \""
-          << to_string(region->get_type()) << "\" is empty (globally).";
+          << to_string(region->get_type()) << "\" is empty (globally) for entity  "
+          << to_string(kind);
       Exceptions::amanzi_throw(msg);
     }
   }
@@ -208,7 +209,8 @@ MeshCache<MEM>::getSetEntitiesAndVolumeFractions(const std::string& region_name,
     if (gsize == 0) {
       Errors::Message msg;
       msg << "AmanziMesh::getSetEntitiesAndVolumeFractions: Region \"" << region->get_name() << "\" of type \""
-          << to_string(region->get_type()) << "\" is empty (globally).";
+          << to_string(region->get_type()) << "\" is empty (globally) for entity "
+          << to_string(kind);
       Exceptions::amanzi_throw(msg);
     }
   }

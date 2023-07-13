@@ -55,7 +55,7 @@ TEST_FIXTURE(reference_mesh, MESH_FUNCTION)
   mf.addSpec("cell", AmanziMesh::Entity_kind::CELL, 1, "HALF2", f1);
 
   auto mps = mf.createMPS(false);
-  MultiPatch<double> mp(*mps);
+  MultiPatch<double> mp(mps);
   CHECK_EQUAL(2, mp.size());
 
   mf.Compute(0.0, mp);
@@ -76,7 +76,7 @@ TEST_FIXTURE(reference_mesh, BOUNDARY_CONDITION_PLIST)
                   AmanziMesh::Entity_kind::FACE,
                   OPERATOR_BC_NEUMANN);
 
-  MultiPatch<double> mp(*mf.createMPS(false));
+  MultiPatch<double> mp(mf.createMPS(false));
   mf.Compute(0.0, mp);
 
   // Check

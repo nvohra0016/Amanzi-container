@@ -33,7 +33,7 @@ namespace Functions {
 class MeshFunction {
 
 public:
-  using Spec = std::tuple<std::string, PatchSpace, Teuchos::RCP<const MultiFunction>>;
+  using Spec = std::tuple<std::string, Teuchos::RCP<PatchSpace>, Teuchos::RCP<const MultiFunction>>;
   using SpecList = std::vector<Spec>;
 
   MeshFunction(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
@@ -49,7 +49,7 @@ public:
   void setMesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh)
   {
     mesh_ = mesh;
-    for (auto& spec : *this) std::get<1>(spec).mesh = mesh;
+    for (auto& spec : *this) std::get<1>(spec)->mesh = mesh;
   }
 
   int getFlag() const { return flag_; }
@@ -64,7 +64,7 @@ public:
                const Teuchos::RCP<const MultiFunction>& func)
   {
     addSpec(Spec(compname,
-                 PatchSpace(mesh_, false, region, entity_kind, num_vectors, flag_),
+                 Teuchos::rcp(new PatchSpace(mesh_, false, region, entity_kind, num_vectors, flag_)),
                  func));
   }
 

@@ -306,6 +306,7 @@ CompositeVectorSpace::SetComponents(const std::vector<std::string>& names,
   std::map<std::string, BlockMap_ptr_type> mastermaps;
   std::map<std::string, BlockMap_ptr_type> ghostmaps;
 
+  AMANZI_ASSERT(mesh_ != Teuchos::null); // cannot call SetComponets prior to setting mesh
   for (int i = 0; i < locations.size(); ++i) {
     mastermaps[names[i]] = mesh_->getMap(locations[i], false);
     ghostmaps[names[i]] = mesh_->getMap(locations[i], true);

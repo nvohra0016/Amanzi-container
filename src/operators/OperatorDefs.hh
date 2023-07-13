@@ -80,23 +80,6 @@ const int OPERATOR_SCHEMA_INDICES = 512;
 const int OPERATOR_SCHEMA_RULE_EXACT = 1;
 const int OPERATOR_SCHEMA_RULE_SUBSET = 2;
 
-// Boundary Conditions:
-//   Dirichlet, Neumann and Mixed are conventional boundary conditions
-//   for 2nd-order operators. Composite (additive) operators may require
-//   special treatment of total flux conditions. Finally some essential
-//   boundary conditions may be imposed in a weak form which leads to 
-//   type2 boundary conditions. See BCs.hh for more detail.
-const int OPERATOR_BC_NONE = 0;
-const int OPERATOR_BC_DIRICHLET = 1;
-const int OPERATOR_BC_NEUMANN = 2;
-const int OPERATOR_BC_TOTAL_FLUX = 3;
-const int OPERATOR_BC_MIXED = 4;
-const int OPERATOR_BC_DIRICHLET_TYPE2 = 5;
-const int OPERATOR_BC_KINEMATIC = 6;
-const int OPERATOR_BC_NORMAL_STRESS = 7;
-const int OPERATOR_BC_SHEAR_STRESS = 8;
-const int OPERATOR_BC_REMOVE = 9;
-
 // memory allocation
 const int OPERATOR_HEX_FACES = 6;  // Hexahedron is the common element
 const int OPERATOR_HEX_NODES = 8;

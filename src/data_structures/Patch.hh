@@ -21,7 +21,6 @@
 
 namespace Amanzi {
 
-
 //
 // A set of entity IDs, defined by a region, mesh, and entity kind.
 //
@@ -55,6 +54,16 @@ struct PatchSpace {
   {
     if (flag_type == -1) Kokkos::resize(flags, size());
   }
+  PatchSpace(const PatchSpace& other) = default;
+  PatchSpace& operator=(const PatchSpace&) = default;
+  ~PatchSpace() = default;
+
+  bool operator==(const PatchSpace& other) const {
+    return mesh == other.mesh &&
+      region == other.region &&
+      entity_kind == other.entity_kind &&
+      num_vectors == other.num_vectors;
+  }
 
   int size() const
   {
@@ -86,48 +95,65 @@ template<typename T> struct MultiPatch;
 
 struct MultiPatchSpace {
   Teuchos::RCP<const AmanziMesh::Mesh> mesh;
+  AmanziMesh::Entity_kind entity_kind;
   bool ghosted;
   int flag_type;
 
-  MultiPatchSpace() : ghosted(false) {}
-  MultiPatchSpace(bool ghosted_) : ghosted(ghosted_) {}
+  MultiPatchSpace()
+    : ghosted(false),
+      entity_kind(AmanziMesh::Entity_kind::UNKNOWN)
+    {}
+  MultiPatchSpace(bool ghosted_)
+    : ghosted(ghosted_),
+      entity_kind(AmanziMesh::Entity_kind::UNKNOWN)
+    {}
   MultiPatchSpace(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh_,
                   bool ghosted_,
+                  AmanziMesh::Entity_kind entity_kind_ = AmanziMesh::Entity_kind::UNKNOWN,
                   int flag_type_ = -1)
     : mesh(mesh_),
+      entity_kind(entity_kind_),
       ghosted(ghosted_),
       flag_type(flag_type_)
   {}
 
-  template<typename T>
-  Teuchos::RCP<MultiPatch<T>> Create() const;
-
-  const PatchSpace& operator[](const int& i) const { return subspaces_[i]; }
+  Teuchos::RCP<const PatchSpace> operator[](const int& i) const { return subspaces_[i]; }
 
   void set_mesh(const Teuchos::RCP<const AmanziMesh::Mesh>& mesh_)
   {
     mesh = mesh_;
-    for (auto& p : *this) { p.mesh = mesh_; }
+    for (auto& p : *this) { p->mesh = mesh_; }
+  }
+  void set_flag(int flag)
+  {
+    flag_type = flag;
+    for (auto& p : *this) { p->flag_type = flag; }
+  }
+  void set_entity_kind(AmanziMesh::Entity_kind entity_kind_)
+  {
+    entity_kind = entity_kind_;
+    for (auto& p : *this) { p->entity_kind = entity_kind_; }
   }
 
-  using const_iterator = std::vector<PatchSpace>::const_iterator;
+  using const_iterator = std::vector<Teuchos::RCP<PatchSpace>>::const_iterator;
   const_iterator begin() const { return subspaces_.begin(); }
   const_iterator end() const { return subspaces_.end(); }
   std::size_t size() const { return subspaces_.size(); }
 
-  using iterator = std::vector<PatchSpace>::iterator;
+  using iterator = std::vector<Teuchos::RCP<PatchSpace>>::const_iterator;
   iterator begin() { return subspaces_.begin(); }
   iterator end() { return subspaces_.end(); }
 
   void addPatch(const std::string& region, AmanziMesh::Entity_kind entity_kind, int num_vectors)
   {
-    subspaces_.emplace_back(PatchSpace{ mesh, ghosted, region, entity_kind, num_vectors, flag_type });
+    subspaces_.emplace_back(
+      Teuchos::rcp(new PatchSpace{ mesh, ghosted, region, entity_kind, num_vectors, flag_type }));
   }
 
-  void addPatch(const PatchSpace& ps) { subspaces_.emplace_back(ps); }
+  void addPatch(const Teuchos::RCP<PatchSpace>& ps) { subspaces_.emplace_back(ps); }
 
  private:
-  std::vector<PatchSpace> subspaces_;
+  std::vector<Teuchos::RCP<PatchSpace>> subspaces_;
 };
 
 
@@ -136,21 +162,23 @@ struct MultiPatchSpace {
 //
 template<typename T>
 struct Patch {
-  using ViewType = Kokkos::View<T**, Kokkos::LayoutLeft>;
+  using View_type = Kokkos::View<T**, Kokkos::LayoutLeft>;
 
-  Patch(const PatchSpace& space_)
+  Patch(const Teuchos::RCP<const PatchSpace>& space_)
     : space(space_)
   {
-    Kokkos::resize(data, space.size(), space.num_vectors);
+    Kokkos::resize(data, space->size(), space->num_vectors);
   }
 
-  KOKKOS_INLINE_FUNCTION ~Patch(){};
+  Patch(const Patch& other) = default;
+  Patch& operator=(const Patch&) = default;
+  ~Patch() = default;
 
-  PatchSpace space;
+  Teuchos::RCP<const PatchSpace> space;
   // note, this layout is required to ensure that function is slowest-varying,
   // and so can be used with MultiFunction::apply(). See note in
   // MultiFunction.hh
-  ViewType data;
+  View_type data;
 
   std::size_t size() const { return data.extent(0); }
   std::size_t getNumVectors() const { return data.extent(1); }
@@ -161,9 +189,9 @@ struct Patch {
 //
 template<typename T>
 struct MultiPatch {
-  explicit MultiPatch(const MultiPatchSpace& space_) : space(space_)
+  explicit MultiPatch(const Teuchos::RCP<const MultiPatchSpace>& space_) : space(space_)
   {
-    for (const auto& subspace : space) patches_.emplace_back(Patch<T>{ subspace });
+    for (const auto& subspace : *space) patches_.emplace_back(Patch<T>{ subspace });
   }
 
   using iterator = typename std::vector<Patch<T>>::iterator;
@@ -179,27 +207,19 @@ struct MultiPatch {
 
   const Patch<T>& operator[](const int& i) const { return patches_[i]; }
 
-  MultiPatchSpace space;
+  Teuchos::RCP<const MultiPatchSpace> space;
 
  protected:
   std::vector<Patch<T>> patches_;
 };
 
 
-template<typename T>
-Teuchos::RCP<MultiPatch<T>>
-MultiPatchSpace::Create() const
-{
-  return Teuchos::rcp(new MultiPatch<T>(*this));
-}
-
 //
 // Nonmember function for creating PatchSpaces from a ParameterList
 //
 inline void
 readMultiPatchSpace(Teuchos::ParameterList& list,
-                    MultiPatchSpace& mps,
-                    AmanziMesh::Entity_kind entity_kind = AmanziMesh::Entity_kind::UNKNOWN)
+                    MultiPatchSpace& mps)
 {
   Teuchos::Array<std::string> regions;
   if (list.isParameter("regions")) {
@@ -209,7 +229,7 @@ readMultiPatchSpace(Teuchos::ParameterList& list,
   }
 
   Teuchos::Array<AmanziMesh::Entity_kind> entity_kinds;
-  if (entity_kind == AmanziMesh::Entity_kind::UNKNOWN) {
+  if (mps.entity_kind == AmanziMesh::Entity_kind::UNKNOWN) {
     if (list.isParameter("entity kind")) {
       entity_kinds.push_back(AmanziMesh::createEntityKind(list.get<std::string>("entity kind")));
     } else {
@@ -217,7 +237,7 @@ readMultiPatchSpace(Teuchos::ParameterList& list,
       for (auto ekind : ekinds) entity_kinds.push_back(AmanziMesh::createEntityKind(ekind));
     }
   } else {
-    entity_kinds.push_back(entity_kind);
+    entity_kinds.push_back(mps.entity_kind);
   }
 
   int n_dofs = list.get<int>("number of vectors", 1);
@@ -232,14 +252,14 @@ readMultiPatchSpace(Teuchos::ParameterList& list,
 //
 // Nonmember function for creating MultiPatchSpaces from a ParameterList
 //
-inline MultiPatchSpace
+inline Teuchos::RCP<MultiPatchSpace>
 createMultiPatchSpace(Teuchos::ParameterList& list,
                       const Teuchos::RCP<const AmanziMesh::Mesh>& mesh,
                       AmanziMesh::Entity_kind entity_kind = AmanziMesh::Entity_kind::UNKNOWN,
                       int flag_type = 0)
 {
   // All are expected to be sublists of identical structure.
-  MultiPatchSpace mps(mesh, false, flag_type);
+  auto mps = Teuchos::rcp(new MultiPatchSpace(mesh, false, entity_kind, flag_type));
 
   for (auto sublist : list) {
     std::string name = sublist.first;
@@ -247,7 +267,7 @@ createMultiPatchSpace(Teuchos::ParameterList& list,
       Teuchos::ParameterList& spec_plist = list.sublist(name);
 
       try {
-        readMultiPatchSpace(spec_plist, mps, entity_kind);
+        readMultiPatchSpace(spec_plist, *mps);
       } catch (Errors::Message& msg) {
         Errors::Message m;
         m << "in sublist " << name << ": " << msg.what();

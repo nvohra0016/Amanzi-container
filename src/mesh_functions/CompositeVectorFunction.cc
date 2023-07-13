@@ -20,7 +20,7 @@ CompositeVectorFunction::Compute(double time, CompositeVector& vec)
   for (auto [compname, ps, functor] : *this) {
     if (vec.hasComponent(compname)) {
       // compute directly into vector?
-      Impl::computeFunction(*functor, time, ps, vec);
+      Impl::computeFunction(*functor, time, *ps, vec);
 
       // compute into patch then copy to vector?
       // Patch<double> p(ps);
@@ -36,7 +36,7 @@ CompositeVectorFunction::FlagToVector(CompositeVector_<int>& flag_vec)
 {
   for (auto [compname, ps, functor] : *this) {
     if (flag_vec.hasComponent(compname)) {
-      Impl::copyFlags(ps, flag_vec);
+      Impl::copyFlags(*ps, flag_vec);
     }
   }
 

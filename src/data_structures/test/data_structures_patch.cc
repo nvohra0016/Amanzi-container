@@ -47,13 +47,13 @@ SUITE(PATCH)
 
   TEST_FIXTURE(test_mesh, MULTIPATCH_CREATE)
   {
-    MultiPatchSpace space;
-    space.mesh = mesh;
-    space.ghosted = false;
+    auto space = Teuchos::rcp(new MultiPatchSpace());
+    space->mesh = mesh;
+    space->ghosted = false;
 
-    space.addPatch("box1", CELL, 2);
-    space.addPatch("box2", CELL, 2);
-    auto mp = space.Create<double>();
+    space->addPatch("box1", CELL, 2);
+    space->addPatch("box2", CELL, 2);
+    auto mp = Teuchos::rcp(new MultiPatch<double>(space));
 
     auto p1 = (*mp)[0];
     CHECK_EQUAL(2, p1.data.extent(0));

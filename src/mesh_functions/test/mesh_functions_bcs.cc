@@ -54,19 +54,19 @@ TEST_FIXTURE(reference_mesh, MESH_FUNCTION)
                   "boundary pressure", Entity_kind::FACE,
                   OPERATOR_BC_DIRICHLET);
   auto mps = mf_d.createMPS(false);
-  MultiPatch<double> dirichlet(*mf_d.createMPS(false));
+  MultiPatch<double> dirichlet(mf_d.createMPS(false));
   mf_d.Compute(1.0, dirichlet);
-  CHECK_EQUAL(OPERATOR_BC_DIRICHLET, dirichlet.space[0].flag_type);
-  CHECK_EQUAL(OPERATOR_BC_DIRICHLET, dirichlet[0].space.flag_type);
+  CHECK_EQUAL(OPERATOR_BC_DIRICHLET, (*dirichlet.space)[0]->flag_type);
+  CHECK_EQUAL(OPERATOR_BC_DIRICHLET, dirichlet[0].space->flag_type);
 
   // next, one for Neumann
   int OPERATOR_BC_NEUMANN = 2;
   MeshFunction mf_n(plist.sublist("neumann"), mesh,
                   "outward normal flux", Entity_kind::FACE,
                   OPERATOR_BC_NEUMANN);
-  MultiPatch<double> neumann(*mf_n.createMPS(false));
+  MultiPatch<double> neumann(mf_n.createMPS(false));
   mf_n.Compute(1.0, neumann);
-  CHECK_EQUAL(OPERATOR_BC_NEUMANN, neumann.space[0].flag_type);
+  CHECK_EQUAL(OPERATOR_BC_NEUMANN, (*neumann.space)[0]->flag_type);
 
   // next, one for a BC that uses no functions, e.g. critical depth conditions,
   // and are computed internally
@@ -76,8 +76,8 @@ TEST_FIXTURE(reference_mesh, MESH_FUNCTION)
           OPERATOR_BC_NEUMANN));
 
   for (int i=0; i!=crit_depth.size(); ++i) {
-    auto ps = crit_depth.space[i];
-    auto ids = ps.getIDs();
+    auto ps = (*crit_depth.space)[i];
+    auto ids = ps->getIDs();
     auto& patch = crit_depth[i];
     Kokkos::parallel_for("crit_depth", ids.extent(0),
                          KOKKOS_LAMBDA(const int& i) {
@@ -93,21 +93,21 @@ TEST_FIXTURE(reference_mesh, MESH_FUNCTION)
   MeshFunction mf_s(plist.sublist("seepage face"), mesh,
                     "boundary pressure", Entity_kind::FACE,
                     OPERATOR_BC_VARIABLE);
-  MultiPatch<double> seepage(*mf_s.createMPS(false));
+  MultiPatch<double> seepage(mf_s.createMPS(false));
   mf_s.Compute(1.0, seepage);
 
   for (int i=0; i!=seepage.size(); ++i) {
-    auto ps = seepage.space[i];
-    auto ids = ps.getIDs();
+    auto ps = (*seepage.space)[i];
+    auto ids = ps->getIDs();
     auto& patch = seepage[i];
     Kokkos::parallel_for("seepage", ids.extent(0),
                          KOKKOS_LAMBDA(const int& i) {
                            auto fc = mesh->getFaceCentroid(ids(i));
                            if (fc[2] > 2.0) {
                              patch.data(i,0) = 0.0;
-                             ps.flags(i) = OPERATOR_BC_NEUMANN;
+                             ps->flags(i) = OPERATOR_BC_NEUMANN;
                            } else {
-                             ps.flags(i) = OPERATOR_BC_DIRICHLET;
+                             ps->flags(i) = OPERATOR_BC_DIRICHLET;
                            }
                          });
   }
@@ -126,10 +126,10 @@ TEST_FIXTURE(reference_mesh, MESH_FUNCTION)
   copyMultiPatchToCompositeVector(seepage,  "face", bc_values);
 
   // copy in flags
-  Functions::Impl::copyFlags(dirichlet.space, bc_markers);
-  Functions::Impl::copyFlags(neumann.space, bc_markers);
-  Functions::Impl::copyFlags(crit_depth.space, bc_markers);
-  Functions::Impl::copyFlags(seepage.space, bc_markers);
+  Functions::Impl::copyFlags(*dirichlet.space, bc_markers);
+  Functions::Impl::copyFlags(*neumann.space, bc_markers);
+  Functions::Impl::copyFlags(*crit_depth.space, bc_markers);
+  Functions::Impl::copyFlags(*seepage.space, bc_markers);
 
   CHECK_EQUAL(4, mesh->getSetSize("RIGHT", Entity_kind::FACE, Parallel_kind::OWNED));
   CHECK_EQUAL(4, mesh->getSetSize("LEFT", Entity_kind::FACE, Parallel_kind::OWNED));

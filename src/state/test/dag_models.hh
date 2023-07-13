@@ -187,13 +187,14 @@ class CModel {
 };
 
 
-template <class cView_type, class View_type>
-class DModel {
+template <class cView_type, class View_type, bool UseAccessor = false>
+class DModel_ {
  public:
   static const int n_dependencies = 1;
   static const std::string name;
+  using Accessor_View_type = Kokkos::View<const int*, typename View_type::device_type>;
 
-  DModel(Teuchos::ParameterList& plist) {}
+  DModel_(Teuchos::ParameterList& plist) {}
 
   void setViews(const std::vector<cView_type>& deps,
                 const std::vector<View_type>& res,
@@ -204,6 +205,11 @@ class DModel {
 
     D_ = res[0];
     G_ = deps[0];
+  }
+
+  void setAccessor(const Accessor_View_type& ids)
+  {
+    ids_ = ids;
   }
 
   KeyVector getMyKeys()
@@ -217,7 +223,8 @@ class DModel {
 
   KOKKOS_INLINE_FUNCTION void operator()(const int i) const
   {
-    D_(i,0) = 2 * G_(i,0);
+    int j = UseAccessor ? ids_(i) : i;
+    D_(i,0) = 2 * G_(j,0);
   }
 
   // derivatives
@@ -229,7 +236,16 @@ class DModel {
  private:
   View_type D_;
   cView_type G_;
+
+  Kokkos::View<const int*, typename View_type::device_type> ids_;
 };
+
+
+template <class cView_type, class View_type>
+using DModel = DModel_<cView_type,View_type,false>;
+template <class cView_type, class View_type>
+using DModelAccessor = DModel_<cView_type,View_type,true>;
+
 
 
 template <class cView_type, class View_type>
@@ -382,8 +398,8 @@ const std::string AModel<cView_type, View_type>::name("A");
 template <class cView_type, class View_type>
 const std::string CModel<cView_type, View_type>::name("C");
 
-template <class cView_type, class View_type>
-const std::string DModel<cView_type, View_type>::name("D");
+template <class cView_type, class View_type, bool UseAccessor>
+const std::string DModel_<cView_type, View_type, UseAccessor>::name("D");
 
 template <class cView_type, class View_type>
 const std::string EModel<cView_type, View_type>::name("E");

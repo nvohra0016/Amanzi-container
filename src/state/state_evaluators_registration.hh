@@ -17,9 +17,11 @@
 #include "EvaluatorIndependentFunction.hh"
 #include "EvaluatorIndependentConstant.hh"
 #include "EvaluatorIndependentTensorFunction.hh"
+#include "EvaluatorIndependentPatchFunction.hh"
 #include "EvaluatorSecondaryMonotypeFromFunction.hh"
 #include "EvaluatorPrimaryStaticMesh.hh"
 #include "EvaluatorSecondaryMeshedQuantity.hh"
+#include "EvaluatorAggregateBCs.hh"
 
 namespace Amanzi {
 
@@ -31,6 +33,8 @@ Utils::RegisteredFactory<Evaluator, EvaluatorIndependentConstant>
   EvaluatorIndependentConstant::fac_("independent variable constant");
 Utils::RegisteredFactory<Evaluator, EvaluatorIndependentTensorFunction>
   EvaluatorIndependentTensorFunction::fac_("independent variable tensor");
+Utils::RegisteredFactory<Evaluator, EvaluatorIndependentPatchFunction>
+  EvaluatorIndependentPatchFunction::fac_("independent variable patch");
 
 Utils::RegisteredFactory<Evaluator, EvaluatorSecondaryMonotypeFromFunction>
   EvaluatorSecondaryMonotypeFromFunction::fac_("secondary variable from function");
@@ -51,5 +55,9 @@ Utils::RegisteredFactory<Evaluator, EvaluatorMeshElevation>
 template<>
 Utils::RegisteredFactory<Evaluator, EvaluatorMeshSlopeMagnitude>
   EvaluatorMeshSlopeMagnitude::fac_("meshed slope magnitude");
+
+Utils::RegisteredFactory<Evaluator, EvaluatorAggregateBCs>
+  EvaluatorAggregateBCs::fac_("boundary condition aggregator");
+
 
 } // namespace Amanzi

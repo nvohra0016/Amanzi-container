@@ -18,15 +18,16 @@
 
 #include "errors.hh"
 #include "MeshFactory.hh"
+#include "Patch.hh"
 #include "CompositeVector.hh"
 #include "TreeVector.hh"
 
 #include "IO.hh"
 #include "State.hh"
 #include "Data_Helpers.hh"
-#include "Vec.hh"
 
-TEST(STATE_CREATION)
+
+TEST(STATE_CONTAINS_PRIMITIVES)
 {
   using namespace Amanzi;
 
@@ -39,22 +40,12 @@ TEST(STATE_CREATION)
 
   CHECK(s.GetRecordSet("my_double").ValidType<double>());
   CHECK(!s.GetRecordSet("my_double").ValidType<int>());
-}
 
-
-TEST(STATE_ASSIGNMENT)
-{
-  using namespace Amanzi;
-
-  State s;
-  s.Require<double>("my_double", Tags::DEFAULT, "my_double");
-  s.Setup();
   s.GetW<double>("my_double", "my_double") = 1.1;
   CHECK_EQUAL(1.1, s.Get<double>("my_double"));
 }
 
-
-TEST(STATE_FACTORIES_WITH_CREATE)
+TEST(STATE_CONTAINS_FACTORIES_WITH_CREATE)
 {
   using namespace Amanzi;
 
@@ -87,7 +78,7 @@ TEST(STATE_FACTORIES_WITH_CREATE)
 }
 
 
-TEST(STATE_FACTORIES_WITH_CONSTRUCTOR)
+TEST(STATE_CONTAINS_FACTORIES_WITH_CONSTRUCTOR)
 {
   using namespace Amanzi;
   auto comm = Amanzi::getDefaultComm();
@@ -121,7 +112,22 @@ TEST(STATE_HETEROGENEOUS_DATA)
 
   // create a mesh
   Comm_ptr_type comm = Amanzi::getDefaultComm();
-  AmanziMesh::MeshFactory fac(comm);
+
+  Teuchos::ParameterList regions;
+  regions.sublist("left")
+    .sublist("region: box")
+    .set<Teuchos::Array<double>>("low coordinate", std::vector<double>{0.,0.,0.})
+    .set<Teuchos::Array<double>>("high coordinate", std::vector<double>{2., 4., 4.});
+  regions.sublist("right")
+    .sublist("region: box")
+    .set<Teuchos::Array<double>>("low coordinate", std::vector<double>{2.,0.,0.} )
+    .set<Teuchos::Array<double>>("high coordinate", std::vector<double>{4.,4.,4.});
+  regions.sublist("point")
+    .sublist("region: point")
+    .set<Teuchos::Array<double>>("coordinate", std::vector<double>{ 1., 1., 1. });
+  auto gm = Teuchos::rcp(new AmanziGeometry::GeometricModel(3, regions, *comm));
+
+  AmanziMesh::MeshFactory fac(comm, gm);
   auto mesh = fac.create(0.0, 0.0, 0.0, 4.0, 4.0, 4.0, 2, 2, 2);
 
   // create a state
@@ -141,11 +147,17 @@ TEST(STATE_HETEROGENEOUS_DATA)
     ->SetComponent("cell", AmanziMesh::CELL, 1)
     ->SetGhosted();
 
+  // require patch data
+  auto& ps = s.Require<MultiPatch<double>, MultiPatchSpace>("my_patch", Tags::DEFAULT, "my_patch");
+  ps.set_mesh(mesh);
+  ps.addPatch("left", AmanziMesh::Entity_kind::CELL, 1);
+
   s.Setup();
 
   // existence
   CHECK(s.HasRecord("my_double"));
   CHECK(s.HasRecord("my_vec"));
+  CHECK(s.HasRecord("my_patch"));
   CHECK(!s.HasRecord("my_nonexistent_data"));
 
   // defaults
@@ -155,6 +167,7 @@ TEST(STATE_HETEROGENEOUS_DATA)
 
   // data access, construction
   CHECK(s.Get<CompositeVector>("my_vec").hasComponent("cell"));
+  CHECK_EQUAL(4, s.Get<MultiPatch<double>>("my_patch")[0].size());
 
   // incorrect type in Get
   CHECK_THROW(s.Get<double>("my_vec"), Errors::Message);

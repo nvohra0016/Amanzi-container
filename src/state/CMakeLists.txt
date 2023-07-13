@@ -74,6 +74,7 @@ set(state_inc_files
   evaluators/EvaluatorIndependentFunction.hh
   evaluators/EvaluatorIndependentConstant.hh
   evaluators/EvaluatorIndependentTensorFunction.hh
+  evaluators/EvaluatorIndependentPatchFunction.hh
   evaluators/EvaluatorPrimary.hh
   evaluators/EvaluatorPrimaryStaticMesh.hh
   evaluators/EvaluatorSecondary.hh
@@ -85,6 +86,8 @@ set(state_inc_files
   evaluators/EvaluatorModelLauncher.hh
   evaluators/EvaluatorModelCV.hh
   evaluators/EvaluatorModelCVByMaterial.hh
+  evaluators/EvaluatorModelPatch.hh
+  evaluators/EvaluatorAggregateBCs.hh
   State.hh
   IO.hh
   Observable.hh
@@ -108,10 +111,12 @@ set(state_src_files
   evaluators/EvaluatorIndependentFunction.cc
   evaluators/EvaluatorIndependentConstant.cc
   evaluators/EvaluatorIndependentTensorFunction.cc
+  evaluators/EvaluatorIndependentPatchFunction.cc
   evaluators/EvaluatorPrimary.cc
   evaluators/EvaluatorSecondary.cc
   evaluators/EvaluatorSecondaryMonotype.cc
   evaluators/EvaluatorSecondaryMonotypeFromFunction.cc
+  evaluators/EvaluatorAggregateBCs.cc
   State.cc
   IO.cc
   Observable.cc
@@ -182,6 +187,7 @@ if (BUILD_TESTS)
                     KIND unit
                     SOURCE test/Main.cc
                            test/state_container.cc
+                           test/state_extensibility.cc
                     LINK_LIBS ${state_test_link_libs})
 
     # tests state as a container of meshes
@@ -282,10 +288,12 @@ if (BUILD_TESTS)
          	           test/state_dag_models.cc
                     LINK_LIBS ${state_test_link_libs})
 
-                  
-                  
-                  
-                         
+    # tests Evaluators on patches
+    add_amanzi_test(state_domain_function_evaluators state_domain_function_evaluators
+                    KIND int
+                    SOURCE test/Main.cc
+         	           test/state_domain_function_evaluators.cc
+                    LINK_LIBS ${state_test_link_libs})
 
 endif()
 
