@@ -85,9 +85,10 @@ Developer's note:
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 
-#include "AmanziComm.hh"
+#include "Key.hh"
 #include "Tag.hh"
 #include "TreeVectorSpace.hh"
+#include "StateDefs.hh"
 
 namespace Amanzi {
 

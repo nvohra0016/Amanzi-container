@@ -72,7 +72,10 @@ class CompositeVectorSpace {
 
   // Is this space and the resulting CV owned by a PK?
   bool Owned() const { return owned_; }
-  CompositeVectorSpace* SetOwned(bool owned = true);
+  CompositeVectorSpace* SetOwned(bool owned = true) {
+    owned_ = owned;
+    return this;
+  }
 
   // Components are refered to by names.
   // -- Iteration over names of the space

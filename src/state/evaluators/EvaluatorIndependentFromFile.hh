@@ -103,9 +103,9 @@ class EvaluatorIndependentFromFile
   EvaluatorIndependentFromFile& operator=(const EvaluatorIndependentFromFile& other);
 
   virtual void EnsureCompatibility(State& S) override;
-  virtual std::string getType() const override {
-    return "independent variable from file";
-  }
+
+  static const std::string name;
+  virtual std::string getType() const override { return name; }
 
  protected:
   // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ class EvaluatorIndependentFromFile
   Teuchos::RCP<Function> time_func_;
 
  private:
-  static Utils::RegisteredFactory<Evaluator, EvaluatorIndependentFromFile> fac_;
+  static Utils::RegisteredFactory<Evaluator, EvaluatorIndependentFromFile> reg_;
 };
 
 } // namespace Amanzi

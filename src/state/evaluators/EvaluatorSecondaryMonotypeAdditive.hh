@@ -41,15 +41,17 @@ class EvaluatorSecondaryMonotypeAdditive
   EvaluatorSecondaryMonotypeAdditive(const EvaluatorSecondaryMonotypeAdditive& other) = default;
   virtual Teuchos::RCP<Evaluator> Clone() const override;
 
-  virtual std::string name() const override { return "additive"; }
-  
+  static const std::string name;
+  virtual std::string getType() const override { return name; }
+
  protected:
   virtual void
   Evaluate_(const State& S, const std::vector<Data_t*>& results) override;
 
   virtual void
-  EvaluatePartialDerivative_(const State& S, const Key& wrt_key,
-                             const Key& wrt_tag,
+  EvaluatePartialDerivative_(const State& S,
+                             const Key& wrt_key,
+                             const Tag& wrt_tag,
                              const std::vector<Data_t*>& results) override;
 
  protected:
@@ -58,9 +60,7 @@ class EvaluatorSecondaryMonotypeAdditive
   using EvaluatorSecondaryMonotype<Data_t,DataFactory_t>::my_keys_;
 
  private:
-  static Utils::RegisteredFactory<
-    Evaluator, EvaluatorSecondaryMonotypeAdditive<Data_t, DataFactory_t>>
-    fac_;
+  static Utils::RegisteredFactory<Evaluator, EvaluatorSecondaryMonotypeAdditive<Data_t, DataFactory_t>> reg_;
 };
 
 
@@ -76,7 +76,7 @@ EvaluatorSecondaryMonotypeAdditive<Data_t,DataFactory_t>::EvaluatorSecondaryMono
   }
 
   for (const auto& dep : dependencies_) {
-    Key coef_name = dep.first + ":" + dep.second;
+    Key coef_name = Keys::getKey(dep.first, dep.second);
     Key pname = dep.first + " coefficient";
     Key pname_full = coef_name + " coefficient";
     if (plist.isParameter(pname_full))
@@ -103,7 +103,7 @@ EvaluatorSecondaryMonotypeAdditive<Data_t,DataFactory_t>::Evaluate_(const State&
   results[0]->putScalar(0.);
   for (const auto& dep : dependencies_) {
     const auto& term = S.Get<Data_t>(dep.first, dep.second);
-    std::string coef_name = dep.first + ":" + dep.second;
+    std::string coef_name = Keys::getKey(dep.first, dep.second);
     double coef = coefs_.at(coef_name);
     results[0]->update(coef, term, 1.0);
   }
@@ -112,15 +112,18 @@ EvaluatorSecondaryMonotypeAdditive<Data_t,DataFactory_t>::Evaluate_(const State&
 template <typename Data_t, typename DataFactory_t>
 void
 EvaluatorSecondaryMonotypeAdditive<Data_t,DataFactory_t>::EvaluatePartialDerivative_(const State& S,
-        const Key& wrt_key,
-        const Key& wrt_tag,
-        const std::vector<Data_t*>& results)
+                             const Key& wrt_key,
+                             const Tag& wrt_tag,
+                             const std::vector<Data_t*>& results)
 {
-  Key pname_full = wrt_key + ":" + wrt_tag;
-  results[0]->putScalar(coefs_[pname_full]);
+  std::string coef_name = Keys::getKey(wrt_key, wrt_tag);
+  results[0]->putScalar(coefs_.at(coef_name));
 }
 
+template<>
+const std::string EvaluatorSecondaryMonotypeAdditive<CompositeVector,CompositeVectorSpace>::name = "additive";
 
+using EvaluatorSecondaryMonotypeAdditiveCV = EvaluatorSecondaryMonotypeAdditive<CompositeVector,CompositeVectorSpace>;
 
 } // namespace Amanzi
 

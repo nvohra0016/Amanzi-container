@@ -147,17 +147,19 @@ PreconditionerHypre::InitBoomer_()
   }
 
   // verbosity
-  int vlevel_int = 1;
-  std::string vlevel =
-    plist_.sublist("verbose object").get<std::string>("verbosity level", "medium");
-  if (vlevel == "high") {
-    vlevel_int = 2;
-  } else if (vlevel == "extreme") {
+  int vlevel_int = 0;
+  if (vo_->getVerbLevel() == Teuchos::VERB_LOW) {
+    vlevel_int = 0;
+  } else if (vo_->getVerbLevel() == Teuchos::VERB_MEDIUM) {
+    vlevel_int = 0;
+  } else if (vo_->getVerbLevel() == Teuchos::VERB_HIGH) {
+    vlevel_int = 0;
+  } else if (vo_->getVerbLevel() == Teuchos::VERB_EXTREME) {
     vlevel_int = 3;
   }
-
   if (plist_.isParameter("verbosity")) vlevel_int = plist_.get<int>("verbosity");
   HYPRE_BoomerAMGSetPrintLevel(HyprePrecond_, vlevel_int);
+
   HYPRE_BoomerAMGSetTol(HyprePrecond_, plist_.get<double>("tolerance", 0.0));
   HYPRE_BoomerAMGSetMaxIter(HyprePrecond_, plist_.get<int>("cycle applications", 5));
   HYPRE_BoomerAMGSetCoarsenType(HyprePrecond_, plist_.get<int>("coarsen type", 0));

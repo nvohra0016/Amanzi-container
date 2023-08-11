@@ -18,6 +18,8 @@
 
 namespace Amanzi {
 
+const std::string EvaluatorAggregateBCs::name = "boundary condition aggregrator";
+
 EvaluatorAggregateBCs::EvaluatorAggregateBCs(Teuchos::ParameterList& plist)
     : EvaluatorSecondary(plist),
       inited_(false)
@@ -82,8 +84,8 @@ EvaluatorAggregateBCs::Update_(State& S)
     }
   }
 
-  result.model()->print(std::cout);
-  result.value()->print(std::cout);
+  // result.model()->print(std::cout);
+  // result.value()->print(std::cout);
 }
 
 } // namespace Amanzi

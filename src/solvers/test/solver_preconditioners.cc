@@ -161,7 +161,7 @@ SUITE(SOLVERS)
       "diagonal",
       "ifpack2: ILUT",
       "hypre: boomer amg",
-      //"hypre: euclid",
+      "hypre: euclid",
       "muelu"
     };
 #endif

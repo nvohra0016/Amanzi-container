@@ -233,7 +233,9 @@ Visualization::write(const State& S)
     createTimestep(S.get_time(), S.get_cycle());
 
     for (auto r = S.data_begin(); r != S.data_end(); ++r) {
-      if (writesDomain(Keys::getDomain(r->first))) {
+      if (writesDomain(Keys::getDomain(r->first)) ||
+          r->first == "time" ||
+          r->first == "cycle") {
         // Should we vis all tags or just the default tag?
         // -- write all tags
         // r->WriteVis(vis, nullptr);

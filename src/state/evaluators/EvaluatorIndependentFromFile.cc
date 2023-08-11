@@ -26,6 +26,8 @@
 
 namespace Amanzi {
 
+const std::string EvaluatorIndependentFromFile::name = "independent variable from file";
+
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------

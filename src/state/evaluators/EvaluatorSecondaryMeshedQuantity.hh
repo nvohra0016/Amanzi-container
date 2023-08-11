@@ -29,7 +29,7 @@ recalculated from the mesh each time.
 
 namespace Amanzi {
 
-template<class Function_type>
+template <template <AmanziMesh::Entity_kind> class Function_type>
 class EvaluatorSecondaryMeshedQuantity
   : public EvaluatorSecondary {
  public:
@@ -48,7 +48,8 @@ class EvaluatorSecondaryMeshedQuantity
     return Teuchos::rcp(new EvaluatorSecondaryMeshedQuantity(*this));
   }
 
-  virtual std::string getType() const override { return "meshed quantity evaluator"; }
+  static const std::string name;
+  virtual std::string getType() const override { return name; }
 
   virtual void EnsureCompatibility(State& S) override {
     if (!inited_) {
@@ -60,10 +61,8 @@ class EvaluatorSecondaryMeshedQuantity
 
       S.Require<CompositeVector,CompositeVectorSpace>(my_keys_[0].first,
               my_keys_[0].second, my_keys_[0].first)
-          .SetMesh(S.GetMesh(domain_))
-          ->SetComponent(AmanziMesh::to_string(Function_type::component),
-                         Function_type::component, 1)
-          ->SetGhosted(true);
+        .SetMesh(S.GetMesh(domain_));
+
       S.RequireEvaluator(Keys::getKey(domain_, "mesh"), my_keys_[0].second);
       inited_ = true;
     }
@@ -76,10 +75,20 @@ class EvaluatorSecondaryMeshedQuantity
   // Does the actual work to update the value in the state.
   // ---------------------------------------------------------------------------
   virtual void Update_(State& S) override {
-    auto mesh = Function_type::needs_3d ? S.GetMesh(domain3d_) : S.GetMesh(domain_);
+    auto mesh = Function_type<AmanziMesh::Entity_kind::CELL>::needs_3d ? S.GetMesh(domain3d_) : S.GetMesh(domain_);
     auto v = S.GetPtrW<CompositeVector>(my_keys_[0].first, my_keys_[0].second, my_keys_[0].first);
-    Function_type f(mesh.get(), v);
-    f.Compute();
+    for (const auto& comp : *v) {
+      if (comp == "cell") {
+        Function_type<AmanziMesh::Entity_kind::CELL> f(*mesh, v);
+        f.Compute();
+      } else if (comp == "face") {
+        Function_type<AmanziMesh::Entity_kind::FACE> f(*mesh, v);
+        f.Compute();
+      } else if (comp == "edge") {
+        Function_type<AmanziMesh::Entity_kind::EDGE> f(*mesh, v);
+        f.Compute();
+      }
+    }
   }
 
   virtual void UpdateDerivative_(State& S, const Key& wrt_key, const Tag& wrt_tag) override
@@ -93,127 +102,114 @@ class EvaluatorSecondaryMeshedQuantity
   Key domain3d_;
 
  private:
-  static Utils::RegisteredFactory<Evaluator, EvaluatorSecondaryMeshedQuantity<Function_type>> fac_;
+  static Utils::RegisteredFactory<Evaluator, EvaluatorSecondaryMeshedQuantity<Function_type>> reg_;
 };
 
 //
 // Provide limited scope to private data
 //
 namespace Impl {
-  struct CellVolume {
-    static const bool needs_3d = false;
-    CellVolume(const AmanziMesh::Mesh* mesh_,
-               Teuchos::RCP<CompositeVector>& v_)
-        : mesh(mesh_),
-          v(v_) {}
 
-    void Compute() {
-      auto vv = v->viewComponent("cell", false);
-      Kokkos::parallel_for(
-          "EvaluatorCellVolume",
-          vv.extent(0),
-          KOKKOS_LAMBDA(const int& c) {
-            vv(c,0) = mesh->getCellVolume(c);
-          });
-      Kokkos::fence();
-    }
+template <AmanziMesh::Entity_kind EK>
+struct Extent {
+  static const AmanziMesh::Entity_kind EntityKind = EK;
+  static const bool needs_3d = false;
 
-    const static AmanziMesh::Entity_kind component = AmanziMesh::Entity_kind::CELL;
+  Extent(const AmanziMesh::Mesh& mesh_,
+         Teuchos::RCP<CompositeVector>& v_)
+    : mesh(mesh_),
+      v(v_) {}
 
-    const AmanziMesh::Mesh* mesh;
-    Teuchos::RCP<CompositeVector> v;
-  };
+  void Compute() {
+    std::string compname = AmanziMesh::to_string(EntityKind);
+    auto vv = v->viewComponent(compname, false);
+    Kokkos::parallel_for(
+      "EvaluatorMeshedEntityExtent",
+      vv.extent(0),
+      KOKKOS_LAMBDA(const int c) {
+        vv(c,0) = mesh.getExtent<EntityKind>(c);
+      });
+  }
+
+  const AmanziMesh::Mesh& mesh;
+  Teuchos::RCP<CompositeVector> v;
+};
 
 
-  struct FaceArea {
-    static const bool needs_3d = false;
-    FaceArea(const AmanziMesh::Mesh* mesh_,
-               Teuchos::RCP<CompositeVector>& v_)
-        : mesh(mesh_),
-          v(v_) {}
+template <AmanziMesh::Entity_kind EK>
+struct Elevation {
+  static const AmanziMesh::Entity_kind EntityKind = EK;
+  static const bool needs_3d = true;
 
-    void Compute() {
-      auto vv = v->viewComponent("face", false);
-      Kokkos::parallel_for(
-          "EvaluatorFaceArea",
-          vv.extent(0),
-          KOKKOS_LAMBDA(const int& c) {
-            vv(c,0) = mesh->getFaceArea(c);
-          });
-    }
+  Elevation(const AmanziMesh::Mesh& mesh_,
+                Teuchos::RCP<CompositeVector>& v_)
+    : mesh(mesh_),
+      v(v_) {}
 
-    const static AmanziMesh::Entity_kind component = AmanziMesh::Entity_kind::FACE;
-    const AmanziMesh::Mesh* mesh;
-    Teuchos::RCP<CompositeVector> v;
-  };
+  void Compute() {
+    std::string compname = AmanziMesh::to_string(EntityKind);
+    auto vv = v->viewComponent(compname, false);
+    int d = mesh.getSpaceDimension()-1;
 
-  struct CellElevation {
-    static const bool needs_3d = true;
-    CellElevation(const AmanziMesh::Mesh* mesh_,
-               Teuchos::RCP<CompositeVector>& v_)
-        : mesh(mesh_),
-          v(v_) {}
+    Kokkos::parallel_for(
+      "EvaluatorMeshedEntityElevation",
+      vv.extent(0),
+      KOKKOS_LAMBDA(const int c) {
+        vv(c,0) = mesh.getCentroid<EntityKind>(c)[d];
+      });
+  }
 
-    void Compute() {
-      auto vv = v->viewComponent("cell", false);
-      int d = mesh->getSpaceDimension()-1;
+  const AmanziMesh::Mesh& mesh;
+  Teuchos::RCP<CompositeVector> v;
+};
 
-      Kokkos::parallel_for(
-          "EvaluatorCellElevation",
-          vv.extent(0),
-          KOKKOS_LAMBDA(const int& c) {
-            vv(c,0) = mesh->getCellCentroid(c)[d];
-          });
-    }
 
-    const static AmanziMesh::Entity_kind component = AmanziMesh::Entity_kind::CELL;
-    const AmanziMesh::Mesh* mesh;
-    Teuchos::RCP<CompositeVector> v;
-  };
+template <AmanziMesh::Entity_kind EK>
+struct SlopeMagnitude {
+  // only CELL is valid, but we need generality so we template it anyway
+  static const AmanziMesh::Entity_kind EntityKind = EK;
+  static const bool needs_3d = false;
 
-  struct SlopeMagnitude {
-    static const bool needs_3d = true;
-    SlopeMagnitude(const AmanziMesh::Mesh* mesh_,
-               Teuchos::RCP<CompositeVector>& v_)
-        : mesh(mesh_),
-          v(v_) {}
+  SlopeMagnitude(const AmanziMesh::Mesh& mesh_,
+                 Teuchos::RCP<CompositeVector>& v_)
+    : mesh(mesh_),
+      v(v_) {}
 
-    void Compute() {
-      auto vv = v->viewComponent("cell", false);
-      const AmanziMesh::Mesh* parent = mesh->getParentMesh().get();
+  void Compute() {
+    AMANZI_ASSERT(EntityKind == AmanziMesh::Entity_kind::CELL);
+    AMANZI_ASSERT(mesh.getParentMesh() != Teuchos::null);
 
-      if (parent->getSpaceDimension() == mesh->getSpaceDimension()) {
-        Kokkos::parallel_for(
-            "EvaluatorCellElevation",
-            vv.extent(0),
-            KOKKOS_LAMBDA(const int& c) {
-              // Now slope.
-              auto f = mesh->getEntityParent(AmanziMesh::Entity_kind::CELL,c);
-              AmanziGeometry::Point n = parent->getFaceNormal(f);
+    const AmanziMesh::Mesh& parent = *mesh.getParentMesh();
+    auto vv = v->viewComponent("cell", false);
 
-              // -- S = || n - (n dot z) z || / | n dot z |
-              vv(c,0) = sqrt(pow(n[0],2) + pow(n[1],2)) / fabs(n[2]);
+    Kokkos::parallel_for(
+      "EvaluatorMeshedCellSlopeMagnitude",
+      vv.extent(0),
+      KOKKOS_LAMBDA(const int& c) {
+        // Now slope.
+        auto f = mesh.getEntityParent(AmanziMesh::Entity_kind::CELL,c);
+        AmanziGeometry::Point n = parent.getFaceNormal(f);
 
-            });
-      } else if (parent->getSpaceDimension() == mesh->getSpaceDimension() + 1) {
-        throw("not yet implemented");
-      } else {
-        AMANZI_ASSERT(false);
-      }
-    }
+        // -- S = || n - (n dot z) z || / | n dot z |
+        vv(c,0) = sqrt(pow(n[0],2) + pow(n[1],2)) / fabs(n[2]);
+      });
+  }
 
-    const static AmanziMesh::Entity_kind component = AmanziMesh::Entity_kind::CELL;
-    const AmanziMesh::Mesh* mesh;
-    Teuchos::RCP<CompositeVector> v;
-  };
+  const AmanziMesh::Mesh& mesh;
+  Teuchos::RCP<CompositeVector> v;
+};
 
 
 } // namespace Impl
 
-using EvaluatorCellVolume = EvaluatorSecondaryMeshedQuantity<Impl::CellVolume>;
-using EvaluatorFaceArea = EvaluatorSecondaryMeshedQuantity<Impl::FaceArea>;
-using EvaluatorMeshElevation = EvaluatorSecondaryMeshedQuantity<Impl::CellElevation>;
+using EvaluatorCellVolume = EvaluatorSecondaryMeshedQuantity<Impl::Extent>;
+template<> const std::string EvaluatorCellVolume::name = "cell volume";
+
+using EvaluatorMeshElevation = EvaluatorSecondaryMeshedQuantity<Impl::Elevation>;
+template<> const std::string EvaluatorMeshElevation::name = "meshed elevation";
+
 using EvaluatorMeshSlopeMagnitude = EvaluatorSecondaryMeshedQuantity<Impl::SlopeMagnitude>;
+template<> const std::string EvaluatorMeshSlopeMagnitude::name = "meshed slope magnitude";
 
 
 

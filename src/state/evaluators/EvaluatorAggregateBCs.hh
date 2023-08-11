@@ -43,7 +43,8 @@ class EvaluatorAggregateBCs : public EvaluatorSecondary {
     AMANZI_ASSERT(false); // never called
   }
 
-  virtual std::string getType() const override { return "boundary condition aggregrator"; }
+  virtual std::string getType() const override { return name; }
+  static const std::string name;
 
  protected:
   bool inited_;

@@ -19,18 +19,19 @@
 #include "EvaluatorIndependentTensorFunction.hh"
 #include "EvaluatorIndependentPatchFunction.hh"
 #include "EvaluatorSecondaryMonotypeFromFunction.hh"
+#include "EvaluatorSecondaryMonotypeAdditive.hh"
 #include "EvaluatorPrimaryStaticMesh.hh"
 #include "EvaluatorSecondaryMeshedQuantity.hh"
 #include "EvaluatorAggregateBCs.hh"
 
+#include "registration_macro.hh"
+
 namespace Amanzi {
 
-Utils::RegisteredFactory<Evaluator, EvaluatorIndependentFunction>
-  EvaluatorIndependentFunction::fac_("independent variable");
-Utils::RegisteredFactory<Evaluator, EvaluatorIndependentFromFile>
-  EvaluatorIndependentFromFile::fac_("independent variable from file");
-Utils::RegisteredFactory<Evaluator, EvaluatorIndependentConstant>
-  EvaluatorIndependentConstant::fac_("independent variable constant");
+REGISTER(EvaluatorIndependentFunction);
+REGISTER(EvaluatorIndependentFromFile);
+REGISTER(EvaluatorIndependentConstant);
+
 Utils::RegisteredFactory<Evaluator, EvaluatorIndependentTensorFunction>
   EvaluatorIndependentTensorFunction::fac_("independent variable tensor");
 Utils::RegisteredFactory<Evaluator, EvaluatorIndependentPatchFunction>
@@ -39,22 +40,19 @@ Utils::RegisteredFactory<Evaluator, EvaluatorIndependentPatchFunction>
 Utils::RegisteredFactory<Evaluator, EvaluatorSecondaryMonotypeFromFunction>
   EvaluatorSecondaryMonotypeFromFunction::fac_("secondary variable from function");
 
+template<>
+REGISTER(EvaluatorSecondaryMonotypeAdditiveCV);
+
 Utils::RegisteredFactory<Evaluator, EvaluatorPrimaryStaticMesh>
   EvaluatorPrimaryStaticMesh::fac_("static mesh");
 
 
 template<>
-Utils::RegisteredFactory<Evaluator, EvaluatorCellVolume>
-  EvaluatorCellVolume::fac_("cell volume");
+REGISTER(EvaluatorCellVolume);
 template<>
-Utils::RegisteredFactory<Evaluator, EvaluatorFaceArea>
-  EvaluatorFaceArea::fac_("face area");
+REGISTER(EvaluatorMeshElevation);
 template<>
-Utils::RegisteredFactory<Evaluator, EvaluatorMeshElevation>
-  EvaluatorMeshElevation::fac_("meshed elevation");
-template<>
-Utils::RegisteredFactory<Evaluator, EvaluatorMeshSlopeMagnitude>
-  EvaluatorMeshSlopeMagnitude::fac_("meshed slope magnitude");
+REGISTER(EvaluatorMeshSlopeMagnitude);
 
 Utils::RegisteredFactory<Evaluator, EvaluatorAggregateBCs>
   EvaluatorAggregateBCs::fac_("boundary condition aggregator");

@@ -34,7 +34,6 @@ class Op_Cell_Cell : public Op {
     X.getComponent("cell", false)->update(1., *diag, 1.);
   }
 
-  
   virtual void ApplyMatrixFreeOp(const Operator* assembler,
           const CompositeVector& X, CompositeVector& Y) const {
     assembler->ApplyMatrixFreeOp(*this, X, Y);
@@ -51,20 +50,19 @@ class Op_Cell_Cell : public Op {
           int my_block_row, int my_block_col) const {
     assembler->AssembleMatrixOp(*this, map, mat, my_block_row, my_block_col);
   }
-  
+
   virtual void Rescale(const CompositeVector& scaling) {
-    assert(false);
-    #if 0 
     if (scaling.hasComponent("cell")) {
-      const Epetra_MultiVector& s_c = *scaling.viewComponent("cell", false);
-      AMANZI_ASSERT(s_c.MyLength() == diag->MyLength());
-      for (int k = 0; k != s_c.NumVectors(); ++k) {
-        for (int i = 0; i != s_c.MyLength(); ++i) {
-          (*diag)[k][i] *= s_c[0][i];
-        }
-      }
+      auto scaling_v = scaling.viewComponent("cell", false);
+      auto diag_v = diag->getLocalView<DefaultDevice>(Tpetra::Access::ReadWrite);
+      AMANZI_ASSERT(scaling_v.extent(0) == diag_v.extent(0));
+      AMANZI_ASSERT(scaling_v.extent(1) == diag_v.extent(1));
+      Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0,0}, {diag_v.extent(0), diag_v.extent(1)});
+      Kokkos::parallel_for("Op_Cell_Cell::Rescale", policy,
+                           KOKKOS_LAMBDA(const int& i, const int& j) {
+                             diag_v(i,j) *= scaling_v(i,j);
+                           });
     }
-    #endif 
   }
 };
 

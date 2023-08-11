@@ -40,11 +40,15 @@ MeshCache<MEM>::MeshCache(MeshCache<MEM_OTHER>& other)
 template<MemSpace_kind MEM>
 void MeshCache<MEM>::setParentMesh(const Teuchos::RCP<const MeshCache>& parent)
 {
-  if (parent_ != Teuchos::null && parent_ != parent) {
-    Errors::Message msg("MeshCache::setParentMesh given conflicting parent mesh.");
-    Exceptions::amanzi_throw(msg);
+  if (parent_ != Teuchos::null) {
+    if (parent_ != parent) {
+      Errors::Message msg("MeshCache::setParentMesh given conflicting parent mesh.");
+      Exceptions::amanzi_throw(msg);
+    }
+  } else {
+    parent_ = parent;
+    cacheParentEntities();
   }
-  parent_ = parent;
 }
 
 template<MemSpace_kind MEM>
@@ -280,6 +284,63 @@ MeshCache<MEM>::getCentroid(const Entity_kind kind, const Entity_ID ent) const {
   }
   return AmanziGeometry::Point();
 }
+
+
+template<MemSpace_kind MEM>
+template<Entity_kind EK, AccessPattern_kind AP>
+KOKKOS_INLINE_FUNCTION
+AmanziGeometry::Point
+MeshCache<MEM>::getCentroid(const Entity_ID ent) const {
+  if constexpr(EK == Entity_kind::CELL) {
+    return getCellCentroid<AP>(ent);
+  } else if constexpr(EK == Entity_kind::FACE) {
+      return getFaceCentroid<AP>(ent);
+  } else if constexpr(EK == Entity_kind::EDGE) {
+      return getEdgeCentroid<AP>(ent);
+  } else if constexpr(EK == Entity_kind::NODE) {
+      return getNodeCoordinate<AP>(ent);
+  }
+  AMANZI_ASSERT(false);
+  return AmanziGeometry::Point();
+}
+
+
+template<MemSpace_kind MEM>
+template<AccessPattern_kind AP>
+KOKKOS_INLINE_FUNCTION
+double
+MeshCache<MEM>::getExtent(const Entity_kind kind, const Entity_ID ent) const {
+  switch(kind) {
+    case (Entity_kind::CELL) :
+      return getCellVolume<AP>(ent);
+    case (Entity_kind::FACE) :
+      return getFaceArea<AP>(ent);
+    case (Entity_kind::EDGE) :
+      return getEdgeLength<AP>(ent);
+    default :
+      AMANZI_ASSERT(false);
+  }
+  return -1.0;
+}
+
+
+template<MemSpace_kind MEM>
+template<Entity_kind EK, AccessPattern_kind AP>
+KOKKOS_INLINE_FUNCTION
+double
+MeshCache<MEM>::getExtent(const Entity_ID ent) const {
+  if constexpr(EK == Entity_kind::CELL) {
+    return getCellVolume<AP>(ent);
+  } else if constexpr(EK == Entity_kind::FACE) {
+      return getFaceArea<AP>(ent);
+  } else if constexpr(EK == Entity_kind::EDGE) {
+      return getEdgeLength<AP>(ent);
+  }
+  AMANZI_ASSERT(false);
+  return -1.0;
+}
+
+
 
 //===================
 //    getFace*
@@ -1671,6 +1732,31 @@ void MeshCache<MEM>::cacheNodeCoordinates()
   } catch(Errors::FrameworkNotImplemented) {}
 }
 
+// parent entities
+template<MemSpace_kind MEM>
+void MeshCache<MEM>::cacheParentEntities()
+{
+  if (data_.parent_entities_cached) return;
+  try {
+    assert(framework_mesh_.get());
+    // NOTE -- need better granularity -- do not wish to cache parent edges or
+    // nodes!
+    data_.parent_cells.resize(ncells_all);
+    for (Entity_ID i=0; i!=ncells_all; ++i) {
+      view<MemSpace_kind::HOST>(data_.parent_cells)[i] = framework_mesh_->getEntityParent(AmanziMesh::Entity_kind::CELL, i);
+    }
+    Kokkos::deep_copy(data_.parent_cells.d_view, data_.parent_cells.h_view);
+
+    data_.parent_faces.resize(nfaces_all);
+    for (Entity_ID i=0; i!=nfaces_all; ++i) {
+      view<MemSpace_kind::HOST>(data_.parent_faces)[i] = framework_mesh_->getEntityParent(AmanziMesh::Entity_kind::FACE, i);
+    }
+    Kokkos::deep_copy(data_.parent_faces.d_view, data_.parent_faces.h_view);
+
+    data_.parent_entities_cached = true;
+  } catch(Errors::FrameworkNotImplemented) {}
+}
+
 // // Note that regions are cached on demand the first time they are requested,
 // // but labeled sets must be pre-cached if the framework mesh is to be
 // // destroyed.
@@ -1734,7 +1820,29 @@ MeshCache<MEM>::getEntityParent(const Entity_kind kind, const Entity_ID entid) c
 }
 
 template<MemSpace_kind MEM>
-bool 
+typename MeshCache<MEM>::cEntity_ID_View
+MeshCache<MEM>::getEntityParents(const Entity_kind kind) const
+{
+  AMANZI_ASSERT(data_.parent_entities_cached);
+  switch(kind) {
+    case Entity_kind::CELL:
+      return view<MEM>(data_.parent_cells);
+      break;
+    case Entity_kind::FACE:
+      return view<MEM>(data_.parent_faces);
+      break;
+    case Entity_kind::EDGE:
+      return view<MEM>(data_.parent_edges);
+      break;
+    case Entity_kind::NODE:
+      return view<MEM>(data_.parent_nodes);
+    default: {}
+  }
+  return MeshCache<MEM>::cEntity_ID_View();
+}
+
+template<MemSpace_kind MEM>
+bool
 MeshCache<MEM>::isPointInCell(const AmanziGeometry::Point& p, const Entity_ID cellid) const
 {
 

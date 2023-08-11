@@ -19,6 +19,8 @@
 
 namespace Amanzi {
 
+const std::string EvaluatorIndependentFunction::name = "independent variable";
+
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------

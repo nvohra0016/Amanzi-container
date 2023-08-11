@@ -387,8 +387,8 @@ struct MeshCache : public MeshCacheBase {
   void cacheNodeEdges();
   void cacheNodeCoordinates();
 
-  // // Parent entities may need to be cached too
-  // void cacheParentEntities();
+  // Parent entities may need to be cached too
+  void cacheParentEntities();
 
   // // Note that regions are cached on demand the first time they are requested,
   // // but labeled sets must be pre-cached if the framework mesh is to be
@@ -537,6 +537,9 @@ struct MeshCache : public MeshCacheBase {
   KOKKOS_INLINE_FUNCTION
   Entity_ID getEntityParent(const Entity_kind kind, const Entity_ID entid) const;
 
+  cEntity_ID_View
+  getEntityParents(const Entity_kind kind) const;
+
   KOKKOS_INLINE_FUNCTION
   Cell_kind getCellType(const Entity_ID c) const;
 
@@ -609,9 +612,15 @@ struct MeshCache : public MeshCacheBase {
   KOKKOS_INLINE_FUNCTION
   AmanziGeometry::Point getEdgeCentroid(const Entity_ID e) const;
 
+  // at run-time, calls one of get*Centroid
   template<AccessPattern_kind = AccessPattern_kind::DEFAULT>
   KOKKOS_INLINE_FUNCTION
   AmanziGeometry::Point getCentroid(const Entity_kind kind, const Entity_ID ent) const;
+
+  // at compile-time, calls one of get*Centroid
+  template<Entity_kind, AccessPattern_kind = AccessPattern_kind::DEFAULT>
+  KOKKOS_INLINE_FUNCTION
+  AmanziGeometry::Point getCentroid(const Entity_ID ent) const;
 
   // extent
   template<AccessPattern_kind AP = AccessPattern_kind::DEFAULT>
@@ -625,6 +634,14 @@ struct MeshCache : public MeshCacheBase {
   template<AccessPattern_kind = AccessPattern_kind::DEFAULT>
   KOKKOS_INLINE_FUNCTION
   double getEdgeLength(const Entity_ID e) const;
+
+  // at run-time, calls one of getCellVolume, getFaceArea, or getEdgeLength
+  template<Entity_kind EK, AccessPattern_kind AP = AccessPattern_kind::DEFAULT>
+  double getExtent(const Entity_ID e) const;
+
+  // at compile-time, calls one of getCellVolume, getFaceArea, or getEdgeLength
+  template<AccessPattern_kind AP = AccessPattern_kind::DEFAULT>
+  double getExtent(const Entity_kind kind, const Entity_ID e) const;
 
   // // Normal vector of a face
   template<AccessPattern_kind = AccessPattern_kind::DEFAULT>

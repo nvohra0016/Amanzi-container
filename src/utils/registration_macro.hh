@@ -1,4 +1,7 @@
-#define REGISTER(c)  \
+#define REGISTER(c) \
+  Utils::RegisteredFactory<Evaluator, c> c::reg_(c::name)
+
+#define REGISTER_MODEL(c) \
   template<> Utils::RegisteredFactory<Evaluator, EvaluatorModelCV<c,DefaultDevice>> EvaluatorModelCV<c,DefaultDevice>::reg_(c<cView_type,View_type>::name)
 
 

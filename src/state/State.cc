@@ -381,16 +381,27 @@ State::RequireEvaluator(const Key& key, const Tag& tag)
     return *evaluator;
   }
 
-  // is it cell volume?
+  // is it a meshed quantity?
+  // recursive calls will result in the above, HasEvaluatorList() branch being taken.
   if (Keys::getVarName(key) == "cell_volume") {
     Teuchos::ParameterList& cv_list = GetEvaluatorList(key);
     cv_list.set("evaluator type", "cell volume");
-    // recursive call will result in the above, HasEvaluatorList() branch being taken.
+    return RequireEvaluator(key, tag);
+  } else if (Keys::getVarName(key) == "face_area") {
+    Teuchos::ParameterList& cv_list = GetEvaluatorList(key);
+    cv_list.set("evaluator type", "face area");
+    return RequireEvaluator(key, tag);
+  } else if (Keys::getVarName(key) == "elevation") {
+    Teuchos::ParameterList& cv_list = GetEvaluatorList(key);
+    cv_list.set("evaluator type", "meshed elevation");
+    return RequireEvaluator(key, tag);
+  } else if (Keys::getVarName(key) == "slope_magnitude") {
+    Teuchos::ParameterList& cv_list = GetEvaluatorList(key);
+    cv_list.set("evaluator type", "meshed slope magnitude");
     return RequireEvaluator(key, tag);
   } else if (Keys::getVarName(key) == "mesh") {
     Teuchos::ParameterList& eval_list = GetEvaluatorList(key);
     eval_list.set("evaluator type", "static mesh");
-    // recursive call will result in the above, HasEvaluatorList() branch being taken.
     return RequireEvaluator(key, tag);
   }
 
@@ -502,6 +513,10 @@ State::Setup()
   // Note that the first pass may modify the graph, but since it is a DAG, and
   // this is called recursively, we can just call it on the nodes that appear
   // initially.
+  //
+  // NOTE: Need to add a check for loops as this DAG is created, otherwise the
+  // user can create a loop in the input file that will seg-fault the
+  // code. --ETC
   { // scope for copy
     EvaluatorMap evaluators_copy(evaluators_);
     for (auto& e : evaluators_copy) {
