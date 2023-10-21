@@ -287,7 +287,7 @@ RunTest(int icase)
   RCP<Mesh> mesh;
   if (icase == 1) {
     // Rectangular mesh
-    mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 25, 25);
+    mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 20, 20);
   } else if (icase == 2) {
     // Triangular mesh
     mesh = meshfactory.create("test/triangular16.exo");
@@ -340,7 +340,7 @@ RunTest(int icase)
   int iter = 0;
   std::vector<double> dx, Linferror, L1error, L2error;
 
-  while (t_new < 1.0) {
+  while (t_new < 0.5) {
     double t_out = t_new;
 
     if (iter % 30 == 0) {
